@@ -214,3 +214,27 @@ __marimo__/
 
 # Streamlit
 .streamlit/secrets.toml
+
+# .gitignore
+# Node
+node_modules/
+npm-debug.log*
+pnpm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Next
+.next/
+out/
+.next-static/
+.next/cache/
+
+# Env
+.env
+.env.*
+!.env.example
+
+# Misc
+.DS_Store
+dist/
+coverage/
