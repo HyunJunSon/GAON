@@ -214,3 +214,21 @@ __marimo__/
 
 # Streamlit
 .streamlit/secrets.toml
+
+
+
+# Env
+.env
+.env.*
+!.env.example
+
+# Misc
+.DS_Store
+dist/
+coverage/
+*.pem
+
+# See https://help.github.com/articles/ignoring-files/ for more about ignoring files.
+
+# vscode
+settings.json
