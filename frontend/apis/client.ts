@@ -1,3 +1,5 @@
+import { authStorage } from "@/utils/authStorage";
+
 /**
  * 공통 fetch 래퍼
  * - BASE_URL + path 결합
@@ -14,6 +16,12 @@ export async function apiFetch<T>(
 ): Promise<T> {
   const url = `${BASE_URL}${path}`;
   const headers = new Headers(options.headers);
+
+  // 토큰이 있다면 Authorization 헤더 주입
+  const token = authStorage.get();
+  if (token && !headers.has('Authorization')) {
+    headers.set('Authorization', `Bearer ${token}`);
+  }
 
   // JSON 요청 자동 처리
   if (options.json != undefined) {

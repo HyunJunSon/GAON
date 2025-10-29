@@ -4,23 +4,36 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { SignupSchema, type SignupInput } from "@/schemas/validators/auth";
 import { useState } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
+import { useSignup } from "@/hooks/useAuth";
 
 export default function SignupPage() {
+  const router = useRouter();
+  const { mutate, isPending, isError, error } = useSignup();
   const [submitting, setSubmitting] = useState(false);
   const { register, handleSubmit, formState: { errors }} = useForm<SignupInput>({
     resolver: zodResolver(SignupSchema),
     mode: 'onChange'
   })
   const onSubmit = async (data: SignupInput) => {
-    try {
-      setSubmitting(true);
-      await new Promise((r) => setTimeout(r, 800));
-      alert(`가입 성공 (mock)\n환영합니다, ${data.name}님!`);
-    } catch (e) {
-      alert('가입 실패 (mock)');
-    } finally {
-      setSubmitting(false);
-    }
+    // try {
+    //   setSubmitting(true);
+    //   await new Promise((r) => setTimeout(r, 800));
+    //   alert(`가입 성공 (mock)\n환영합니다, ${data.name}님!`);
+    // } catch (e) {
+    //   alert('가입 실패 (mock)');
+    // } finally {
+    //   setSubmitting(false);
+    // }
+    mutate(
+      { name: data.name, email: data.email, password: data.password },
+      {
+        onSuccess: () => {
+          // 가입 성공 후: 홈으로 이동하거나 /login 으로 유도
+          router.replace('/login');
+        },
+      }
+    );
   };
 
   return (

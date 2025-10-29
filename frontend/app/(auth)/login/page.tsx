@@ -4,8 +4,12 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { LoginSchema, type LoginInput } from '@/schemas/validators/auth';
 import { useState } from 'react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
+import { useLogin } from '@/hooks/useAuth';
 
 export default function LoginPage() {
+  const router = useRouter();
+  const { mutate, isPending, isError, error } = useLogin();
   const [submitting, setSubmitting] = useState(false);
   const { register, handleSubmit, formState: { errors }} = useForm<LoginInput>({
     resolver: zodResolver(LoginSchema),
@@ -13,15 +17,24 @@ export default function LoginPage() {
   })
   // 지금은 목업: 실제 API 연동 전까지 setTimeout으로 성공/실패 UX 확인
   const onSubmit = async (data: LoginInput) => {
-    try {
-      setSubmitting(true);
-      await new Promise((r) => setTimeout(r, 800))
-      alert(`로그인 성공 (mock)\nemail: ${data.email}`)
-    } catch (e) {
-      alert('로그인 실패 (mock)')
-    } finally {
-      setSubmitting(false);
-    }
+    // try {
+    //   setSubmitting(true);
+    //   await new Promise((r) => setTimeout(r, 800))
+    //   alert(`로그인 성공 (mock)\nemail: ${data.email}`)
+    // } catch (e) {
+    //   alert('로그인 실패 (mock)')
+    // } finally {
+    //   setSubmitting(false);
+    // }
+    mutate(
+      { email: data.email, password: data.password },
+      {
+        onSuccess: () => {
+          // 로그인 성공 후 이동(필요에 맞게 경로 조정)
+          router.replace('/');
+        },
+      }
+    )
   }
   return (
     <main className="mx-auto max-w-md p-6">
