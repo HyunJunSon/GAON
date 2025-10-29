@@ -1,0 +1,60 @@
+name: 🐞 버그 / 이슈 보고서
+description: 발견한 버그나 문제를 보고할 때 사용하세요.
+title: "[버그] 제목을 간결하게 작성해주세요"
+labels: ["bug"]
+body:
+  - type: input
+    id: title
+    attributes:
+      label: 📝 제목
+      description: 간결하고 명확하게 한 줄로 요약 (예: "로그인 폼에서 비밀번호 유효성 검사 오류")
+      placeholder: "예: 회원가입 시 이메일 인증 실패"
+
+  - type: textarea
+    id: summary
+    attributes:
+      label: 📍 내용 요약
+      description: 어떤 문제나 요청인지 간략히 설명해주세요.
+      placeholder: "무엇이 문제인지 또는 어떤 기능을 요청하는지 간단히 적어주세요."
+
+  - type: textarea
+    id: reproduce
+    attributes:
+      label: ✅ 재현 방법
+      description: 버그가 발생한 과정을 순서대로 작성해주세요.
+      placeholder: |
+        1. 로그인 페이지 접속
+        2. 비밀번호 입력 후 로그인 버튼 클릭
+        3. 오류 발생
+
+  - type: textarea
+    id: expected
+    attributes:
+      label: 💡 기대 동작
+      description: 정상적으로라면 어떤 결과가 나와야 하는지 적어주세요.
+      placeholder: "예: 로그인 성공 후 대시보드로 이동해야 함"
+
+  - type: textarea
+    id: actual
+    attributes:
+      label: 🧪 실제 동작
+      description: 실제로 어떤 문제가 발생했는지 설명해주세요. (스크린샷, 콘솔 로그 첨부 가능)
+      placeholder: "예: 콘솔에서 500 에러 발생 / UI 깨짐"
+
+  - type: textarea
+    id: environment
+    attributes:
+      label: 📦 환경 정보
+      description: 문제가 발생한 환경을 적어주세요.
+      placeholder: |
+        OS: macOS 15.6.1
+        Browser / Version: Chrome 129
+        Branch: main
+        기타: 로컬 Docker 환경
+
+  - type: input
+    id: related
+    attributes:
+      label: 🗂 관련 항목
+      description: 관련된 PR이나 이슈가 있다면 적어주세요.
+      placeholder: "#42, #77"
