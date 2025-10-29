@@ -1,3 +1,4 @@
+<<<<<<< Updated upstream
 # GAON
 
 ## Automatic Environment Activation
@@ -54,3 +55,5 @@ direnv allow
 Then the environment will be automatically activated when you enter the directory.
 
 # this is test for changing my id
+=======
+>>>>>>> Stashed changes
