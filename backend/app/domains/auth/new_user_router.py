@@ -63,3 +63,30 @@ def new_delete_user_api(user_delete: NewUserDelete, current_user: User = Depends
     
     new_delete_user(db, current_user)
     auth_logger.info(f"회원 탈퇴 성공: {current_user.email}")
+
+
+@new_auth_router.patch("/user", status_code=status.HTTP_204_NO_CONTENT)
+def new_update_user_api(user_update: NewUserUpdate, current_user: User = Depends(new_get_current_user), db: Session = Depends(get_db)):
+    auth_logger.info(f"회원 정보 업데이트 시도: {current_user.email}")
+
+    # 현재 비밀번호 확인
+    if not user_crud.pwd_context.verify(user_update.current_password.encode('utf-8'), current_user.password):
+        auth_logger.warning(f"회원 정보 업데이트 실패: 현재 비밀번호 불일치 - {current_user.email}")
+        raise InvalidCredentialsException()
+
+    # 새 비밀번호가 제공된 경우 업데이트
+    if user_update.new_password:
+        new_update_user_password(db, current_user, user_update.new_password)
+        auth_logger.info(f"사용자 비밀번호 업데이트 완료: {current_user.email}")
+
+    # 새 이메일이 제공된 경우 업데이트
+    if user_update.email and user_update.email != current_user.email:
+        # 새 이메일이 이미 존재하는지 확인
+        existing_user = new_get_user_by_email(db, user_update.email)
+        if existing_user and existing_user.id != current_user.id:
+            auth_logger.warning(f"회원 정보 업데이트 실패: 이미 존재하는 이메일 - {user_update.email}")
+            raise UserAlreadyExistsException()
+        new_update_user_email(db, current_user, user_update.email)
+        auth_logger.info(f"사용자 이메일 업데이트 완료: {current_user.email}")
+
+    auth_logger.info(f"회원 정보 업데이트 성공: {current_user.email}")

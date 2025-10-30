@@ -59,3 +59,17 @@ def new_authenticate_user(db: Session, email: str, password: str) -> Optional[Us
         return None
     auth_logger.info(f"사용자 인증 성공: {email}")
     return user
+
+def new_update_user_password(db: Session, user: User, new_password: str):
+    auth_logger.info(f"사용자 비밀번호 업데이트 시작: {user.email}")
+    user.password = pwd_context.hash(new_password.encode('utf-8'))
+    db.add(user)
+    db.commit()
+    auth_logger.info(f"사용자 비밀번호 업데이트 완료: {user.email}")
+
+def new_update_user_email(db: Session, user: User, new_email: str):
+    auth_logger.info(f"사용자 이메일 업데이트 시작: {user.email}")
+    user.email = new_email
+    db.add(user)
+    db.commit()
+    auth_logger.info(f"사용자 이메일 업데이트 완료: {user.email}")

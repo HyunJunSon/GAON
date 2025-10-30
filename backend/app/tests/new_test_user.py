@@ -237,3 +237,165 @@ def test_new_delete_user_fail_unauthenticated(client, db_session, setup_new_test
 
     db_user = db_session.query(user_models.User).filter(user_models.User.email == email).first()
     assert db_user is not None
+
+def test_new_update_user_password_success(client, db_session, setup_new_test_user):
+    """새로운 사용자 비밀번호 업데이트 성공 테스트"""
+    email, password = setup_new_test_user
+    new_password = "NewPass1!"
+
+    login_response = client.post(
+        "/api/new_auth/login",
+        data={
+            "username": email,
+            "password": password
+        }
+    )
+    assert login_response.status_code == 200
+    access_token = login_response.json()["access_token"]
+
+    update_response = client.patch(
+        "/api/new_auth/user",
+        headers={
+            "Authorization": f"Bearer {access_token}"
+        },
+        json={
+            "current_password": password,
+            "new_password": new_password
+        }
+    )
+    assert update_response.status_code == 204
+
+    updated_user = db_session.query(user_models.User).filter(user_models.User.email == email).first()
+    assert updated_user is not None
+    assert pwd_context.verify(new_password.encode('utf-8'), updated_user.password)
+
+
+def test_new_update_user_email_success(client, db_session, setup_new_test_user):
+    """새로운 사용자 이메일 업데이트 성공 테스트"""
+    email, password = setup_new_test_user
+    new_email = "new_email@example.com"
+
+    login_response = client.post(
+        "/api/new_auth/login",
+        data={
+            "username": email,
+            "password": password
+        }
+    )
+    assert login_response.status_code == 200
+    access_token = login_response.json()["access_token"]
+
+    update_response = client.patch(
+        "/api/new_auth/user",
+        headers={
+            "Authorization": f"Bearer {access_token}"
+        },
+        json={
+            "current_password": password,
+            "email": new_email
+        }
+    )
+    assert update_response.status_code == 204
+
+    updated_user = db_session.query(user_models.User).filter(user_models.User.email == new_email).first()
+    assert updated_user is not None
+    assert updated_user.email == new_email
+
+
+def test_new_update_user_fail_wrong_password(client, db_session, setup_new_test_user):
+    """새로운 사용자 업데이트 실패 (잘못된 비밀번호) 테스트"""
+    email, _ = setup_new_test_user
+    new_password = "NewPass1!"
+
+    login_response = client.post(
+        "/api/new_auth/login",
+        data={
+            "username": email,
+            "password": "password123!"
+        }
+    )
+    assert login_response.status_code == 200
+    access_token = login_response.json()["access_token"]
+
+    update_response = client.patch(
+        "/api/new_auth/user",
+        headers={
+            "Authorization": f"Bearer {access_token}"
+        },
+        json={
+            "current_password": "wrongpassword",
+            "new_password": new_password
+        }
+    )
+    assert update_response.status_code == 401
+    assert update_response.json() == {"detail": "잘못된 자격 증명입니다."}
+
+    # 비밀번호가 변경되지 않았는지 확인
+    user_after_attempt = db_session.query(user_models.User).filter(user_models.User.email == email).first()
+    assert user_after_attempt is not None
+    assert pwd_context.verify("password123!".encode('utf-8'), user_after_attempt.password)
+
+
+def test_new_update_user_fail_duplicate_email(client, db_session, setup_new_test_user):
+    """새로운 사용자 업데이트 실패 (중복 이메일) 테스트"""
+    email, password = setup_new_test_user
+    
+    # 두 번째 사용자 생성
+    second_user_email = "second_user@example.com"
+    second_user_password = "SecondPass1!"
+    second_user_data = {
+        "name": "seconduser",
+        "password": second_user_password,
+        "confirmPassword": second_user_password,
+        "email": second_user_email
+    }
+    new_create_user(db=db_session, user_create=NewUserCreate(**second_user_data))
+
+    login_response = client.post(
+        "/api/new_auth/login",
+        data={
+            "username": email,
+            "password": password
+        }
+    )
+    assert login_response.status_code == 200
+    access_token = login_response.json()["access_token"]
+
+    update_response = client.patch(
+        "/api/new_auth/user",
+        headers={
+            "Authorization": f"Bearer {access_token}"
+        },
+        json={
+            "current_password": password,
+            "email": second_user_email  # 이미 존재하는 이메일로 변경 시도
+        }
+    )
+    assert update_response.status_code == 409
+    assert update_response.json() == {"detail": "이미 존재하는 사용자입니다."}
+
+    # 이메일이 변경되지 않았는지 확인
+    user_after_attempt = db_session.query(user_models.User).filter(user_models.User.email == email).first()
+    assert user_after_attempt is not None
+    assert user_after_attempt.email == email
+
+
+def test_new_update_user_fail_unauthenticated(client, db_session, setup_new_test_user):
+    """새로운 사용자 업데이트 실패 (인증되지 않음) 테스트""" 
+    email, password = setup_new_test_user
+    new_password = "NewPass1!"
+
+    update_response = client.patch(
+        "/api/new_auth/user",
+        json={
+            "current_password": password,
+            "new_password": new_password
+        }
+    )
+    assert update_response.status_code == 401
+    assert update_response.json() == {"detail": "Not authenticated"}
+
+    # 비밀번호가 변경되지 않았는지 확인
+    user_after_attempt = db_session.query(user_models.User).filter(user_models.User.email == email).first()
+    assert user_after_attempt is not None
+    assert pwd_context.verify(password.encode('utf-8'), user_after_attempt.password)
