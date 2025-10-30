@@ -13,7 +13,6 @@ data: oh_eunyoung.txt, family_dialogues.json
 
 <details>
 <summary>Embedding</summary>
-```
 목적: text-embedding-3-large 가 “의미 유사도 검색”에 적합한지 확인 (= 결과적으로 Retriever 품질로 드러남)
 
 테스트 방식
@@ -28,7 +27,6 @@ data: oh_eunyoung.txt, family_dialogues.json
 <pre>deepeval test run tests/test_embedding_retriever.py -v
 *** </pre>
 
-```
 </details>
 
 <details>
