@@ -24,8 +24,7 @@ data: oh_eunyoung.txt, family_dialogues.json
 파일: tests/test_embedding_retriever.py
 
 실행:
-<pre>deepeval test run tests/test_embedding_retriever.py -v
-*** </pre>
+<pre>deepeval test run tests/test_embedding_retriever.py -v</pre>
 
 </details>
 
