@@ -26,12 +26,8 @@ jobs:
           TODAY_KST=$(TZ=Asia/Seoul date +%m.%d)
           TITLE="${TODAY_KST} Daily Log"
 
-          # 1) prevent duplicate issue
-          Q=$(python3 - <<'PY'
-import urllib.parse as u
-print(u.quote("${TITLE}"))
-PY
-)
+          # 1) prevent duplicate issue (URL-encode the title)
+          Q=$(python3 -c "import urllib.parse,sys; print(urllib.parse.quote(sys.argv[1]))" "$TITLE")
           EXIST=$(curl -s -H "Authorization: token $TOKEN" \
             "$GITEA_BASE/api/v1/repos/$REPO/issues/search?q=${Q}&limit=1" \
             | jq -r '.total_count // .issues|length // 0')
