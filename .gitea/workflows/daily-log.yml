@@ -1,0 +1,49 @@
+name: create-daily-log
+on:
+  schedule:
+    # UTC 기준: Sun–Thu 23:30 → KST 기준: Mon–Fri 08:30
+    - cron: "30 23 * * 0-4"
+  workflow_dispatch:
+
+jobs:
+  create:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Create Daily Log issue
+        env:
+          GITEA_BASE: http://dev.wyhil.com:43000     # ✅ 실제 Gitea 주소로 변경
+          REPO: SG-OHA-2025-TEAM-04/GAON             # ✅ 실제 조직/레포 이름으로 변경
+          TOKEN: ${{ secrets.DAILY_LOG_TOKEN }}      # ✅ Secrets 이름 맞추기
+        run: |
+          set -e
+          TODAY_KST=$(TZ=Asia/Seoul date +%m.%d)    # 예: 10.31
+          ISO_WEEK=$(TZ=Asia/Seoul date +%V)        # 주차 계산
+          TITLE="${TODAY_KST} Daily Log"
+
+          # ---- 중복 생성 방지 ----
+          QUERY=$(python3 - <<PY
+import urllib.parse as u; print(u.quote("${TITLE}"))
+PY
+)
+          EXISTS=$(curl -s -H "Authorization: token $TOKEN" \
+            "$GITEA_BASE/api/v1/repos/$REPO/issues/search?q=${QUERY}&limit=1" \
+            | jq -r '.total_count // .issues|length // 0')
+          if [ "${EXISTS}" != "0" ]; then
+            echo "✅ '${TITLE}' already exists. Skip creating duplicate."
+            exit 0
+          fi
+
+          # ---- 이슈 생성 요청 (템플릿 적용) ----
+          PAYLOAD=$(jq -n \
+            --arg title "$TITLE" \
+            --arg body "" \
+            --argjson labels '["type:daily-log"]' \
+            --argjson assignees '["edgar_kim","ahnseoyeon","sojy001","zorba"]' \
+            '{title:$title, body:$body, labels:$labels, assignees:$assignees}')
+
+          curl -s -X POST "$GITEA_BASE/api/v1/repos/$REPO/issues" \
+            -H "Authorization: token $TOKEN" \
+            -H "Content-Type: application/json" \
+            -d "$PAYLOAD"
+
+          echo "🎉 Created '${TITLE}' successfully!"
