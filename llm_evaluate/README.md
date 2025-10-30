@@ -4,7 +4,8 @@ Embedding-> Retriever -> Generator -> Judge/Evaluator -> Formatter -> Simulator
 
 <details>
 <summary>setup</summary>
-<pre> ```bash pip install -U deepeval openai langchain chromadb export OPENAI_API_KEY=sk-*** ``` </pre>
+<pre> pip install -U deepeval openai langchain chromadb
+export OPENAI_API_KEY=sk-*** </pre>
 </details>
 
 <details>
