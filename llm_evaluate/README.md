@@ -6,6 +6,9 @@ Embedding-> Retriever -> Generator -> Judge/Evaluator -> Formatter -> Simulator
 <summary>setup</summary>
 <pre>pip install -U deepeval openai langchain chromadb
 export OPENAI_API_KEY=sk-*** </pre>
+
+data: oh_eunyoung.txt, family_dialogues.json
+
 </details>
 
 <details>
