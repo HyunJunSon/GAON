@@ -13,6 +13,7 @@ export OPENAI_API_KEY=sk-***
 <details>
 <summary>Embedding</summary>
 ```
+d
 ```
 </details>
 
