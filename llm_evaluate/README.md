@@ -12,7 +12,8 @@ export OPENAI_API_KEY=sk-***
 
 <details>
 <summary>Embedding</summary>
-
+```
+```
 </details>
 
 
