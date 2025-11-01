@@ -2,6 +2,10 @@
 
 GAON(가족의온도) 프로젝트입니다.
 
+## ERD (Entity Relationship Diagram)
+
+[ERD Cloud 링크](https://www.erdcloud.com/d/iitcrpXWjTZSgzcdN)
+
 ## 설정 방법
 
 이 프로젝트는 설정 값을 `.env` 파일을 통해 관리합니다. 프로젝트 루트 디렉터리에 `.env` 파일을 생성하고, 다음 예시와 같이 필요한 환경 변수들을 정의해주세요:
