@@ -135,3 +135,8 @@ __pypackages__/
 
 # Alembic configuration (contains database connection info)
 alembic.ini
+gaon-venv/
+gaon.egg-info/
+
+# gcp 서비스계정 파일
+gcp_service_account_key.json
