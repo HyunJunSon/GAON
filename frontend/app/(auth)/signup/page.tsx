@@ -6,45 +6,29 @@ import { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useSignup } from "@/hooks/useAuth";
+import { useServerError } from "@/hooks/useServerError";
+import ErrorAlert from "@/components/ui/ErrorAlert";
 
 export default function SignupPage() {
   const router = useRouter();
   const { mutate, isPending, isError, error } = useSignup();
-  const [serverError, setServerError] = useState<string | null>(null);
+  const { serverError, handleError, clearError } = useServerError()
   const [submitting, setSubmitting] = useState(false);
   const { register, handleSubmit, formState: { errors }} = useForm<SignupInput>({
     resolver: zodResolver(SignupSchema),
     mode: 'onChange'
   })
   const onSubmit = async (data: SignupInput) => {
-    // try {
-    //   setSubmitting(true);
-    //   await new Promise((r) => setTimeout(r, 800));
-    //   alert(`가입 성공 (mock)\n환영합니다, ${data.name}님!`);
-    // } catch (e) {
-    //   alert('가입 실패 (mock)');
-    // } finally {
-    //   setSubmitting(false);
-    // }
     mutate(
       { name: data.name, email: data.email, password: data.password, confirmPassword: data.confirmPassword },
       {
         onSuccess: () => {
+          // 성공 시 서버 에러 초기화
+          clearError();
           // 가입 성공 후: 홈으로 이동하거나 /login 으로 유도
           router.replace('/login');
         },
-        onError: (e: unknown) => {
-          // ✅ 서버에서 내려준 { message } 우선 사용, 없으면 기본 문구
-          let message = '회원가입에 실패했습니다. \n이메일/비밀번호를 확인하거나 잠시 후 다시 시도해주세요.';
-
-          if (e instanceof Error) {
-            message = e.message;
-          } else if (typeof e === 'object' && e && 'message' in e) {
-            message = String((e as { message?: string }).message);
-          }
-
-          setServerError(message);
-        },
+        onError: handleError,
       }
     );
   };
@@ -113,15 +97,7 @@ export default function SignupPage() {
             {errors.termsAgreed.message as string}
           </p>
         )}
-        {serverError && (
-          <div
-            role="alert"
-            aria-live="polite"
-            className="mb-3 rounded border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700"
-          >
-            {serverError}
-          </div>
-        )}   
+        <ErrorAlert message={serverError}/>
         <button
           type="submit"
           disabled={submitting}

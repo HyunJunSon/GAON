@@ -6,48 +6,29 @@ import { useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useLogin } from '@/hooks/useAuth';
+import { useServerError } from '@/hooks/useServerError';
+import ErrorAlert from '@/components/ui/ErrorAlert';
 
 export default function LoginPage() {
   const router = useRouter();
   const { mutate, isPending, isError, error } = useLogin();
-  const [serverError, setServerError] = useState<string | null>(null);
-  const [submitting, setSubmitting] = useState(false);
+  const { serverError, handleError, clearError } = useServerError();
   const { register, handleSubmit, formState: { errors }} = useForm<LoginInput>({
     resolver: zodResolver(LoginSchema),
     mode: 'onChange'
   })
   // 지금은 목업: 실제 API 연동 전까지 setTimeout으로 성공/실패 UX 확인
   const onSubmit = async (data: LoginInput) => {
-    // try {
-    //   setSubmitting(true);
-    //   await new Promise((r) => setTimeout(r, 800))
-    //   alert(`로그인 성공 (mock)\nemail: ${data.email}`)
-    // } catch (e) {
-    //   alert('로그인 실패 (mock)')
-    // } finally {
-    //   setSubmitting(false);
-    // }
     mutate(
       { email: data.email, password: data.password },
       {
         onSuccess: () => {
           // ✅ 성공 시 서버 에러 초기화
-          setServerError(null);
+          clearError();
           // 로그인 성공 후 이동(필요에 맞게 경로 조정)
           router.replace('/');
         },
-        onError: (e: unknown) => {
-          // ✅ 서버에서 내려준 { message } 우선 사용, 없으면 기본 문구
-          let message = '로그인에 실패했습니다. \n이메일/비밀번호를 확인하거나 잠시 후 다시 시도해주세요.';
-
-          if (e instanceof Error) {
-            message = e.message;
-          } else if (typeof e === 'object' && e && 'message' in e) {
-            message = String((e as { message?: string }).message);
-          }
-
-          setServerError(message);
-        },
+        onError: handleError,
       },
     )
   }
@@ -81,15 +62,7 @@ export default function LoginPage() {
             </p>
           )}
         </div>
-        {serverError && (
-          <div
-            role="alert"
-            aria-live="polite"
-            className="mb-3 rounded border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700"
-          >
-            {serverError}
-          </div>
-        )}    
+        <ErrorAlert message={serverError} /> 
         <button type='submit' disabled={isPending} className='w-full rounded bg-black text-white py-2 disabled:opacity-50'>
           {isPending ? '로그인 중...' : '로그인'}
         </button>
