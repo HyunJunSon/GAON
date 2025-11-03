@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
-import { NAV_LINKS, NavLink } from "./NavLinks";
+import { NAV_LINKS, AUTH_PAGES, type NavLink } from "./NavLinks";
 
 /**
  * 공통 네비게이션
@@ -14,10 +14,32 @@ import { NAV_LINKS, NavLink } from "./NavLinks";
  */
 export default function AppNavigation() {
   const pathname = usePathname();
+  // 서버에서 받은 초기값으로 state 초기화 → SSR/CSR 일치
+  const [authed, setAuthed] = useState<boolean>(false);
 
+  // 토큰 존재 여부로 로그인 상태 추정
+  // 외부 변화 구독만 실행
   useEffect(() => {
-    
-  }, [])
+    if (AUTH_PAGES.has(pathname)) return;
+
+    const id = setTimeout(() => {
+      try {
+        const s = !!localStorage.getItem('ga_access_token');
+        const c = document.cookie.includes('ga_auth=1');
+        setAuthed(s || c);
+      } catch {
+        setAuthed(false);
+      }
+    }, 0); // ← 이펙트 본문에서 바로 setState 하지 않고, 콜백으로 지연
+
+    return () => clearTimeout(id);
+  }, [pathname]);
+
+  // 인증 페이지에서는 네비게이션 숨김
+  if (AUTH_PAGES.has(pathname)) return null;
+  // 비로그인 상태에서는 네비게이션 숨김
+  if (!authed) return null;
+
   return (
     <>
       {/* 데스크탑/태블릿: 좌측 사이드바 */}
