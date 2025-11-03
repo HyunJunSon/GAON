@@ -11,7 +11,7 @@ export default function HomePage() {
       <h1 className="text-2xl font-semibold">홈</h1>
       <div className="grid gap-3">
         <Link href="/conversation" className="underline">대화 탭으로 이동</Link>
-        <Link href="/results/summary" className="underline">분석결과(요약)으로 이동</Link>
+        <Link href="/analysis/summary" className="underline">분석결과(요약)으로 이동</Link>
       </div>
       <button
       onClick={() => mutate()}
