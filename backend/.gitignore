@@ -135,3 +135,4 @@ __pypackages__/
 
 # Alembic configuration (contains database connection info)
 alembic.ini
+gcp_service_account_key.json

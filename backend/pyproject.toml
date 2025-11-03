@@ -67,6 +67,7 @@ dependencies = [
     "typing-inspect==0.9.0",
     "typing-inspection==0.4.1",
     "typing_extensions==4.12.2",
+
 ]
 
 [tool.setuptools]
