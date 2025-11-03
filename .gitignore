@@ -54,6 +54,8 @@ venv/
 .venv/
 env/
 ENV/
+gaon-venv/
+.gaon-venv
 
 # Node / JS dependencies (frontend/.gitignore 에서도 관리)
 node_modules/
