@@ -80,3 +80,12 @@ class UserCreate(BaseModel):
         
         auth_logger.debug(f"이메일 유효성 검사 통과: {v}")
         return v
+
+
+class UserResponse(BaseModel):
+    """회원가입 성공 시 반환될 모델"""
+    email: EmailStr
+    name: str
+
+    class Config:
+        from_attributes = True  # Pydantic V2에서는 orm_mode 대신 from_attributes 사용

@@ -3,12 +3,14 @@ fastapi==0.115.0
 uvicorn[standard]==0.30.3
 
 # === Authentication & Security ===
-passlib[bcrypt]>=1.7.4
+bcrypt==5.0.0
+python-multipart==0.0.9
+python-jose[cryptography]==3.3.0
 
 # === Database ===
 sqlalchemy==2.0.43
 alembic==1.13.2
-psycopg2-binary==2.9.9
+psycopg2-binary
 asyncpg==0.30.0
 pgvector==0.3.6
 greenlet==3.2.4
@@ -19,6 +21,7 @@ pydantic-settings==2.11.0
 python-dotenv==1.1.1
 PyYAML==6.0.2
 orjson==3.11.3
+email-validator==2.3.0
 jinja2==3.1.4
 
 # === HTTP & Parsing ===
@@ -31,37 +34,37 @@ tqdm==4.67.1
 pypdf==6.1.1
 
 # === AI / LLM Core ===
-openai==1.106.1
-anthropic==0.69.0
-google-api-python-client==2.184.0
-huggingface-hub==0.35.3
-transformers==4.42.4
-tokenizers==0.19.1
-filelock==3.13.1
-fsspec==2024.6.1
-torch==2.5.1
-torchvision==0.20.1
-torchaudio==2.5.1
-accelerate==1.10.1
-safetensors==0.6.2
-sentence-transformers==5.1.1
-scikit-learn==1.7.2
-scipy==1.14.1
-numpy==1.26.4
-networkx==3.3
-
-# === LangChain & Related ===
-langchain==0.3.27
-langchain-core==0.3.79
-langchain-community==0.3.31
-langchain-openai==0.3.32
-langchain-anthropic==0.3.22
-langchain-google-genai==2.1.12
-langchain-huggingface==0.3.1
-langchain-experimental==0.3.4
-langchain-postgres==0.0.15
-langchain-text-splitters==0.3.11
-langsmith==0.4.26
+# openai==1.106.1
+# anthropic==0.69.0
+# google-api-python-client==2.184.0
+# huggingface-hub==0.35.3
+# transformers==4.42.4
+# tokenizers==0.19.1
+# filelock==3.13.1
+# fsspec==2024.6.1
+# # torch
+# # torchvision
+# # torchaudio
+# accelerate==1.10.1
+# safetensors==0.6.2
+# sentence-transformers==5.1.1
+# scikit-learn==1.7.2
+# scipy==1.14.1
+# numpy==1.26.4
+# networkx==3.3
+# 
+# # === LangChain & Related ===
+# langchain==0.3.27
+# langchain-core==0.3.79
+# langchain-community==0.3.31
+# langchain-openai==0.3.32
+# langchain-anthropic==0.3.22
+# langchain-google-genai==2.1.12
+# langchain-huggingface==0.3.1
+# langchain-experimental==0.3.4
+# langchain-postgres==0.0.15
+# langchain-text-splitters==0.3.11
+# langsmith==0.4.26
 
 # === Typing ===
 typing-inspect==0.9.0
