@@ -26,7 +26,7 @@ export default function SignupPage() {
     //   setSubmitting(false);
     // }
     mutate(
-      { name: data.name, email: data.email, password: data.password },
+      { name: data.name, email: data.email, password: data.password, confirmPassword: data.confirmPassword },
       {
         onSuccess: () => {
           // 가입 성공 후: 홈으로 이동하거나 /login 으로 유도
