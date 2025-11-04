@@ -3,38 +3,24 @@
 // 지금은 실제 업로드/분석 요청 없이 UI 골격만 표시
 // 2단계에서 FormData 업로드 + 서보 호출(POST /conversations/analyze) 연결 예정
 
-import { useRef, useState } from 'react';
+import { useState } from 'react';
 import { useStartAnalysis } from '@/hooks/useAnalysis';
 import { useServerError } from '@/hooks/useServerError';
 import ErrorAlert from '@/components/ui/ErrorAlert';
+import FileDropzone from '@/components/upload/FileDropzone';
 
-const ACCEPT = ['audio/mpeg', 'audio/mp3', 'audio/wav', 'audio/x-wav', 'audio/m4a'];
+const ACCEPT_EXT = ['.mp3', '.wav', '.m4a'];
+const ACCEPT_MIME = ['audio/mpeg', 'audio/mp3', 'audio/wav', 'audio/x-wav', 'audio/m4a']
 const MAX_MB = 25;
 
 export default function ConversationPage() {
-  const inputRef = useRef<HTMLInputElement | null>(null);
   const [file, setFile] = useState<File | null>(null);
   const { mutate, isPending } = useStartAnalysis();
   const { serverError, handleError, clearError } = useServerError();
-  
-  const onPick = () => inputRef.current?.click();
 
-  const onFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleSelect = (files: File[]) => {
     clearError();
-    const f = e.target.files?.[0] || null;
-    if (!f) return setFile(null);
-
-    if (ACCEPT.length && !ACCEPT.includes(f.type)) {
-      handleError(new Error('지원하지 않는 파일 형식입니다. (mp3, wav, m4a)'));
-      e.target.value = '';
-      return;
-    }
-    if (f.size > MAX_MB * 1024 * 1024) {
-      handleError(new Error(`파일 용량이 너무 큽니다. (최대 ${MAX_MB}MB)`));
-      e.target.value = '';
-      return;
-    }
-    setFile(f);
+    setFile(files[0] ?? null);
   };
 
   const onStart = () => {
@@ -56,31 +42,23 @@ export default function ConversationPage() {
 
       {serverError && <ErrorAlert message={serverError} />}
 
-      <section className="rounded-lg border border-dashed border-gray-300 p-6 bg-white">
-        <div className="flex items-center gap-3">
-          <button
-            type="button"
-            onClick={onPick}
-            className="rounded border px-3 py-2 text-sm hover:bg-gray-50"
-          >
-            파일 선택
-          </button>
-          <input
-            ref={inputRef}
-            type="file"
-            accept=".mp3,.wav,.m4a,audio/*"
-            className="hidden"
-            onChange={onFileChange}
-          />
-          <span className="text-sm text-gray-700">
-            {file ? `${file.name} (${(file.size / 1024 / 1024).toFixed(1)} MB)` : '선택된 파일 없음'}
-          </span>
-        </div>
-        <p className="mt-2 text-xs text-gray-500">
-          지원 형식: mp3, wav, m4a · 최대 {MAX_MB}MB
-        </p>
-      </section>
+      <section className="space-y-3">
+        <FileDropzone
+          acceptExt={ACCEPT_EXT}
+          acceptMime={ACCEPT_MIME}
+          maxMB={MAX_MB}
+          multiple={false}
+          onFileSelect={handleSelect}
+          onError={(msg) => handleError(new Error(msg))}
+          placeholder="여기로 .txt 파일을 드래그하거나 클릭하여 선택하세요."
+        />
 
+        <div className="rounded border bg-white px-4 py-3 text-sm text-gray-700">
+          {file
+            ? <>선택된 파일: <strong>{file.name}</strong> ({(file.size / 1024 / 1024).toFixed(2)} MB)</>
+            : '선택된 파일 없음'}
+        </div>
+      </section>
       <div>
         <button
           type="button"

@@ -1,47 +1,24 @@
 'use client';
 
-import { useRef, useState } from 'react';
+import { useState } from 'react';
 import { useStartAnalysis } from '@/hooks/useAnalysis';
 import { useServerError } from '@/hooks/useServerError';
 import ErrorAlert from '@/components/ui/ErrorAlert';
+import FileDropzone from '@/components/upload/FileDropzone';
 
 // 텍스트 업로드 전용: 확장자/타입을 제한
 const ACCEPT_MIME = ['text/plain'];
-const ACCEPT_EXT = '.txt'; // 필요 시 .md 등 추가
+const ACCEPT_EXT = ['.txt']; // 필요 시 .md 등 추가
 const MAX_MB = 5; // 텍스트는 작게 제한(필요 시 조정)
 
 export default function ConversationTextUploadPage() {
-  const inputRef = useRef<HTMLInputElement | null>(null);
   const [file, setFile] = useState<File | null>(null);
   const { mutate, isPending } = useStartAnalysis();
   const { serverError, handleError, clearError } = useServerError();
 
-  const onPick = () => inputRef.current?.click();
-
-  const onFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleSelect = (files: File[]) => {
     clearError();
-    const f = e.target.files?.[0] || null;
-    if (!f) return setFile(null);
-
-    // 1) MIME 타입 검사
-    // 일부 브라우저에서 빈 타입으로 올 수 있으니 확장자도 함께 체크
-    const isMimeOk = !f.type || ACCEPT_MIME.includes(f.type);
-    const isExtOk = f.name.toLowerCase().endsWith(ACCEPT_EXT);
-
-    if (!isMimeOk && !isExtOk) {
-      handleError(new Error(`지원하지 않는 파일 형식입니다. (${ACCEPT_EXT})`));
-      e.target.value = '';
-      return;
-    }
-
-    // 2) 용량 검사
-    if (f.size > MAX_MB * 1024 * 1024) {
-      handleError(new Error(`파일 용량이 너무 큽니다. (최대 ${MAX_MB}MB)`));
-      e.target.value = '';
-      return;
-    }
-
-    setFile(f);
+    setFile(files[0] ?? null);
   };
 
   const onStart = () => {
@@ -63,33 +40,23 @@ export default function ConversationTextUploadPage() {
 
       {serverError && <ErrorAlert message={serverError} />}
 
-      <section className="rounded-lg border border-dashed border-gray-300 p-6 bg-white">
-        <div className="flex items-center gap-3">
-          <button
-            type="button"
-            onClick={onPick}
-            className="rounded border px-3 py-2 text-sm hover:bg-gray-50"
-          >
-            파일 선택
-          </button>
-          <input
-            ref={inputRef}
-            type="file"
-            accept={ACCEPT_EXT}
-            className="hidden"
-            onChange={onFileChange}
-          />
-          <span className="text-sm text-gray-700">
-            {file
-              ? `${file.name} (${(file.size / 1024 / 1024).toFixed(2)} MB)`
-              : '선택된 파일 없음'}
-          </span>
-        </div>
-        <p className="mt-2 text-xs text-gray-500">
-          지원 형식: {ACCEPT_EXT} · 최대 {MAX_MB}MB
-        </p>
-      </section>
+      <section className="space-y-3">
+        <FileDropzone
+          acceptExt={ACCEPT_EXT}
+          acceptMime={ACCEPT_MIME}
+          maxMB={MAX_MB}
+          multiple={false}
+          onFileSelect={handleSelect}
+          onError={(msg) => handleError(new Error(msg))}
+          placeholder="여기로 .txt 파일을 드래그하거나 클릭하여 선택하세요."
+        />
 
+        <div className="rounded border bg-white px-4 py-3 text-sm text-gray-700">
+          {file
+            ? <>선택된 파일: <strong>{file.name}</strong> ({(file.size / 1024 / 1024).toFixed(2)} MB)</>
+            : '선택된 파일 없음'}
+        </div>
+      </section>
       <div>
         <button
           type="button"
