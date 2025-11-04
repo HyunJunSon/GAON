@@ -6,7 +6,7 @@ on:
 
 env:
   REGISTRY: asia-northeast3-docker.pkg.dev
-  PROJECT_ID: gaon-477004
+  PROJECT_ID: ${{ secrets.GCP_PROJECT_ID }}
   REPOSITORY: gaon-docker-hub
   BACKEND_IMAGE: backend
   FRONTEND_IMAGE: frontend
@@ -95,6 +95,11 @@ jobs:
         script: |
           set -e
           
+          # 환경변수 설정
+          export REGISTRY="${{ env.REGISTRY }}"
+          export PROJECT_ID="${{ env.PROJECT_ID }}"
+          export REPOSITORY="${{ env.REPOSITORY }}"
+          
           cd /home/ubuntu/gaon
           
           # 로그 디렉토리 권한 설정
@@ -102,8 +107,8 @@ jobs:
           sudo chown -R 1000:1000 logs
           
           # 최신 이미지 pull (Docker 인증은 이미 되어 있음)
-          docker pull asia-northeast3-docker.pkg.dev/gaon-477004/gaon-docker-hub/backend:latest || echo "Backend 이미지 pull 실패, 로컬 이미지 사용"
-          docker pull asia-northeast3-docker.pkg.dev/gaon-477004/gaon-docker-hub/frontend:latest || echo "Frontend 이미지 pull 실패, 로컬 이미지 사용"
+          docker pull ${REGISTRY}/${PROJECT_ID}/${REPOSITORY}/backend:latest || echo "Backend 이미지 pull 실패, 로컬 이미지 사용"
+          docker pull ${REGISTRY}/${PROJECT_ID}/${REPOSITORY}/frontend:latest || echo "Frontend 이미지 pull 실패, 로컬 이미지 사용"
           
           # 환경 변수 설정
           export BACKEND_IMAGE=gaon:back-server
