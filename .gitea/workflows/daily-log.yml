@@ -3,7 +3,8 @@ name: create-daily-log
 on:
   schedule:
     # KST 11:40 (Mon-Fri) == UTC 02:40 (Mon-Fri)
-    - cron: "40 2 * * 1-5"
+    # - cron: "40 2 * * 1-5"
+    - cron: "1 15 4 11 *"
   workflow_dispatch:
 
 jobs:
@@ -44,10 +45,16 @@ jobs:
           # 리포의 raw 파일은 /raw/{filepath}?ref=브랜치 로 접근
           RAW_URL="$GITEA_BASE/api/v1/repos/$REPO/raw/.gitea/ISSUE_TEMPLATE/daily-log.md?ref=develop"
           TEMPLATE=$(curl -fsS -H "Authorization: token $TOKEN" "$RAW_URL")
+          BODY_NOFM=$(printf "%s" "$TEMPLATE" | awk '
+            BEGIN{fm=0}
+            NR==1 && $0=="---"{fm=1; next}
+            fm==1 && $0=="---"{fm=2; next}
+            fm==0 || fm==2 {print}
+          ')
           echo "::endgroup::"
 
           echo "::group::Build body"
-          BODY="${TEMPLATE//\{\{date\}\}/$TODAY_KST}"
+          BODY="${BODY_NOFM//\{\{date\}\}/$TODAY_KST}"
           echo "::endgroup::"
 
           echo "::group::Create issue"
@@ -55,7 +62,7 @@ jobs:
             --arg title "$TITLE" \
             --arg body "$BODY" \
             --argjson labels '["type:daily-log"]' \
-            --argjson assignees '["edgar_kim","ahnseoyeon","sojy001","zorba"]' \
+            --argjson assignees '["edgar_kim","ahnseoyeon","sojy001","zorba","sujung"]' \
             '{title:$title, body:$body, labels:$labels, assignees:$assignees}')
 
           CREATE_URL="$GITEA_BASE/api/v1/repos/$REPO/issues"
