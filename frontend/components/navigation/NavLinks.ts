@@ -11,7 +11,7 @@ export type NavLink = {
 export const NAV_LINKS: NavLink[] = [
   {href: '/', label: '메인', icon: Home},
   {href: '/conversation', label: '대화', icon: MessageSquareText},
-  {href: '/analysis/summary', label: '분석', icon: BarChart3},
+  {href: '/analysis', label: '분석', icon: BarChart3},
   {href: '/practice', label: '연습', icon: Rocket},
 ]
 
