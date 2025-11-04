@@ -110,6 +110,10 @@ jobs:
           docker pull ${REGISTRY}/${PROJECT_ID}/${REPOSITORY}/backend:latest || echo "Backend 이미지 pull 실패, 로컬 이미지 사용"
           docker pull ${REGISTRY}/${PROJECT_ID}/${REPOSITORY}/frontend:latest || echo "Frontend 이미지 pull 실패, 로컬 이미지 사용"
           
+          # 간단한 이름으로 태그 생성
+          docker tag ${REGISTRY}/${PROJECT_ID}/${REPOSITORY}/backend:latest gaon:back-server
+          docker tag ${REGISTRY}/${PROJECT_ID}/${REPOSITORY}/frontend:latest gaon:front-server
+          
           # 환경 변수 설정
           export BACKEND_IMAGE=gaon:back-server
           export FRONTEND_IMAGE=gaon:front-server

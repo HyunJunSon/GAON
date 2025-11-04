@@ -2,7 +2,7 @@ version: "3.8"
 
 services:
   gaon_backend:
-    image: ${BACKEND_IMAGE:-gaon:back-server}
+    image: ${BACKEND_IMAGE:-asia-northeast3-docker.pkg.dev/gaon-477004/gaon-docker-hub/backend:latest}
     container_name: gaon-backend
     env_file:
       - .env
@@ -22,7 +22,7 @@ services:
     network_mode: host
 
   gaon_frontend:
-    image: ${FRONTEND_IMAGE:-gaon:front-server}
+    image: ${FRONTEND_IMAGE:-asia-northeast3-docker.pkg.dev/gaon-477004/gaon-docker-hub/frontend:latest}
     container_name: gaon-frontend
     environment:
       - NEXT_PUBLIC_API_URL=http://localhost:8000
