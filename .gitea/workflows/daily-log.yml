@@ -1,7 +1,9 @@
 name: create-daily-log
+
 on:
   schedule:
-    - cron: "30 23 * * 0-4"   # KST 08:30 (Mon–Fri)
+    # KST 08:30 (Mon-Fri) == UTC 23:30 (Sun-Thu)
+    - cron: "30 23 * * 0-4"
   workflow_dispatch:
 
 jobs:
@@ -14,7 +16,7 @@ jobs:
             sudo apt-get update -y && sudo apt-get install -y jq
           fi
 
-      - name: Create Daily Log issue (use template file)
+      - name: Create Daily Log issue from template
         env:
           GITEA_BASE: http://dev.wyhil.com:43000
           REPO: SG-OHA-2025-TEAM-04/GAON
@@ -24,11 +26,8 @@ jobs:
           TODAY_KST=$(TZ=Asia/Seoul date +%m.%d)
           TITLE="${TODAY_KST} Daily Log"
 
-          # 1) 중복 생성 방지
-          Q=$(python3 - <<PY
-import urllib.parse as u; print(u.quote("${TITLE}"))
-PY
-)
+          # 1) prevent duplicate issue (URL-encode the title)
+          Q=$(python3 -c "import urllib.parse,sys; print(urllib.parse.quote(sys.argv[1]))" "$TITLE")
           EXIST=$(curl -s -H "Authorization: token $TOKEN" \
             "$GITEA_BASE/api/v1/repos/$REPO/issues/search?q=${Q}&limit=1" \
             | jq -r '.total_count // .issues|length // 0')
@@ -37,19 +36,27 @@ PY
             exit 0
           fi
 
-          # 2) 템플릿 파일 원본(raw) 가져오기
-          #   (branch는 기본 브랜치 이름으로 교체; develop을 기본으로 썼다면 develop)
+          # 2) get raw template from repository (adjust ref if default branch changes)
           RAW_URL="$GITEA_BASE/api/v1/repos/$REPO/raw/.gitea/ISSUE_TEMPLATE/daily-log.md?ref=develop"
           TEMPLATE=$(curl -fsSL "$RAW_URL")
 
-          # 3) {{date}} 치환
+          # 3) replace {{date}} placeholder
           BODY="${TEMPLATE//\{\{date\}\}/$TODAY_KST}"
 
-          # 4) JSON 페이로드 생성
+          # 4) build JSON payload
           PAYLOAD=$(jq -n \
             --arg title "$TITLE" \
             --arg body "$BODY" \
             --argjson labels '["type:daily-log"]' \
+            --argjson assignees '["edgar_kim","ahnseoyeon","sojy001","zorba"]' \
+            '{title:$title, body:$body, labels:$labels, assignees:$assignees}')
+
+          # 5) create issue
+          curl -s -X POST "$GITEA_BASE/api/v1/repos/$REPO/issues" \
+            -H "Authorization: token $TOKEN" \
+            -H "Content-Type: application/json" \
+            -d "$PAYLOAD" \
+            | jq -r '.number // "created"'
             --argjson assignees '["edgar_kim","ahnseoyeon","sojy001","zorba"]' \
             '{title:$title, body:$body, labels:$labels, assignees:$assignees}')
 

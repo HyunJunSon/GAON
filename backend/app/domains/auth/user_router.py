@@ -14,7 +14,7 @@ auth_router = APIRouter(
 
 @auth_router.post("/signup", status_code=status.HTTP_204_NO_CONTENT)
 def user_create(_user_create: user_schema.UserCreate, db: Session = Depends(get_db)):
-    auth_logger.info(f"회원가입 시도: { _user_create.username } - { _user_create.email }")
+    auth_logger.info(f"회원가입 시도: { _user_create.name } - { _user_create.email }")
     
     user = user_crud.get_existing_user(db, user_create=_user_create)
     if user:
@@ -22,4 +22,4 @@ def user_create(_user_create: user_schema.UserCreate, db: Session = Depends(get_
         raise UserAlreadyExistsException()
     
     user_crud.create_user(db=db, user_create=_user_create)
-    auth_logger.info(f"회원가입 성공: { _user_create.username } - { _user_create.email }")
+    auth_logger.info(f"회원가입 성공: { _user_create.name } - { _user_create.email }")

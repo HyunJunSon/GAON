@@ -9,6 +9,13 @@ class Settings(BaseSettings):
     db_host: str = "localhost"
     db_port: int = 1111
     db_name: str = ""
+    database_url: str = ""
+
+    # 벡터 데이터베이스 설정
+    embedding_dimension: int = 1536  # OpenAI embeddings의 기본 차원
+
+    # OpenAI 설정
+    openai_api_key: str = ""
 
     # CORS 설정
     frontend_url: str = "http://localhost:3000"
@@ -26,6 +33,8 @@ class Settings(BaseSettings):
     langchain_endpoint: str = "https://api.smith.langchain.com"
     langchain_project: str = "Gaon"
     langchain_api_key: str = ""
+
+    # 환경 변수에서 직접 불러올 수 있도록 설정 추가
 
     class Config:
         env_file = ".env"

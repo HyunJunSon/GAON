@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import Providers from "@/components/providers/Providers";
+import AppNavigation from "@/components/navigation/AppNavigation";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -24,12 +25,18 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en">
+    <html lang="ko">
       <body
-        className={`${geistSans.variable} ${geistMono.variable} antialiased`}
+        className={`min-h-dvh ${geistSans.variable} ${geistMono.variable} antialiased`}
       >
-        {/* 전역 Provider로 모든 페이지 감싸기 */}
-        <Providers>{children}</Providers>
+        <div className="mx-auto flex max-w-screen-2xl">
+          <AppNavigation />
+          <main className="min-h-dvh flex-1 p-4 md:p-6">
+            {/* 전역 Provider로 모든 페이지 감싸기 */}
+            <Providers>{children}</Providers>
+          </main>
+        </div>
+        <div className="h-14 md:hidden"/>
       </body>
     </html>
   );

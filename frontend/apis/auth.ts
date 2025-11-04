@@ -29,6 +29,7 @@ export async function signup(payload: {
   name: string;
   email: string;
   password: string;
+  confirmPassword: string;
 }) {
   return apiFetch<SignupResponse>('/api/auth/signup', {
     method: 'POST',
