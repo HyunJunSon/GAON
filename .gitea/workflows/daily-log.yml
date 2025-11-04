@@ -2,9 +2,8 @@ name: create-daily-log
 
 on:
   schedule:
-    # KST 11:40 (Mon-Fri) == UTC 02:40 (Mon-Fri)
-    # - cron: "40 2 * * 1-5"
-    - cron: "1 15 4 11 *"
+    # KST 08:30 (Mon-Fri)
+    - cron: "30 23 * * 0-4"
   workflow_dispatch:
 
 jobs:
@@ -25,51 +24,87 @@ jobs:
         run: |
           set -euo pipefail
 
+          # --- Dates ---
           TODAY_KST=$(TZ=Asia/Seoul date +%m.%d)
-          TITLE="${TODAY_KST} Daily Log"
+          TODAY_DATE=$(TZ=Asia/Seoul date +%Y-%m-%d)
+
+          # 프로젝트 1주차 시작(월요일) 기준으로 주차 계산 (원하는 기준일로 조정)
+          PROJECT_START="2024-10-28"
+          DAYS_DIFF=$(( ( $(date -d "$TODAY_DATE" +%s) - $(date -d "$PROJECT_START" +%s) ) / 86400 ))
+          WEEK_NUM=$(( DAYS_DIFF / 7 + 1 ))
+
+          # 제목은 주차 포함(중복 방지에 유리)
+          TITLE="Week${WEEK_NUM}_${TODAY_KST} Daily Log"
 
           echo "::group::Check duplicate issue"
-          # Gitea는 /issues/search가 아니라 /issues?q= 로 검색합니다.
-          SEARCH_URL="$GITEA_BASE/api/v1/repos/$REPO/issues?q=$(python3 -c "import urllib.parse,sys;print(urllib.parse.quote(sys.argv[1]))" "$TITLE")&state=open&limit=1"
+          Q=$(python3 -c "import urllib.parse,sys; print(urllib.parse.quote(sys.argv[1]))" "$TITLE")
+          SEARCH_URL="$GITEA_BASE/api/v1/repos/$REPO/issues?q=${Q}&state=open&limit=1"
           RESP=$(curl -fsS -H "Authorization: token $TOKEN" "$SEARCH_URL" || true)
-          # 응답이 배열이므로 길이로 판정
           COUNT=$(echo "${RESP:-[]}" | jq 'length')
           echo "Found count: $COUNT"
-          if [ "${COUNT}" != "0" ]; then
+          if [ "$COUNT" != "0" ]; then
             echo "Already exists: $TITLE"
             exit 0
           fi
           echo "::endgroup::"
 
           echo "::group::Fetch template"
-          # 리포의 raw 파일은 /raw/{filepath}?ref=브랜치 로 접근
           RAW_URL="$GITEA_BASE/api/v1/repos/$REPO/raw/.gitea/ISSUE_TEMPLATE/daily-log.md?ref=develop"
           TEMPLATE=$(curl -fsS -H "Authorization: token $TOKEN" "$RAW_URL")
+          echo "::endgroup::"
+
+          echo "::group::Build body"
           BODY_NOFM=$(printf "%s" "$TEMPLATE" | awk '
             BEGIN{fm=0}
             NR==1 && $0=="---"{fm=1; next}
             fm==1 && $0=="---"{fm=2; next}
             fm==0 || fm==2 {print}
           ')
-          echo "::endgroup::"
-
-          echo "::group::Build body"
           BODY="${BODY_NOFM//\{\{date\}\}/$TODAY_KST}"
+
+          # About(주차) 안내 한 줄 추가
+          BODY="> About: Week${WEEK_NUM}_${TODAY_KST} Daily Log"$'\n\n'"$BODY"
           echo "::endgroup::"
 
-          echo "::group::Create issue"
+          echo "::group::Create issue (without labels first)"
           PAYLOAD=$(jq -n \
             --arg title "$TITLE" \
             --arg body "$BODY" \
-            --argjson labels '["type:daily-log"]' \
             --argjson assignees '["edgar_kim","ahnseoyeon","sojy001","zorba","sujung"]' \
-            '{title:$title, body:$body, labels:$labels, assignees:$assignees}')
+            '{title:$title, body:$body, assignees:$assignees}')
 
           CREATE_URL="$GITEA_BASE/api/v1/repos/$REPO/issues"
-          RESULT=$(curl -fsS -X POST "$CREATE_URL" \
+          # -w로 상태코드, -D -로 헤더도 잠깐 찍어 디버깅
+          RESULT=$(curl -sS -X POST "$CREATE_URL" \
             -H "Authorization: token $TOKEN" \
             -H "Content-Type: application/json" \
-            -d "$PAYLOAD")
+            -d "$PAYLOAD" )
+          ISSUE_NUM=$(echo "$RESULT" | jq -r '.number // empty')
 
-          echo "Created issue #$(echo "$RESULT" | jq -r '.number // "unknown")"
+          if [ -z "$ISSUE_NUM" ]; then
+            echo "Create issue failed. Raw response:"
+            echo "$RESULT"
+            exit 1
+          fi
+          echo "Created issue #$ISSUE_NUM"
+          echo "::endgroup::"
+
+          echo "::group::Attach label by ID"
+          # 레이블 목록에서 'type:daily-log'의 ID 조회
+          LABELS_URL="$GITEA_BASE/api/v1/repos/$REPO/labels?limit=100"
+          LABELS_JSON=$(curl -fsS -H "Authorization: token $TOKEN" "$LABELS_URL")
+          LABEL_ID=$(echo "$LABELS_JSON" | jq -r '.[] | select(.name=="type:daily-log") | .id' | head -n1)
+
+          if [ -z "$LABEL_ID" ]; then
+            echo "WARN: label 'type:daily-log' not found in repo. Skipping label attach."
+          else
+            ADD_LABEL_URL="$GITEA_BASE/api/v1/repos/$REPO/issues/$ISSUE_NUM/labels"
+            # 이 엔드포인트는 [정수 ID 배열]을 받습니다.
+            ADD_RES=$(curl -sS -X POST "$ADD_LABEL_URL" \
+              -H "Authorization: token $TOKEN" \
+              -H "Content-Type: application/json" \
+              -d "[$LABEL_ID]")
+            echo "Label attach response (truncated):"
+            echo "$ADD_RES" | jq '.[0] | {id,name}' 2>/dev/null || echo "$ADD_RES"
+          fi
           echo "::endgroup::"
