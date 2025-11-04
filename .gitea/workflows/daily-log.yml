@@ -92,48 +92,67 @@ jobs:
           echo "Created issue #$ISSUE_NUM"
           echo "::endgroup::"
 
-          echo "::group::Attach label by ID"
-          # 레이블 목록에서 'type:daily-log'의 ID 조회
-          LABELS_URL="$GITEA_BASE/api/v1/repos/$REPO/labels?limit=100"
-          LABELS_JSON=$(curl -fsS -H "Authorization: token $TOKEN" "$LABELS_URL")
-          LABEL_ID=$(echo "$LABELS_JSON" | jq -r '.[] | select(.name=="type:daily_log") | .id' | head -n1)
-          if [ -z "$LABEL_ID" ]; then
-            echo "WARN: label 'type:daily_log' not found in repo. Skipping label attach."
-          else
-            ADD_LABEL_URL="$GITEA_BASE/api/v1/repos/$REPO/issues/$ISSUE_NUM/labels"
-            # 이 엔드포인트는 [정수 ID 배열]을 받습니다.
-            ADD_RES=$(curl -sS -X POST "$ADD_LABEL_URL" \
+          echo "::group::Resolve label(daily_log) & milestone(${MILESTONE_TITLE}) IDs"
+          # 라벨: daily_log (없으면 생성)
+          LABEL_NAME="daily_log"
+          LABELS_JSON=$(curl -fsS -H "Authorization: token $TOKEN" "$API/repos/$REPO/labels?limit=100")
+          LABEL_ID=$(echo "$LABELS_JSON" | jq -r --arg n "$LABEL_NAME" '.[] | select(.name==$n) | .id' | head -n1)
+          if [ -z "${LABEL_ID:-}" ] || [ "$LABEL_ID" = "null" ]; then
+            CREATE_LABEL_RES=$(curl -fsS -X POST "$API/repos/$REPO/labels" \
               -H "Authorization: token $TOKEN" \
               -H "Content-Type: application/json" \
-              -d "[$LABEL_ID]")
-            echo "Label attach response (truncated):"
-            echo "$ADD_RES" | jq '.[0] | {id,name}' 2>/dev/null || echo "$ADD_RES"
+              -d "$(jq -n --arg name "$LABEL_NAME" --arg color "#1f883d" '{name:$name,color:$color}')")
+            LABEL_ID=$(echo "$CREATE_LABEL_RES" | jq -r '.id // empty')
           fi
-          echo "::endgroup::"
+          if [ -n "${LABEL_ID:-}" ]; then
+            LABELS_ID_ARR="[$LABEL_ID]"
+          else
+            echo "⚠️  failed to resolve/create label '$LABEL_NAME' — will create issue without labels"
+            LABELS_ID_ARR="[]"
+          fi
+          
+          # 마일스톤/제목
+          MILESTONE_TITLE="GAON_Week${WEEK_NUM}"
 
-          # 1) 마일스톤 조회
-          MS_LIST_URL="$GITEA_BASE/api/v1/repos/$REPO/milestones?state=open&limit=100"
-          MS_JSON=$(curl -fsS -H "Authorization: token $TOKEN" "$MS_LIST_URL")
+          # 마일스톤: GAON_WeekN (없으면 생성)
+          MS_JSON=$(curl -fsS -H "Authorization: token $TOKEN" "$API/repos/$REPO/milestones?state=open&limit=100")
           MS_ID=$(echo "$MS_JSON" | jq -r --arg t "$MILESTONE_TITLE" '.[] | select(.title==$t) | .id' | head -n1)
-
-          # 2) 없으면 생성 (원하면 due_on 필드도 추가 가능: {"due_on":"2025-11-09T15:00:00Z"} 같은 ISO8601)
-          if [ -z "$MS_ID" ]; then
-            CREATE_MS_RES=$(curl -fsS -X POST "$GITEA_BASE/api/v1/repos/$REPO/milestones" \
+          if [ -z "${MS_ID:-}" ] || [ "$MS_ID" = "null" ]; then
+            CREATE_MS_RES=$(curl -fsS -X POST "$API/repos/$REPO/milestones" \
               -H "Authorization: token $TOKEN" \
               -H "Content-Type: application/json" \
               -d "$(jq -n --arg title "$MILESTONE_TITLE" '{title:$title, state:"open"}')")
             MS_ID=$(echo "$CREATE_MS_RES" | jq -r '.id // empty')
           fi
-
-          # 3) 이슈에 마일스톤 설정 (PATCH /issues/{index})
-          if [ -n "$MS_ID" ]; then
-            EDIT_ISSUE_URL="$GITEA_BASE/api/v1/repos/$REPO/issues/$ISSUE_NUM"
-            curl -fsS -X PATCH "$EDIT_ISSUE_URL" \
-              -H "Authorization: token $TOKEN" \
-              -H "Content-Type: application/json" \
-              -d "{\"milestone\": $MS_ID}" >/dev/null
-            echo "✔ milestone set: $MILESTONE_TITLE (#$MS_ID)"
-          else
-            echo "⚠️  milestone '$MILESTONE_TITLE' not found/created; skipped"
+          if [ -z "${MS_ID:-}" ]; then
+            echo "⚠️  failed to resolve/create milestone '$MILESTONE_TITLE' — creating issue without milestone"
           fi
+          echo "LABEL_ID=${LABEL_ID:-NA} ; MS_ID=${MS_ID:-NA}"
+          echo "::endgroup::"
+
+          echo "::group::Create issue (with assignees + labels + milestone)"
+          # Create payload (labels: ID 배열, milestone: ID) — Gitea 1.25 스펙
+          PAYLOAD=$(jq -n \
+            --arg title "$TITLE" \
+            --arg body "$BODY" \
+            --argjson assignees '["edgar_kim","ahnseoyeon","sojy001","zorba","sujung"]' \
+            --argjson labels "$LABELS_ID_ARR" \
+            '{title:$title, body:$body, assignees:$assignees, labels:$labels}')
+
+          # milestone이 있으면 payload에 병합
+          if [ -n "${MS_ID:-}" ]; then
+            PAYLOAD=$(echo "$PAYLOAD" | jq --argjson ms "$MS_ID" '. + {milestone:$ms}')
+          fi
+
+          CREATE_URL="$API/repos/$REPO/issues"
+          RESULT=$(curl -sS -X POST "$CREATE_URL" \
+            -H "Authorization: token $TOKEN" \
+            -H "Content-Type: application/json" \
+            -d "$PAYLOAD" )
+
+          ISSUE_NUM=$(echo "$RESULT" | jq -r '.number // empty')
+          if [ -z "$ISSUE_NUM" ]; then
+            echo "Create issue failed. Raw response:"; echo "$RESULT"; exit 1
+          fi
+          echo "✅ Created issue #$ISSUE_NUM"
           echo "::endgroup::"
