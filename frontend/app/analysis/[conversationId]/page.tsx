@@ -1,68 +1,36 @@
 'use client';
-// 특정 conversation에 분석 결과 페이지
-// 2단계에서 TanStack Query로 GET /analysis/{conversationId} 연결
-// 3단계에서 탭(/summary|/emotion|/dialog) 확장 예정
 
 import { useParams } from 'next/navigation';
-import { fetchAnalysis } from '@/apis/analysis';
-import { useEffect, useState } from 'react';
-
-
-type Status = 'queued' | 'processing' | 'ready' | 'failed';
+import { useAnalysis } from '@/hooks/useAnalysis';
 
 export default function AnalysisDetailPage() {
-  const params = useParams(); // { conversationId: string | string[] }
+  const params = useParams();
   const conversationId = Array.isArray(params.conversationId)
     ? params.conversationId[0]
     : (params.conversationId as string | undefined);
 
-  const [status, setStatus] = useState<Status | null>(null);
-  const [error, setError] = useState<string | null>(null);
-  const [result, setResult] = useState<any>(null);
-
-  useEffect(() => {
-    if (!conversationId) return;
-
-    let timer: ReturnType<typeof setInterval> | null = null;
-    let stop = false;
-
-    const load = async () => {
-      try {
-        const data = await fetchAnalysis(conversationId);
-        setStatus(data.status);
-        setResult(data);
-
-        if (data.status === 'ready' || data.status === 'failed') {
-          if (timer) clearInterval(timer);
-          timer = null;
-        }
-      } catch (e: any) {
-        setError(e?.message ?? '결과를 불러오지 못했습니다.');
-        if (timer) clearInterval(timer);
-        timer = null;
-      }
-    };
-
-    // 최초 1회 + 2초 폴링
-    load();
-    timer = setInterval(load, 2000);
-
-    return () => {
-      if (timer) clearInterval(timer);
-      stop = true;
-    };
-  }, [conversationId]);
+  const { data, isLoading, isError, error } = useAnalysis(conversationId ?? '');
 
   if (!conversationId) {
     return <p className="p-4 text-sm text-gray-600">유효하지 않은 ID입니다.</p>;
   }
 
-  if (error) {
+  if (isLoading) {
+    return (
+      <div className="space-y-4 p-4">
+        <div className="h-6 w-40 rounded bg-gray-200 animate-pulse" />
+        <div className="h-4 w-64 rounded bg-gray-200 animate-pulse" />
+        <div className="h-24 w-full rounded bg-gray-200 animate-pulse" />
+      </div>
+    );
+  }
+
+  if (isError || !data) {
     return (
       <main className="space-y-4">
         <h1 className="text-2xl font-semibold">분석 결과</h1>
         <div className="rounded border border-red-300 bg-red-50 p-3 text-sm text-red-700">
-          {error}
+          {(error as Error)?.message ?? '결과를 불러오지 못했습니다.'}
         </div>
       </main>
     );
@@ -77,26 +45,28 @@ export default function AnalysisDetailPage() {
         </p>
       </header>
 
-      {!status || status !== 'ready' ? (
+      {data.status !== 'ready' ? (
         <section className="rounded-lg border bg-white p-4">
           <p className="text-sm text-gray-700">
-            현재 상태: <strong>{status ?? 'loading...'}</strong>
+            현재 상태: <strong>{data.status}</strong>
           </p>
-          <p className="text-xs text-gray-500 mt-1">분석 완료 시 내용이 표시됩니다.</p>
+          <p className="text-xs text-gray-500 mt-1">
+            분석이 완료되면 내용이 표시됩니다. (자동 새로고침)
+          </p>
         </section>
       ) : (
         <>
           <section className="rounded-lg border bg-white p-4">
             <h2 className="text-lg font-medium mb-2">요약</h2>
             <ul className="list-disc pl-5 text-sm text-gray-700">
-              {result?.summary?.bullets?.map((b: string, i: number) => <li key={i}>{b}</li>)}
+              {data.summary?.bullets?.map((b, i) => <li key={i}>{b}</li>)}
             </ul>
           </section>
 
           <section className="rounded-lg border bg-white p-4">
             <h2 className="text-lg font-medium mb-2">감정(샘플)</h2>
             <div className="text-sm text-gray-700 space-y-2">
-              {result?.emotion?.series?.map((s: any) => (
+              {data.emotion?.series?.map((s) => (
                 <div key={s.label} className="flex items-center gap-2">
                   <span className="w-20 text-gray-500">{s.label}</span>
                   <div className="h-2 bg-gray-200 rounded w-64">
@@ -111,7 +81,7 @@ export default function AnalysisDetailPage() {
           <section className="rounded-lg border bg-white p-4">
             <h2 className="text-lg font-medium mb-2">대화록</h2>
             <pre className="rounded bg-gray-50 p-3 text-sm whitespace-pre-wrap">
-              {result?.dialog?.raw}
+              {data.dialog?.raw}
             </pre>
           </section>
         </>
