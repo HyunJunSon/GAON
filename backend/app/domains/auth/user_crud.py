@@ -13,10 +13,13 @@ def create_user(db: Session, user_create: UserCreate):
         password=hash_password(user_create.password),
         email=user_create.email,
         create_date=datetime.now(),
+        terms_agreed=user_create.terms_agreed,
     )
     db.add(db_user)
     db.commit()
+    db.refresh(db_user)
     auth_logger.info(f"DB에 사용자 생성 완료: { user_create.email }")
+    return db_user
 
 
 def get_user_by_email(db: Session, email: str):

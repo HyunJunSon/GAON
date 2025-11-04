@@ -26,7 +26,8 @@ def create_user_service(db: Session, user_create: user_schema.UserCreate):
         )
     
     # 새로운 사용자 생성
-    return user_crud.create_user(db=db, user_create=user_create)
+    created_user = user_crud.create_user(db=db, user_create=user_create)
+    return user_schema.UserResponse(user_id=created_user.id)
 
 
 def login_for_access_token(
