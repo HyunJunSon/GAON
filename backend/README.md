@@ -354,3 +354,4 @@ search_results = rag_system.search_similar(
 2. `ChunkerFactory`에 새로운 전략 등록
 
 
+# 5차 테스트 - 기존 gcloud 사용

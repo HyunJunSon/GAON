@@ -1,0 +1,154 @@
+name: Deploy GAON Application
+
+on:
+  push:
+    branches: [ "main", "develop" ]
+
+env:
+  REGISTRY: asia-northeast3-docker.pkg.dev
+  PROJECT_ID: gaon-477004
+  REPOSITORY: gaon-docker-hub
+  BACKEND_IMAGE: backend
+  FRONTEND_IMAGE: frontend
+
+jobs:
+  check-changes:
+    runs-on: self-hosted
+    outputs:
+      backend_changed: ${{ steps.changes.outputs.backend_changed }}
+      frontend_changed: ${{ steps.changes.outputs.frontend_changed }}
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v3
+      with:
+        fetch-depth: 2
+    
+    - name: Check changed files
+      id: changes
+      run: |
+        echo "backend_changed=$(git diff --name-only HEAD~1 HEAD | grep -q '^backend/' && echo 'true' || echo 'false')" >> $GITHUB_OUTPUT
+        echo "frontend_changed=$(git diff --name-only HEAD~1 HEAD | grep -q '^frontend/' && echo 'true' || echo 'false')" >> $GITHUB_OUTPUT
+
+  build-backend:
+    needs: check-changes
+    if: needs.check-changes.outputs.backend_changed == 'true'
+    runs-on: self-hosted
+    
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v3
+
+    - name: Authenticate to Google Cloud
+      run: |
+        export PATH=$PATH:/home/ubuntu/google-cloud-sdk/bin
+        echo '${{ secrets.GCP_SA_KEY }}' > /tmp/gcp-key.json
+        gcloud auth activate-service-account --key-file=/tmp/gcp-key.json
+        gcloud auth configure-docker ${{ env.REGISTRY }}
+        rm /tmp/gcp-key.json
+
+    - name: Build and push backend image
+      run: |
+        export PATH=$PATH:/home/ubuntu/google-cloud-sdk/bin
+        IMAGE_TAG=${{ env.REGISTRY }}/${{ env.PROJECT_ID }}/${{ env.REPOSITORY }}/${{ env.BACKEND_IMAGE }}
+        docker build -t ${IMAGE_TAG}:${{ github.sha }} -t ${IMAGE_TAG}:latest -t gaon:back-server ./backend
+        docker push ${IMAGE_TAG}:${{ github.sha }}
+        docker push ${IMAGE_TAG}:latest
+
+  build-frontend:
+    needs: check-changes
+    if: needs.check-changes.outputs.frontend_changed == 'true'
+    runs-on: self-hosted
+    
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v3
+
+    - name: Authenticate to Google Cloud
+      run: |
+        export PATH=$PATH:/home/ubuntu/google-cloud-sdk/bin
+        echo '${{ secrets.GCP_SA_KEY }}' > /tmp/gcp-key.json
+        gcloud auth activate-service-account --key-file=/tmp/gcp-key.json
+        gcloud auth configure-docker ${{ env.REGISTRY }}
+        rm /tmp/gcp-key.json
+
+    - name: Build and push frontend image
+      run: |
+        export PATH=$PATH:/home/ubuntu/google-cloud-sdk/bin
+        IMAGE_TAG=${{ env.REGISTRY }}/${{ env.PROJECT_ID }}/${{ env.REPOSITORY }}/${{ env.FRONTEND_IMAGE }}
+        docker build -t ${IMAGE_TAG}:${{ github.sha }} -t ${IMAGE_TAG}:latest -t gaon:front-server ./frontend
+        docker push ${IMAGE_TAG}:${{ github.sha }}
+        docker push ${IMAGE_TAG}:latest
+
+  deploy:
+    needs: [check-changes, build-backend, build-frontend]
+    if: always() && (needs.build-backend.result == 'success' || needs.build-backend.result == 'skipped') && (needs.build-frontend.result == 'success' || needs.build-frontend.result == 'skipped') && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/develop')
+    runs-on: self-hosted
+    
+    steps:
+    - name: Deploy to OCI Server
+      uses: appleboy/ssh-action@v1.0.0
+      with:
+        host: ${{ secrets.OCI_HOST }}
+        username: ${{ secrets.OCI_USERNAME }}
+        key: ${{ secrets.OCI_SSH_KEY }}
+        port: ${{ secrets.OCI_PORT }}
+        script: |
+          set -e
+          
+          cd /home/ubuntu/gaon
+          
+          # 로그 디렉토리 권한 설정
+          sudo mkdir -p logs
+          sudo chown -R 1000:1000 logs
+          
+          # 최신 이미지 pull (Docker 인증은 이미 되어 있음)
+          docker pull asia-northeast3-docker.pkg.dev/gaon-477004/gaon-docker-hub/backend:latest || echo "Backend 이미지 pull 실패, 로컬 이미지 사용"
+          docker pull asia-northeast3-docker.pkg.dev/gaon-477004/gaon-docker-hub/frontend:latest || echo "Frontend 이미지 pull 실패, 로컬 이미지 사용"
+          
+          # 환경 변수 설정
+          export BACKEND_IMAGE=gaon:back-server
+          export FRONTEND_IMAGE=gaon:front-server
+          
+          # 현재 실행 중인 이미지 백업 (롤백용)
+          CURRENT_BACKEND=$(docker inspect gaon-backend --format='{{.Config.Image}}' 2>/dev/null || echo "")
+          CURRENT_FRONTEND=$(docker inspect gaon-frontend --format='{{.Config.Image}}' 2>/dev/null || echo "")
+          
+          # 롤백 함수
+          rollback() {
+            echo "🚨 Error detected! Rolling back..."
+            if [ ! -z "$CURRENT_BACKEND" ] && [ ! -z "$CURRENT_FRONTEND" ]; then
+              export BACKEND_IMAGE=$CURRENT_BACKEND
+              export FRONTEND_IMAGE=$CURRENT_FRONTEND
+              docker-compose -f docker-compose.prod.yml up -d --no-deps gaon_backend
+              docker-compose -f docker-compose.prod.yml up -d --no-deps gaon_frontend
+              docker-compose -f docker-compose.prod.yml up -d --no-deps gaon_nginx
+              echo "✅ Rollback completed!"
+            fi
+            exit 1
+          }
+          
+          # 에러 시 롤백 실행
+          trap rollback ERR
+          
+          # 롤링 업데이트 (무중단 배포)
+          echo "🚀 Starting rolling update..."
+          
+          # 기존 컨테이너 완전 정리 (ContainerConfig 에러 방지)
+          docker-compose -f docker-compose.prod.yml down --remove-orphans || true
+          docker system prune -f || true
+          
+          # 새로 시작
+          docker-compose -f docker-compose.prod.yml up -d || rollback
+          echo "⏳ Waiting for services to start..."
+          sleep 20
+          
+          # 헬스체크
+          if ! curl -f http://localhost:8000/health; then
+            echo "❌ Backend health check failed!"
+            rollback
+          fi
+          
+          # 정리
+          docker image prune -f
+          
+          echo "✅ Deployment completed successfully!"
