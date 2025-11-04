@@ -4,6 +4,11 @@ from starlette.middleware.cors import CORSMiddleware
 from .core.config import settings
 from .domains.auth.user_router import auth_router
 
+# 모든 모델 import (SQLAlchemy 관계 설정을 위해 필요)
+from .domains.auth.user_models import User
+from .domains.conversation.models import Conversation
+from .domains.family.models import Family
+
 app = FastAPI()
 
 # 설정에서 가져온 프론트엔드 URL 또는 기본값 사용

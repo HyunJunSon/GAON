@@ -3,7 +3,8 @@ fastapi==0.115.0
 uvicorn[standard]==0.30.3
 
 # === Authentication & Security ===
-passlib[bcrypt]>=1.7.4
+passlib>=1.7.4
+argon2-cffi==25.1.0
 
 # === Database ===
 sqlalchemy==2.0.43
