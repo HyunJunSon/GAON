@@ -1,6 +1,7 @@
 from sqlalchemy import Column, Integer, String, DateTime
 from sqlalchemy.orm import relationship
-from ...core.database import Base
+from sqlalchemy.sql import func
+from app.core.database import Base
 
 
 class User(Base):
@@ -10,7 +11,7 @@ class User(Base):
     name = Column(String, nullable=False)
     password = Column(String, nullable=False)
     email = Column(String, nullable=False, unique=True)
-    create_date = Column(DateTime, nullable=False)
+    create_date = Column(DateTime, nullable=False, default=func.now())
     
     # Relationships 
     conversations = relationship("Conversation", back_populates="user")

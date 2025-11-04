@@ -354,32 +354,4 @@ search_results = rag_system.search_similar(
 2. `ChunkerFactory`에 새로운 전략 등록
 
 
-
-## LangSmith 모니터링 설정
-
-### 환경 변수 설정
-`.env` 파일에 다음 설정을 추가하세요:
-
-```env
-LANGCHAIN_TRACING_V2=true
-LANGCHAIN_ENDPOINT=https://api.smith.langchain.com
-LANGCHAIN_API_KEY=your_langsmith_api_key_here
-LANGCHAIN_PROJECT=Gaon
-```
-
-### LangSmith API 키 발급
-1. https://smith.langchain.com 접속
-2. 계정 생성 후 로그인
-3. Settings > API Keys에서 새 API 키 생성
-4. 생성된 키를 `.env` 파일에 추가
-
-### 모니터링 확인
-- 모든 LangChain 작업이 자동으로 추적됨
-- LangSmith 대시보드에서 실시간 모니터링 가능
-- 프로젝트명: "Gaon"
-
-### 테스트 실행
-```bash
-cd backend
-python -m app.tests.test_langsmith
-```
+# 5차 테스트 - 기존 gcloud 사용

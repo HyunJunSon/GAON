@@ -1,20 +1,13 @@
 from fastapi import FastAPI
 from starlette.middleware.cors import CORSMiddleware
-import os
-from langsmith import Client
 
 from .core.config import settings
 from .domains.auth.user_router import auth_router
 
-# LangSmith 환경 변수 설정
-if settings.langchain_api_key:
-    os.environ["LANGCHAIN_TRACING_V2"] = settings.langchain_tracing_v2
-    os.environ["LANGCHAIN_ENDPOINT"] = settings.langchain_endpoint
-    os.environ["LANGCHAIN_PROJECT"] = settings.langchain_project
-    os.environ["LANGCHAIN_API_KEY"] = settings.langchain_api_key
-    
-    # LangSmith 클라이언트 초기화
-    client = Client()
+# 모든 모델 import (SQLAlchemy 관계 설정을 위해 필요)
+from .domains.auth.user_models import User
+from .domains.conversation.models import Conversation
+from .domains.family.models import Family
 
 app = FastAPI()
 
