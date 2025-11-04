@@ -142,9 +142,15 @@ jobs:
           # 롤링 업데이트 (무중단 배포)
           echo "🚀 Starting rolling update..."
           
-          # 기존 컨테이너 완전 정리 (ContainerConfig 에러 방지)
+          # 기존 컨테이너 강제 정리 (컨테이너 이름 충돌 방지)
+          echo "🧹 Cleaning up existing containers..."
+          docker rm -f gaon-backend gaon-frontend gaon-nginx gaon-postgres 2>/dev/null || true
+          docker rm -f $(docker ps -aq --filter "name=gaon") 2>/dev/null || true
           docker-compose -f docker-compose.prod.yml down --remove-orphans || true
           docker system prune -f || true
+          
+          echo "⏳ Waiting for cleanup to complete..."
+          sleep 5
           
           # 새로 시작
           docker-compose -f docker-compose.prod.yml up -d || rollback
