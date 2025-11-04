@@ -2,8 +2,8 @@ name: create-daily-log
 
 on:
   schedule:
-    # KST 08:30 (Mon-Fri) == UTC 23:30 (Sun-Thu)
-    - cron: "30 23 * * 0-4"
+    # KST 11:40 (Mon-Fri) == UTC 02:40 (Mon-Fri)
+    - cron: "40 2 * * 1-5"
   workflow_dispatch:
 
 jobs:
@@ -22,28 +22,35 @@ jobs:
           REPO: SG-OHA-2025-TEAM-04/GAON
           TOKEN: ${{ secrets.DAILY_LOG_TOKEN }}
         run: |
-          set -e
+          set -euo pipefail
+
           TODAY_KST=$(TZ=Asia/Seoul date +%m.%d)
           TITLE="${TODAY_KST} Daily Log"
 
-          # 1) prevent duplicate issue (URL-encode the title)
-          Q=$(python3 -c "import urllib.parse,sys; print(urllib.parse.quote(sys.argv[1]))" "$TITLE")
-          EXIST=$(curl -s -H "Authorization: token $TOKEN" \
-            "$GITEA_BASE/api/v1/repos/$REPO/issues/search?q=${Q}&limit=1" \
-            | jq -r '.total_count // .issues|length // 0')
-          if [ "$EXIST" != "0" ]; then
+          echo "::group::Check duplicate issue"
+          # Gitea는 /issues/search가 아니라 /issues?q= 로 검색합니다.
+          SEARCH_URL="$GITEA_BASE/api/v1/repos/$REPO/issues?q=$(python3 -c "import urllib.parse,sys;print(urllib.parse.quote(sys.argv[1]))" "$TITLE")&state=open&limit=1"
+          RESP=$(curl -fsS -H "Authorization: token $TOKEN" "$SEARCH_URL" || true)
+          # 응답이 배열이므로 길이로 판정
+          COUNT=$(echo "${RESP:-[]}" | jq 'length')
+          echo "Found count: $COUNT"
+          if [ "${COUNT}" != "0" ]; then
             echo "Already exists: $TITLE"
             exit 0
           fi
+          echo "::endgroup::"
 
-          # 2) get raw template from repository (adjust ref if default branch changes)
+          echo "::group::Fetch template"
+          # 리포의 raw 파일은 /raw/{filepath}?ref=브랜치 로 접근
           RAW_URL="$GITEA_BASE/api/v1/repos/$REPO/raw/.gitea/ISSUE_TEMPLATE/daily-log.md?ref=develop"
-          TEMPLATE=$(curl -fsSL "$RAW_URL")
+          TEMPLATE=$(curl -fsS -H "Authorization: token $TOKEN" "$RAW_URL")
+          echo "::endgroup::"
 
-          # 3) replace {{date}} placeholder
+          echo "::group::Build body"
           BODY="${TEMPLATE//\{\{date\}\}/$TODAY_KST}"
+          echo "::endgroup::"
 
-          # 4) build JSON payload
+          echo "::group::Create issue"
           PAYLOAD=$(jq -n \
             --arg title "$TITLE" \
             --arg body "$BODY" \
@@ -51,18 +58,11 @@ jobs:
             --argjson assignees '["edgar_kim","ahnseoyeon","sojy001","zorba"]' \
             '{title:$title, body:$body, labels:$labels, assignees:$assignees}')
 
-          # 5) create issue
-          curl -s -X POST "$GITEA_BASE/api/v1/repos/$REPO/issues" \
+          CREATE_URL="$GITEA_BASE/api/v1/repos/$REPO/issues"
+          RESULT=$(curl -fsS -X POST "$CREATE_URL" \
             -H "Authorization: token $TOKEN" \
             -H "Content-Type: application/json" \
-            -d "$PAYLOAD" \
-            | jq -r '.number // "created"'
-            --argjson assignees '["edgar_kim","ahnseoyeon","sojy001","zorba"]' \
-            '{title:$title, body:$body, labels:$labels, assignees:$assignees}')
+            -d "$PAYLOAD")
 
-          # 5) 이슈 생성
-          curl -s -X POST "$GITEA_BASE/api/v1/repos/$REPO/issues" \
-            -H "Authorization: token $TOKEN" \
-            -H "Content-Type: application/json" \
-            -d "$PAYLOAD" \
-            | jq -r '.number // "created"'
+          echo "Created issue #$(echo "$RESULT" | jq -r '.number // "unknown")"
+          echo "::endgroup::"
