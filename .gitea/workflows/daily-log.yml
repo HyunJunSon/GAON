@@ -101,13 +101,13 @@ jobs:
           if [ -z "$LABEL_ID" ]; then
             echo "WARN: label 'type:daily-log' not found in repo. Skipping label attach."
           else
-            ADD_LABEL_URL="$GITEA_BASE/api/v1/repos/$REPO/issues/$ISSUE_NUM/labels"
-            # 이 엔드포인트는 [정수 ID 배열]을 받습니다.
-            ADD_RES=$(curl -sS -X POST "$ADD_LABEL_URL" \
+            # labels 부착(단일 엔드포인트: 바디 불필요)
+            ADD_LABEL_URL="$GITEA_BASE/api/v1/repos/$REPO/issues/$ISSUE_NUM/labels/$LABEL_ID"
+            curl -fsS -X POST "$ADD_LABEL_URL" \
               -H "Authorization: token $TOKEN" \
-              -H "Content-Type: application/json" \
-              -d "[$LABEL_ID]")
-            echo "Label attach response (truncated):"
+              -H "Accept: application/json" \
+              >/dev/null
+            echo "✔ label attached: daily_log (#$LABEL_ID)"
             echo "$ADD_RES" | jq '.[0] | {id,name}' 2>/dev/null || echo "$ADD_RES"
           fi
           echo "::endgroup::"
