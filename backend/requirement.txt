@@ -71,6 +71,7 @@ langchain-postgres==0.0.15
 langchain-text-splitters==0.3.11
 langsmith==0.4.26
 
+
 # === Google Cloud ===
 google-cloud-storage==3.4.1
 
