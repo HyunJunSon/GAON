@@ -91,25 +91,6 @@ jobs:
           fi
           echo "Created issue #$ISSUE_NUM"
           echo "::endgroup::"
-
-          echo "::group::Resolve label(daily_log) & milestone(${MILESTONE_TITLE}) IDs"
-          # 라벨: daily_log (없으면 생성)
-          LABEL_NAME="daily_log"
-          LABELS_JSON=$(curl -fsS -H "Authorization: token $TOKEN" "$API/repos/$REPO/labels?limit=100")
-          LABEL_ID=$(echo "$LABELS_JSON" | jq -r --arg n "$LABEL_NAME" '.[] | select(.name==$n) | .id' | head -n1)
-          if [ -z "${LABEL_ID:-}" ] || [ "$LABEL_ID" = "null" ]; then
-            CREATE_LABEL_RES=$(curl -fsS -X POST "$API/repos/$REPO/labels" \
-              -H "Authorization: token $TOKEN" \
-              -H "Content-Type: application/json" \
-              -d "$(jq -n --arg name "$LABEL_NAME" --arg color "#1f883d" '{name:$name,color:$color}')")
-            LABEL_ID=$(echo "$CREATE_LABEL_RES" | jq -r '.id // empty')
-          fi
-          if [ -n "${LABEL_ID:-}" ]; then
-            LABELS_ID_ARR="[$LABEL_ID]"
-          else
-            echo "⚠️  failed to resolve/create label '$LABEL_NAME' — will create issue without labels"
-            LABELS_ID_ARR="[]"
-          fi
           
           # 마일스톤/제목
           MILESTONE_TITLE="GAON_Week${WEEK_NUM}"
