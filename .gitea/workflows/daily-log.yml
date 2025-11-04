@@ -96,7 +96,7 @@ jobs:
           # 레이블 목록에서 'type:daily-log'의 ID 조회
           LABELS_URL="$GITEA_BASE/api/v1/repos/$REPO/labels?limit=100"
           LABELS_JSON=$(curl -fsS -H "Authorization: token $TOKEN" "$LABELS_URL")
-          LABEL_ID=$(echo "$LABELS_JSON" | jq -r '.[] | select(.name=="type:daily-log") | .id' | head -n1)
+          LABEL_ID=$(echo "$LABELS_JSON" | jq -r '.[] | select(.name=="daily_log") | .id' | head -n1)
 
           if [ -z "$LABEL_ID" ]; then
             echo "WARN: label 'type:daily-log' not found in repo. Skipping label attach."
@@ -109,5 +109,35 @@ jobs:
               -d "[$LABEL_ID]")
             echo "Label attach response (truncated):"
             echo "$ADD_RES" | jq '.[0] | {id,name}' 2>/dev/null || echo "$ADD_RES"
+          fi
+          echo "::endgroup::"
+
+          echo "::group::Ensure milestone 'GAON_Week${WEEK_NUM}' and set to issue"
+          MILESTONE_TITLE="GAON_Week${WEEK_NUM}"
+
+          # 1) 마일스톤 조회
+          MS_LIST_URL="$GITEA_BASE/api/v1/repos/$REPO/milestones?state=open&limit=100"
+          MS_JSON=$(curl -fsS -H "Authorization: token $TOKEN" "$MS_LIST_URL")
+          MS_ID=$(echo "$MS_JSON" | jq -r --arg t "$MILESTONE_TITLE" '.[] | select(.title==$t) | .id' | head -n1)
+
+          # 2) 없으면 생성 (원하면 due_on 필드도 추가 가능: {"due_on":"2025-11-09T15:00:00Z"} 같은 ISO8601)
+          if [ -z "$MS_ID" ]; then
+            CREATE_MS_RES=$(curl -fsS -X POST "$GITEA_BASE/api/v1/repos/$REPO/milestones" \
+              -H "Authorization: token $TOKEN" \
+              -H "Content-Type: application/json" \
+              -d "$(jq -n --arg title "$MILESTONE_TITLE" '{title:$title, state:"open"}')")
+            MS_ID=$(echo "$CREATE_MS_RES" | jq -r '.id // empty')
+          fi
+
+          # 3) 이슈에 마일스톤 설정 (PATCH /issues/{index})
+          if [ -n "$MS_ID" ]; then
+            EDIT_ISSUE_URL="$GITEA_BASE/api/v1/repos/$REPO/issues/$ISSUE_NUM"
+            curl -fsS -X PATCH "$EDIT_ISSUE_URL" \
+              -H "Authorization: token $TOKEN" \
+              -H "Content-Type: application/json" \
+              -d "{\"milestone\": $MS_ID}" >/dev/null
+            echo "✔ milestone set: $MILESTONE_TITLE (#$MS_ID)"
+          else
+            echo "⚠️  milestone '$MILESTONE_TITLE' not found/created; skipped"
           fi
           echo "::endgroup::"
