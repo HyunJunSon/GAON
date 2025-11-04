@@ -94,26 +94,25 @@ jobs:
 
           echo "::group::Attach label by ID"
           # 레이블 목록에서 'type:daily-log'의 ID 조회
-          LABELS_URL="$GITEA_BASE/api/v1/repos/$REPO/labels?limit=100"
-          LABELS_JSON=$(curl -fsS -H "Authorization: token $TOKEN" "$LABELS_URL")
-          LABEL_ID=$(echo "$LABELS_JSON" | jq -r '.[] | select(.name=="daily_log") | .id' | head -n1)
+          # 0) 공통 변수
+          API="$GITEA_BASE/api/v1"
+          OWNER=$(echo "$REPO" | cut -d'/' -f1)
+          REPO_NAME=$(echo "$REPO" | cut -d'/' -f2)
 
-          if [ -z "$LABEL_ID" ]; then
-            echo "WARN: label 'type:daily-log' not found in repo. Skipping label attach."
-          else
-            # labels 부착(단일 엔드포인트: 바디 불필요)
-            ADD_LABEL_URL="$GITEA_BASE/api/v1/repos/$REPO/issues/$ISSUE_NUM/labels/$LABEL_ID"
-            curl -fsS -X POST "$ADD_LABEL_URL" \
+          # 1) 라벨 ID 조회 (없으면 생성)
+          LABEL_NAME="daily_log"
+          LABELS_JSON=$(curl -fsS -H "Authorization: token $TOKEN" \
+            "$API/repos/$OWNER/$REPO_NAME/labels?limit=100")
+          LABEL_ID=$(echo "$LABELS_JSON" | jq -r --arg n "$LABEL_NAME" '.[] | select(.name==$n) | .id' | head -n1)
+
+          if [ -z "$LABEL_ID" ] || [ "$LABEL_ID" = "null" ]; then
+            CREATE_LABEL_RES=$(curl -fsS -X POST "$API/repos/$OWNER/$REPO_NAME/labels" \
               -H "Authorization: token $TOKEN" \
-              -H "Accept: application/json" \
-              >/dev/null
-            echo "✔ label attached: daily_log (#$LABEL_ID)"
-            echo "$ADD_RES" | jq '.[0] | {id,name}' 2>/dev/null || echo "$ADD_RES"
+              -H "Content-Type: application/json" \
+              -d "$(jq -n --arg name "$LABEL_NAME" --arg color "#1f883d" '{name:$name,color:$color}')")
+            LABEL_ID=$(echo "$CREATE_LABEL_RES" | jq -r '.id')
           fi
-          echo "::endgroup::"
-
-          echo "::group::Ensure milestone 'GAON_Week${WEEK_NUM}' and set to issue"
-          MILESTONE_TITLE="GAON_Week${WEEK_NUM}"
+          echo "LABEL_ID=$LABEL_ID"
 
           # 1) 마일스톤 조회
           MS_LIST_URL="$GITEA_BASE/api/v1/repos/$REPO/milestones?state=open&limit=100"
