@@ -4,6 +4,7 @@ import { AnalysisRes, fetchAnalysis, getConversationId, startAnalysis, StartAnal
 import { qk } from "@/constants/queryKeys";
 import { useMutation, useQuery, UseQueryResult } from "@tanstack/react-query";
 import { useRouter } from "next/navigation";
+import { startTransition } from "react";
 
 /**
  * 업로드 → 분석 시작
@@ -22,7 +23,11 @@ export function useStartAnalysis() {
     onSuccess: (res: StartAnalysisAny) => {
       // 백엔드 snake_case 대비 방어
       const id = getConversationId(res);
-      router.replace(`/analysis/${id}`);
+      // 전환 부드럽게
+      router.prefetch(`/analysis/${id}`);
+      startTransition(() => {
+        router.replace(`/analysis/${id}`);
+      });
     }
   })
 }
