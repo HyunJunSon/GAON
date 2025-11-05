@@ -32,14 +32,7 @@ export function useLogin() {
 }
 
 export function useSignup() {
-  const qc = useQueryClient();
-  return useMutation({
-    mutationFn: signup,
-    onSuccess: (data) => {
-      authStorage.set(data.accessToken);
-      qc.setQueryData(qk.auth.me, data.user);
-    },
-  });
+  return useMutation({ mutationFn: signup });
 }
 
 export function useLogout() {
@@ -49,6 +42,9 @@ export function useLogout() {
     onSuccess: () => {
       authStorage.clear();
       qc.removeQueries({ queryKey: qk.auth.me }); // 세션 정보 제거
+      if (typeof window !== 'undefined') {
+        window.location.replace('/login'); // 로그인으로 이동
+      }
     },
   });
 }

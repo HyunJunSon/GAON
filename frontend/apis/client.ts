@@ -8,7 +8,7 @@ import { authStorage } from "@/utils/authStorage";
  */
 const BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL?.replace(/\/$/, '') || '';
 
-type FetchOptions = RequestInit & { json?: unknown };
+type FetchOptions = RequestInit & { json?: unknown, auth?: boolean };
 
 export async function apiFetch<T>(
   path: string,
@@ -18,11 +18,13 @@ export async function apiFetch<T>(
   const headers = new Headers(options.headers);
 
   // 토큰이 있다면 Authorization 헤더 주입
-  const token = authStorage.get();
-  if (token && !headers.has('Authorization')) {
-    headers.set('Authorization', `Bearer ${token}`);
+  if (options.auth !== false) {
+    const token = authStorage.get();
+    if (token && !headers.has('Authorization')) {
+      headers.set('Authorization', `Bearer ${token}`);
+    }
   }
-
+  
   // JSON 요청 자동 처리
   if (options.json != undefined) {
     headers.set('Content-Type', 'application/json');
@@ -35,6 +37,13 @@ export async function apiFetch<T>(
     // 필요시 credentials: 'include' 등 정책 추가
   })
 
+  if (res.status === 401) {
+    // 만료/무효 → 세션 초기화 및 로그인으로
+    authStorage.clear()
+    if (typeof window !== "undefined") window.location.href = "/login"
+    throw new Error('Unauthorized')
+  }
+  
   // 2xx 외 에러 처리
   if (!res.ok) {
     let message = `HTTP ${res.status}`;

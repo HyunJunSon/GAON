@@ -1,6 +1,7 @@
 /**
  * React Query 키 네이밍 규칙
  * - 배열 형태로 계층적으로 관리
+ * - 서버 상태 키를 한 곳에서 관리하여 재사용성을 높임
  */
 export const qk = {
   auth: {
@@ -11,8 +12,6 @@ export const qk = {
     detail: (id: string) => ['conversations', 'detail', id] as const,
   },
   analysis: {
-    summary: (id: string) => ['analysis', 'summary', id] as const,
-    emotion: (id: string) => ['analysis', 'emotion', id] as const,
-    transcript: (id: string) => ['analysis', 'transcript', id] as const,
+    byId: (id: string) => ['analysis', id] as const,
   },
 };
