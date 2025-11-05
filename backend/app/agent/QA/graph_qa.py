@@ -17,6 +17,7 @@ class QAState:
     conversation_df: Optional[pd.DataFrame] = None
     analysis_result: Optional[Dict[str, Any]] = None
     confidence: float = 0.0
+    reason: str = ""
     final_result: Optional[Dict[str, Any]] = None
     meta: Dict[str, Any] = field(default_factory=dict)
     verbose: bool = True
@@ -55,17 +56,34 @@ class QAGraph:
     def node_evaluate(self, state: QAState):
         if self.verbose:
             print("\n📈 [ScoreEvaluator] 신뢰도 평가 중...")
-        state.confidence = self.evaluator.evaluate(state.analysis_result)
+
+        state.confidence, state.reason = self.evaluator.evaluate(state.analysis_result)
+
+        # ✅ 근거 출력
         print(f"   ✅ 평가 결과: {state.confidence:.2f}")
+        print(f"   💬 근거(reason): {state.reason}")
+
         return state
+
 
     def node_reanalyze(self, state: QAState):
         if self.verbose:
-            print("\n🔁 [ReAnalyzer] 재분석 수행 중 (신뢰도 낮음)...")
+            print("\n🔁 [ReAnalyzer] 재분석 수행 중...")
+
+        # ✅ 이전 근거 다시 출력 (왜 재분석하는지)
+        if state.reason:
+            print(f"   ⚠️ 재분석 사유: {state.reason}")
+
         re_result = self.reanalyzer.reanalyze(state.conversation_df, state.analysis_result)
         state.final_result = re_result
+
+        # ✅ 재분석 후 새 근거 표시
+        if "reason" in re_result:
+            print(f"   💬 재분석 근거(after): {re_result['reason']}")
+
         print("   ✅ 재분석 완료:", re_result)
         return state
+
 
     def node_save(self, state: QAState):
         if self.verbose:

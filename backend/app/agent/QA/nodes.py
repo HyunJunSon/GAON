@@ -27,30 +27,47 @@ analysis_result_df = pd.DataFrame([
 class ScoreEvaluator:
     verbose: bool = False
 
-    def evaluate(self, analysis_result: Dict[str, Any]) -> float:
+    def evaluate(self, analysis_result: Dict[str, Any]) -> tuple[float, str]:
         """
-        감정, 톤, 요약 내용 등을 기반으로 신뢰도를 평가하는 LLM Agent.
+        감정, 톤, 요약 내용 등을 기반으로 신뢰도를 평가하고 근거(reason)를 함께 반환.
         """
         llm = ChatOpenAI(model="gpt-4o-mini", api_key=settings.openai_api_key)
         prompt = f"""
-        다음 분석 결과의 신뢰도를 0~1 사이 실수로 평가해줘.
-        - 0.8 이상: 매우 신뢰할 수 있음
-        - 0.65~0.8: 보통 수준
-        - 0.65 미만: 재분석 필요
+        다음 분석 결과의 신뢰도를 0~1 사이 실수로 평가하고,
+        그 이유를 간단히 설명해줘.
+        결과는 JSON으로 아래 형식으로 반환해줘.
+        {{
+            "confidence": float,
+            "reason": "string"
+        }}
         분석 결과:
         {analysis_result}
         """
         try:
             response = llm.invoke(prompt)
             content = response.content if hasattr(response, "content") else str(response)
-            # 단순히 LLM 결과에 수치 포함되어 있다 가정 (mock fallback)
-            score = float(analysis_result.get("score", 0.8))
+
+            # ✅ JSON 파싱 + fallback 로직 추가
+            import json, re
+            try:
+                parsed = json.loads(content)
+                confidence = parsed.get("confidence", 0.0)
+                reason = parsed.get("reason", "No reason provided")
+            except json.JSONDecodeError:
+                # 🔁 fallback: 일반 텍스트에서 숫자 추출
+                match = re.search(r"([0-1]\.\d+|\d\.\d+|\d)", content)
+                confidence = float(match.group(1)) if match else 0.0
+                reason = content.strip()[:200]  # 텍스트 일부를 reason으로 사용
+
             if self.verbose:
-                print(f"🤖 [LLM 평가 응답] {content}")
-            return min(max(score, 0), 1.0)
+                print(f"🤖 [LLM 평가 결과] 신뢰도: {confidence:.2f}, 근거: {reason}")
+
+            return confidence, reason
+
         except Exception as e:
-            print(f"⚠️ 신뢰도 평가 실패: {e}")
-            return 0.0
+            print(f"⚠️ LLM 평가 실패: {e}")
+            return 0.0, str(e)
+
 
 # =====================================
 # ✅ ReAnalyzer (LLM 재분석 수행)
@@ -61,14 +78,20 @@ class ReAnalyzer:
 
     def reanalyze(self, conversation_df: pd.DataFrame, prev_result: Dict[str, Any]) -> Dict[str, Any]:
         """
-        이전 분석의 결과를 참고해 대화를 다시 분석하여 통합 결과 반환.
+        이전 분석의 결과를 참고해 대화를 다시 분석하여 통합 결과와 근거를 반환.
         """
         llm = ChatOpenAI(model="gpt-4o-mini", api_key=settings.openai_api_key)
         text = "\n".join(conversation_df["text"].tolist())
         prompt = f"""
-        아래 대화 내용을 다시 분석해줘. 
-        이전 분석 결과는 참고용이야. 결과를 JSON 형식으로 반환해줘.
-        - emotion, tone, style, score 포함
+        아래 대화 내용을 다시 분석해줘.
+        이전 분석 결과는 참고용이야. 
+        결과를 JSON 형식으로 반환해줘.
+        {{
+            "summary": "string",
+            "style_analysis": {{"emotion": "string", "tone": "string"}},
+            "score": float,
+            "reason": "string"
+        }}
         대화 내용:
         {text}
 
@@ -77,17 +100,38 @@ class ReAnalyzer:
         """
         try:
             response = llm.invoke(prompt)
-            if self.verbose:
-                print(f"🧠 [ReAnalyzer LLM 응답] {response.content if hasattr(response, 'content') else response}")
-            # mock response
-            return {
-                "summary": prev_result.get("summary", "대화 재분석 결과"),
-                "style_analysis": {"emotion": "긍정적", "tone": "차분함"},
-                "score": 0.78,
+            content = response.content if hasattr(response, "content") else str(response)
+            import json, re
+
+            # JSON 파싱 시도
+            try:
+                parsed = json.loads(content)
+            except json.JSONDecodeError:
+                parsed = {}
+                match = re.search(r"([0-1]\.\d+|\d\.\d+|\d)", content)
+                parsed["score"] = float(match.group(1)) if match else 0.75
+                parsed["reason"] = content.strip()[:200]
+
+            result = {
+                "summary": parsed.get("summary", prev_result.get("summary", "대화 재분석 결과")),
+                "style_analysis": parsed.get(
+                    "style_analysis",
+                    {"emotion": "긍정적", "tone": "차분함"}
+                ),
+                "score": parsed.get("score", 0.75),
+                "reason": parsed.get("reason", "재분석 결과에 대한 근거 없음"),
             }
+
+            if self.verbose:
+                print(f"🧠 [ReAnalyzer LLM 응답] {content}")
+                print(f"💬 [재분석 근거] {result['reason']}")
+
+            return result
+
         except Exception as e:
             print(f"⚠️ 재분석 실패: {e}")
             return prev_result
+
 
 # =====================================
 # ✅ AnalysisSaver (최종 결과 저장)
