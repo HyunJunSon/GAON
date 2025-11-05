@@ -16,3 +16,4 @@ class Conversation(Base):
     # Relationships
     user = relationship("User", back_populates="conversations")
     family = relationship("Family", back_populates="conversations")
+    files = relationship("ConversationFile", back_populates="conversation", cascade="all, delete-orphan")
