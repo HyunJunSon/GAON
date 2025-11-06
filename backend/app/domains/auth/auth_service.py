@@ -3,12 +3,15 @@ from datetime import timedelta
 from fastapi import Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordRequestForm
 from sqlalchemy.orm import Session
+from passlib.context import CryptContext
 
 from app.core import security
 from app.core.database import get_db
 from app.domains.auth import user_crud
 from app.domains.auth import user_schema
 from app.domains.auth import auth_schema as schemas
+
+pwd_context = CryptContext(schemes=["argon2"], deprecated="auto")
 
 
 def create_user_service(db: Session, user_create: user_schema.UserCreate):
@@ -43,7 +46,7 @@ def login_for_access_token(
     user = user_crud.get_user_by_email(db, email=form_data.username)
     
     # 사용자가 없거나 비밀번호가 일치하지 않으면 인증 오류 발생
-    if not user or not security.verify_password(form_data.password, user.password):
+    if not user or not pwd_context.verify(form_data.password, user.password):
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="이메일 또는 비밀번호가 잘못되었습니다.",

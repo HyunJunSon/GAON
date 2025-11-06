@@ -1,7 +1,6 @@
 from sqlalchemy.orm import Session
 from .user_schema import UserCreate
 from .user_models import User
-from app.core.security import hash_password
 from app.utils.logger import auth_logger
 from datetime import datetime
 from passlib.context import CryptContext
@@ -14,10 +13,10 @@ def create_user(db: Session, user_create: UserCreate):
     auth_logger.info(f"DB에 사용자 생성 시작: {user_create.email}")
     db_user = User(
         name=user_create.name,
-        password=hash_password(user_create.password),
+        password=pwd_context.hash(user_create.password),
         email=user_create.email,
         create_date=datetime.now(),
-        terms_agreed=user_create.terms_agreed,
+        terms_agreed=user_create.termsAgreed,
     )
     db.add(db_user)
     db.commit()

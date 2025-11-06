@@ -6,8 +6,9 @@ from ...utils.logger import auth_logger
 class UserCreate(BaseModel):
     name: str
     password: str
+    confirmPassword: str
     email: EmailStr
-    terms_agreed: bool
+    termsAgreed: bool
 
     @field_validator('name')
     def validate_name(cls, v):
@@ -29,12 +30,26 @@ class UserCreate(BaseModel):
             auth_logger.warning("비밀번호가 빈 값입니다.")
             raise ValueError('비밀번호는 빈 값일 수 없습니다.')
         
-        # 8~16자, 한글/영문/특수문자 최소 1가지 조합인지 확인
-        if not re.match(r'^(?=.*[A-Za-z])(?=.*[ㄱ-ㅎㅏ-ㅣ가-힣])(?=.*[@$!%*#?&])[A-Za-zㄱ-ㅎㅏ-ㅣ가-힣@$!%*#?&]{8,16}$', v):
+        # 8~16자, 영문/숫자/특수문자 최소 1가지 조합인지 확인 (프론트엔드와 동일)
+        if not re.match(r'^(?=.*[A-Za-z])(?=.*\d)(?=.*[`~!@\$!%*#^?&()\-\_=+])[A-Za-z\d`~!@\$!%*#^?&()\-\_=+]{8,16}$', v):
             auth_logger.warning(f"비밀번호 형식이 유효하지 않습니다: {v}")
-            raise ValueError('비밀번호는 8~16자이며, 한글, 영문, 특수문자를 각각 최소 1개 이상 포함해야 합니다.')
+            raise ValueError('비밀번호는 8~16자이며, 영문, 숫자, 특수문자를 각각 최소 1개 이상 포함해야 합니다.')
         
         auth_logger.debug("비밀번호 유효성 검사 통과")
+        return v
+
+    @field_validator('confirmPassword')
+    def validate_confirm_password(cls, v, info: FieldValidationInfo):
+        if not v or not v.strip():
+            auth_logger.warning("비밀번호 확인이 빈 값입니다.")
+            raise ValueError('비밀번호 확인은 빈 값일 수 없습니다.')
+        
+        # password와 일치하는지 확인
+        if 'password' in info.data and v != info.data['password']:
+            auth_logger.warning("비밀번호가 일치하지 않습니다.")
+            raise ValueError('비밀번호가 일치하지 않습니다.')
+        
+        auth_logger.debug("비밀번호 확인 유효성 검사 통과")
         return v
 
     @field_validator('email')
@@ -51,7 +66,7 @@ class UserCreate(BaseModel):
         auth_logger.debug(f"이메일 유효성 검사 통과: {v}")
         return v
 
-    @field_validator('terms_agreed')
+    @field_validator('termsAgreed')
     def validate_terms_agreed(cls, v):
         if v is not True:
             auth_logger.warning("약관 동의가 필요합니다.")
