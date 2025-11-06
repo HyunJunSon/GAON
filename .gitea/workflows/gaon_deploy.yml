@@ -27,9 +27,15 @@ jobs:
     - name: Check changed files
       id: changes
       run: |
-        echo "backend_changed=$(git diff --name-only HEAD~1 HEAD | grep -q '^backend/' && echo 'true' || echo 'false')" >> $GITHUB_OUTPUT
-        echo "frontend_changed=$(git diff --name-only HEAD~1 HEAD | grep -q '^frontend/' && echo 'true' || echo 'false')" >> $GITHUB_OUTPUT
-        echo "migration_changed=$(git diff --name-only HEAD~1 HEAD | grep -q '^backend/alembic/versions/' && echo 'true' || echo 'false')" >> $GITHUB_OUTPUT
+        # 최근 2개 커밋에서 변경된 파일들 확인 (머지 커밋 대응)
+        CHANGED_FILES=$(git diff --name-only HEAD~2 HEAD)
+        
+        echo "backend_changed=$(echo "$CHANGED_FILES" | grep -q '^backend/' && echo 'true' || echo 'false')" >> $GITHUB_OUTPUT
+        echo "frontend_changed=$(echo "$CHANGED_FILES" | grep -q '^frontend/' && echo 'true' || echo 'false')" >> $GITHUB_OUTPUT
+        echo "migration_changed=$(echo "$CHANGED_FILES" | grep -q '^backend/alembic/versions/' && echo 'true' || echo 'false')" >> $GITHUB_OUTPUT
+        
+        # 디버깅용 로그
+        echo "Changed files: $CHANGED_FILES"
 
   build-backend:
     needs: check-changes
