@@ -2,6 +2,7 @@
 
 import { AnalysisRes, fetchAnalysis, getConversationId, startAnalysis, StartAnalysisAny } from "@/apis/analysis";
 import { qk } from "@/constants/queryKeys";
+import { conversationIdStorage } from "@/utils/conversationIdStorage";
 import { useMutation, useQuery, UseQueryResult } from "@tanstack/react-query";
 import { useRouter } from "next/navigation";
 import { startTransition } from "react";
@@ -23,10 +24,12 @@ export function useStartAnalysis() {
     onSuccess: (res: StartAnalysisAny) => {
       // 백엔드 snake_case 대비 방어
       const id = getConversationId(res);
+      conversationIdStorage.set(id);
+
       // 전환 부드럽게
-      router.prefetch(`/analysis/${id}`);
+      router.prefetch(`/analysis`);
       startTransition(() => {
-        router.replace(`/analysis/${id}`);
+        router.replace(`/analysis`);
       });
     }
   })
