@@ -2,11 +2,14 @@ import os
 from sqlalchemy import create_engine
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker, Session
-from .config import settings
 
+# DATABASE_URL 환경변수 직접 사용 (보안상 더 안전)
+DATABASE_URL = os.getenv("DATABASE_URL")
 
-# PostgreSQL 데이터베이스 연결 설정 (pgvector 지원 포함)
-DATABASE_URL = f"postgresql+psycopg2://{settings.db_user}:{settings.db_password}@{settings.db_host}:{settings.db_port}/{settings.db_name}"
+if not DATABASE_URL:
+    # 환경변수가 없을 경우 개별 설정값으로 구성
+    from .config import settings
+    DATABASE_URL = f"postgresql+psycopg2://{settings.db_user}:{settings.db_password}@{settings.db_host}:{settings.db_port}/{settings.db_name}"
 
 # 데이터베이스 엔진 생성 - 연결 풀 설정 포함
 engine = create_engine(

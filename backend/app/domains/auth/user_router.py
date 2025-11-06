@@ -11,7 +11,6 @@ signup_router = APIRouter(
     prefix="/api/auth",
 )
 
-
 @signup_router.post("/signup", status_code=status.HTTP_204_NO_CONTENT)
 def user_create(_user_create: user_schema.UserCreate, db: Session = Depends(get_db)):
     auth_logger.info(f"회원가입 시도: { _user_create.name } - { _user_create.email }")

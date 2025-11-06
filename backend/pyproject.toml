@@ -9,8 +9,10 @@ dependencies = [
     # --- Web framework ---
     "fastapi==0.115.0",
     "uvicorn[standard]==0.30.3",
+    "python-multipart==0.0.12", # 파일 업로드용
     # --- Authentication & Security ---
-    "passlib[bcrypt]>=1.7.4",
+    "passlib>=1.7.4",
+    "argon2-cffi==25.1.0",
     # --- Database ---
     "sqlalchemy==2.0.43",
     "alembic==1.13.2",
@@ -24,6 +26,8 @@ dependencies = [
     "python-dotenv==1.1.1",
     "PyYAML==6.0.2",
     "orjson==3.11.3",
+    # --- Email validation for Pydantic EmailStr ---
+    "email-validator==2.3.0",
     # --- HTTP & Parsing ---
     "httpx==0.28.1",
     "aiohttp==3.13.0",
@@ -32,6 +36,9 @@ dependencies = [
     "requests==2.32.5",
     "tqdm==4.67.1",
     "pypdf==6.1.1",
+    # --- Document Processing ---
+    "ebooklib==0.18",
+    "python-docx==1.1.2",
     # --- AI / LLM Core ---
     "openai==1.106.1",
     "anthropic==0.69.0",
@@ -63,11 +70,18 @@ dependencies = [
     "langchain-postgres==0.0.15",
     "langchain-text-splitters==0.3.11",
     "langsmith==0.4.26",
+    # --- Google Cloud ---
+    "google-cloud-storage==3.4.1",
     # --- Typing ---
     "typing-inspect==0.9.0",
     "typing-inspection==0.4.1",
     "typing_extensions==4.12.2",
+    "types-passlib>=1.7.7.20250602",
+    "pip>=25.3",
+    "docx>=0.2.4",
 ]
+[tool.uv]
+venv = "gaon-venv"
 
 [tool.setuptools]
 packages = ["app"]
@@ -82,5 +96,6 @@ dev = [
     "black",
     "ruff",
     "httpx",
+    "reportlab==4.2.5",
 ]
 

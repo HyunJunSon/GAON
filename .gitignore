@@ -67,7 +67,6 @@ build/
 *.7z
 *.rar
 
-<<<<<<< Updated upstream
 # mkdocs documentation
 /site
 
@@ -136,9 +135,8 @@ coverage/
 
 # vscode
 settings.json
-=======
+
 # Others
 *.pid
 *.seed
 *.pid.lock
->>>>>>> Stashed changes
