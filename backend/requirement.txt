@@ -42,37 +42,37 @@ python-docx==1.1.2
 reportlab==4.2.5
 
 # === AI / LLM Core ===
-# openai==1.106.1
-# anthropic==0.69.0
-# google-api-python-client==2.184.0
-# huggingface-hub==0.35.3
-# transformers==4.42.4
-# tokenizers==0.19.1
-# filelock==3.13.1
-# fsspec==2024.6.1
-# # torch
-# # torchvision
-# # torchaudio
-# accelerate==1.10.1
-# safetensors==0.6.2
-# sentence-transformers==5.1.1
-# scikit-learn==1.7.2
-# scipy==1.14.1
-# numpy==1.26.4
-# networkx==3.3
-# 
-# # === LangChain & Related ===
-# langchain==0.3.27
-# langchain-core==0.3.79
-# langchain-community==0.3.31
-# langchain-openai==0.3.32
-# langchain-anthropic==0.3.22
-# langchain-google-genai==2.1.12
-# langchain-huggingface==0.3.1
-# langchain-experimental==0.3.4
-# langchain-postgres==0.0.15
-# langchain-text-splitters==0.3.11
-# langsmith==0.4.26
+openai==1.106.1
+anthropic==0.69.0
+google-api-python-client==2.184.0
+huggingface-hub==0.35.3
+transformers==4.42.4
+tokenizers==0.19.1
+filelock==3.13.1
+fsspec==2024.6.1
+torch==2.5.1
+torchvision==0.20.1
+torchaudio==2.5.1
+accelerate==1.10.1
+safetensors==0.6.2
+sentence-transformers==5.1.1
+scikit-learn==1.7.2
+scipy==1.14.1
+numpy==1.26.4
+networkx==3.3
+
+# === LangChain & Related ===
+langchain==0.3.27
+langchain-core==0.3.79
+langchain-community==0.3.31
+langchain-openai==0.3.32
+langchain-anthropic==0.3.22
+langchain-google-genai==2.1.12
+langchain-huggingface==0.3.1
+langchain-experimental==0.3.4
+langchain-postgres==0.0.15
+langchain-text-splitters==0.3.11
+langsmith==0.4.26
 
 
 # === Google Cloud ===
