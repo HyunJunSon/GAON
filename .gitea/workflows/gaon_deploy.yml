@@ -169,6 +169,8 @@ jobs:
           # DB 마이그레이션 적용 (마이그레이션 변경사항이 있을 때)
           if [ "${{ needs.check-changes.outputs.migration_changed }}" == "true" ]; then
             echo "🔄 Applying database migrations..."
+            # alembic.ini 파일을 컨테이너로 복사
+            docker cp /home/ubuntu/gaon/alembic.ini gaon-backend:/app/alembic.ini
             docker exec gaon-backend alembic upgrade head || rollback
             echo "✅ Database migrations applied successfully!"
           fi
