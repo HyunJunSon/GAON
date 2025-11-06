@@ -17,6 +17,7 @@ jobs:
     outputs:
       backend_changed: ${{ steps.changes.outputs.backend_changed }}
       frontend_changed: ${{ steps.changes.outputs.frontend_changed }}
+      migration_changed: ${{ steps.changes.outputs.migration_changed }}
     steps:
     - name: Checkout repository
       uses: actions/checkout@v3
@@ -28,6 +29,7 @@ jobs:
       run: |
         echo "backend_changed=$(git diff --name-only HEAD~1 HEAD | grep -q '^backend/' && echo 'true' || echo 'false')" >> $GITHUB_OUTPUT
         echo "frontend_changed=$(git diff --name-only HEAD~1 HEAD | grep -q '^frontend/' && echo 'true' || echo 'false')" >> $GITHUB_OUTPUT
+        echo "migration_changed=$(git diff --name-only HEAD~1 HEAD | grep -q '^backend/alembic/versions/' && echo 'true' || echo 'false')" >> $GITHUB_OUTPUT
 
   build-backend:
     needs: check-changes
@@ -156,6 +158,13 @@ jobs:
           docker-compose -f docker-compose.prod.yml up -d || rollback
           echo "⏳ Waiting for services to start..."
           sleep 20
+          
+          # DB 마이그레이션 적용 (마이그레이션 변경사항이 있을 때)
+          if [ "${{ needs.check-changes.outputs.migration_changed }}" == "true" ]; then
+            echo "🔄 Applying database migrations..."
+            docker exec gaon-backend alembic upgrade head || rollback
+            echo "✅ Database migrations applied successfully!"
+          fi
           
           # 헬스체크
           if ! curl -f http://localhost:8000/health; then
