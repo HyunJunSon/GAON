@@ -111,14 +111,21 @@ class CleanerGraph:
     def run(self, **kwargs):
         state = CleanerState(
             verbose=self.verbose,
-            user_id="201",  # ✅ 업로더
+            user_id="201",
             context="샘플 대화 context",
             created_at="2025-11-05 12:00:00",
         )
+
         print("\n🚀 [CleanerGraph] 실행 시작\n" + "=" * 60)
-        for event in self.pipeline.stream(state):
-            node_name = event.get("node")
-            if node_name and self.verbose:
-                print(f"➡️  노드 실행 중: {node_name}")
-        print("✅ [CleanerGraph] 파이프라인 실행 완료\n" + "=" * 60)
-        return state
+        # ✅ stream 대신 invoke로 변경 — invoke는 최종 state를 반환
+        result_state = self.pipeline.invoke(state)
+        
+        if self.verbose:
+            print("✅ [CleanerGraph] 파이프라인 실행 완료\n" + "=" * 60)
+
+        # ✅ CleanerState로 래핑 (혹시 dict 형태로 리턴될 경우 대비)
+        if isinstance(result_state, dict):
+            result_state = CleanerState(**result_state)
+
+        return result_state
+

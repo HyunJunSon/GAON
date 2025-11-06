@@ -1,22 +1,24 @@
-from .graph_cleaner import CleanerGraph
-import pprint
+from app.agent.Cleaner.graph_cleaner import CleanerGraph
 
-def main():
+def run_cleaner(sample=True):
+    """
+    Cleaner 모듈 실행 진입점 함수
+    """
     cg = CleanerGraph(verbose=True)
-    res = cg.run()
+    result = cg.run(sample=sample)
 
-    # ✅ 결과 확인
-    print("\n=== ✅ 최종 상태 ===")
-    pprint.pprint(res.__dict__)
+    # 후속 단계용 기본 메타데이터 추가
+    result_dict = {
+        "conv_id": "C001",
+        "conversation_df": result.cleaned_df if hasattr(result, "cleaned_df") else None,
+        "user_id": "201",  # 샘플 사용자 ID
+    }
 
-    # conversation_df 출력
-    conv_df = res.meta.get("conversation_df")
-    if conv_df is not None:
-        try:
-            print("\n=== 💾 conversation_df ===")
-            print(conv_df.to_string(index=False))
-        except Exception:
-            print(conv_df)
+    print("✅ [CleanerGraph] 실행 완료")
+    return result_dict
+
 
 if __name__ == "__main__":
-    main()
+    print("단독 실행 모드")
+    output = run_cleaner(sample=True)
+    print(output)

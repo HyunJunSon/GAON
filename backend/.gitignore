@@ -140,3 +140,8 @@ gaon.egg-info/
 
 # gcp 서비스계정 파일
 gcp_service_account_key.json
+
+# Testing config files
+app/core/config_testing.py
+app/core/database_testing.py
+.env_testing
