@@ -2,7 +2,8 @@ from fastapi import FastAPI
 from starlette.middleware.cors import CORSMiddleware
 
 from .core.config import settings
-from .domains.auth.user_router import auth_router
+from .domains.auth.user_router import signup_router
+from .domains.auth.auth_router import router as auth_router
 from .domains.conversation.router import router as conversation_router
 
 # 모든 모델 import (SQLAlchemy 관계 설정을 위해 필요)
@@ -30,5 +31,6 @@ def health_check():
     return {"message": "안녕하세요. 가족의온도를 책임지는 가온 입니다."}
 
 
+app.include_router(signup_router)
 app.include_router(auth_router)
 app.include_router(conversation_router)
