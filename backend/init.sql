@@ -1,8 +1,8 @@
 -- pgvector 확장을 활성화 (한 번만 실행)
 CREATE EXTENSION IF NOT EXISTS vector;
 
--- user 테이블 생성
-CREATE TABLE user (
+-- users 테이블 생성
+CREATE TABLE users (
     id SERIAL PRIMARY KEY,
     name VARCHAR(255) NOT NULL,
     password VARCHAR(255) NOT NULL,
@@ -23,11 +23,25 @@ CREATE TABLE conversation (
     id SERIAL PRIMARY KEY,
     title VARCHAR(255) NOT NULL,
     content TEXT,
-    user_id INTEGER REFERENCES user(id),
+    user_id INTEGER REFERENCES users(id),
     family_id INTEGER REFERENCES family(id),
     create_date TIMESTAMP NOT NULL
 );
 
+-- conversation_file 테이블 생성 (파일 업로드 관리)
+CREATE TABLE conversation_file (
+    id SERIAL PRIMARY KEY,
+    conversation_id INTEGER REFERENCES conversation(id) ON DELETE CASCADE,
+    gcs_file_path VARCHAR(500) NOT NULL,
+    original_filename VARCHAR(255) NOT NULL,
+    file_type VARCHAR(50) NOT NULL,
+    file_size INTEGER NOT NULL,
+    processing_status VARCHAR(20) DEFAULT 'pending',
+    raw_content TEXT,
+    chunked_content JSONB,
+    upload_date TIMESTAMP DEFAULT NOW(),
+    processed_date TIMESTAMP
+);
 -- ideal_answer 테이블 생성 (RAG 시스템용)
 CREATE TABLE ideal_answer (
     idea_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),              -- 모범답안ID
@@ -37,12 +51,13 @@ CREATE TABLE ideal_answer (
     analysisid UUID                                                  -- 분석결과ID (외래키 가능)
 );
 
--- created_at 컬럼에 인덱스 생성 (성능 최적화)
+-- 인덱스 생성
 CREATE INDEX idx_ideal_answer_created_at ON ideal_answer(created_at);
-
--- source 컬럼에 GIN 인덱스 생성 (全文 검색용)
 CREATE INDEX idx_ideal_answer_source ON ideal_answer USING gin(to_tsvector('english', source));
-
--- embedding 컬럼에 ivfflat 인덱스 생성 (벡터 유사도 검색 최적화)
 CREATE INDEX idx_ideal_answer_embedding ON ideal_answer USING ivfflat (embedding vector_cosine_ops) WITH (lists = 100);
+
+-- conversation_file 인덱스
+CREATE INDEX idx_conversation_file_conversation_id ON conversation_file(conversation_id);
+CREATE INDEX idx_conversation_file_processing_status ON conversation_file(processing_status);
+CREATE INDEX idx_conversation_file_upload_date ON conversation_file(upload_date);
 

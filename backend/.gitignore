@@ -145,3 +145,7 @@ gcp_service_account_key.json
 app/core/config_testing.py
 app/core/database_testing.py
 .env_testing
+
+# 테스트용 데이터
+test-raw/data/
+

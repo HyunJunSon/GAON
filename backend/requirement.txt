@@ -1,6 +1,7 @@
 # === Web Framework ===
 fastapi==0.115.0
 uvicorn[standard]==0.30.3
+python-multipart==0.0.12
 
 # === Authentication & Security ===
 passlib>=1.7.4
