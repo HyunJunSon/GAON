@@ -1,4 +1,7 @@
 'use client';
+// 업로드/분석 요청 페이지 스켈레톤
+// 지금은 실제 업로드/분석 요청 없이 UI 골격만 표시
+// 2단계에서 FormData 업로드 + 서보 호출(POST /conversations/analyze) 연결 예정
 
 import { useState } from 'react';
 import { useStartAnalysis } from '@/hooks/useAnalysis';
@@ -6,12 +9,11 @@ import { useServerError } from '@/hooks/useServerError';
 import ErrorAlert from '@/components/ui/ErrorAlert';
 import FileDropzone from '@/components/upload/FileDropzone';
 
-// 텍스트 업로드 전용: 확장자/타입을 제한
-const ACCEPT_MIME = ['text/plain'];
-const ACCEPT_EXT = ['.txt']; // 필요 시 .md 등 추가
-const MAX_MB = 5; // 텍스트는 작게 제한(필요 시 조정)
+const ACCEPT_EXT = ['.mp3', '.wav', '.m4a'];
+const ACCEPT_MIME = ['audio/mpeg', 'audio/mp3', 'audio/wav', 'audio/x-wav', 'audio/m4a']
+const MAX_MB = 25;
 
-export default function ConversationTextUploadPage() {
+export default function ConversationPage() {
   const [file, setFile] = useState<File | null>(null);
   const { mutate, isPending } = useStartAnalysis();
   const { serverError, handleError, clearError } = useServerError();
@@ -24,18 +26,18 @@ export default function ConversationTextUploadPage() {
   const onStart = () => {
     if (!file) return;
     mutate(
-      { file, lang: 'ko' }, // 서버가 텍스트를 음성과 동일 엔드포인트에서 처리한다고 가정
-      { onError: handleError }
+      { file, lang: 'ko' },
+      {
+        onError: handleError
+      }
     );
   };
 
   return (
     <main className="space-y-6">
       <header>
-        <h1 className="text-2xl font-semibold">텍스트 업로드</h1>
-        <p className="text-sm text-gray-600">
-          .txt 파일을 업로드하여 대화 분석을 시작합니다.
-        </p>
+        <h1 className="text-2xl font-semibold">대화 업로드</h1>
+        <p className="text-sm text-gray-600">음성 파일을 선택하고 분석을 시작하세요.</p>
       </header>
 
       {serverError && <ErrorAlert message={serverError} />}

@@ -9,7 +9,7 @@ class Conversation(Base):
     id = Column(Integer, primary_key=True)
     title = Column(String, nullable=False)
     content = Column(Text)
-    user_id = Column(Integer, ForeignKey("user.id"))
+    user_id = Column(Integer, ForeignKey("users.id"))
     family_id = Column(Integer, ForeignKey("family.id"))
     create_date = Column(DateTime, nullable=False)
     

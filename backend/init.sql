@@ -1,8 +1,8 @@
 -- pgvector 확장을 활성화 (한 번만 실행)
 CREATE EXTENSION IF NOT EXISTS vector;
 
--- user 테이블 생성
-CREATE TABLE user (
+-- users 테이블 생성
+CREATE TABLE users (
     id SERIAL PRIMARY KEY,
     name VARCHAR(255) NOT NULL,
     password VARCHAR(255) NOT NULL,
@@ -23,7 +23,7 @@ CREATE TABLE conversation (
     id SERIAL PRIMARY KEY,
     title VARCHAR(255) NOT NULL,
     content TEXT,
-    user_id INTEGER REFERENCES user(id),
+    user_id INTEGER REFERENCES users(id),
     family_id INTEGER REFERENCES family(id),
     create_date TIMESTAMP NOT NULL
 );
@@ -42,7 +42,6 @@ CREATE TABLE conversation_file (
     upload_date TIMESTAMP DEFAULT NOW(),
     processed_date TIMESTAMP
 );
-
 -- ideal_answer 테이블 생성 (RAG 시스템용)
 CREATE TABLE ideal_answer (
     idea_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),              -- 모범답안ID
