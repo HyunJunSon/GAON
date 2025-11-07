@@ -165,7 +165,11 @@ jobs:
           # 새로 시작
           docker-compose -f docker-compose.prod.yml up -d || rollback
           echo "⏳ Waiting for services..."
-          sleep 30
+          sleep 60
+          
+          # 컨테이너 상태 확인
+          docker ps -a
+          docker logs gaon-backend --tail 10
           
           # DB 마이그레이션 적용
           if [ "${{ needs.check-changes.outputs.migration_changed }}" == "true" ]; then
@@ -179,11 +183,20 @@ jobs:
             echo "✅ Database migrations applied!"
           fi
           
-          # 헬스체크
-          if ! curl -f http://localhost:8000/health; then
-            echo "❌ Backend health check failed!"
-            rollback
-          fi
+          # 헬스체크 (더 관대하게)
+          echo "🔍 Health check..."
+          for i in {1..5}; do
+            if curl -f http://localhost:8000/health; then
+              echo "✅ Backend health check passed!"
+              break
+            fi
+            echo "⏳ Attempt $i/5 failed, waiting 10s..."
+            sleep 10
+            if [ $i -eq 5 ]; then
+              echo "❌ Backend health check failed after 5 attempts!"
+              rollback
+            fi
+          done
           
           # 정리
           docker image prune -f
