@@ -7,8 +7,8 @@ chunking.py 실행시 가장 작은 목차 분류를 기준으로 600~800자 청
 embedding_save.py 실행시 임베드 텍스트를 벡터화하고 전체 jsonl을 postgresql에 저장함\
 $ python embedding_save.py --create-table-if-missing\
 
-embedding_data_analysis -> \
-embedding_data_analysis.py data_analysis의 summary부분만 벡터화 시켜도 될듯함\
+data_analysis_embedding -> \
+data_analysis_embedding.py data_analysis의 summary부분만 벡터화 시켜도 될듯함\
 
 retriever.py 실행시 data_analysis의 interest, tone, top_words, summary를 고려하여 책 가져옴\
 텍스트 인덱스(FTS, trigram)\
