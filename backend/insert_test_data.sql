@@ -1,14 +1,11 @@
--- =========================================
--- ✅ 테스트 데이터 INSERT
--- =========================================
--- 목적: conversation 테이블에 샘플 대화 데이터 삽입
--- 파일: backend/insert_test_data.sql
+Copy-- =========================================
+-- ✅ 테스트 데이터 INSERT (FK 제약 해결)
 -- =========================================
 
 -- ✅ 1. 기존 테스트 데이터 삭제 (선택)
--- DELETE FROM conversation WHERE cont_title LIKE '테스트%';
+DELETE FROM conversation WHERE cont_title LIKE '테스트%';
 
--- ✅ 2. 샘플 대화 데이터 INSERT
+-- ✅ 2. 샘플 대화 데이터 INSERT (conv_file_id = NULL)
 INSERT INTO conversation (
     conv_id,
     cont_title,
@@ -96,9 +93,9 @@ INSERT INTO conversation (
 동생한테 용돈을 좀 달라고 해서 그 물건을 사면 괜찮아져요.',
     '2025-11-07 11:12:00',
     '2025-11-07 11:31:08',
-    1,  -- ✅ user_id (users 테이블의 실제 ID로 수정 필요)
-    NULL,  -- family_id
-    NULL,  -- conv_file_id
+    1,
+    NULL,
+    NULL,  -- ✅ conv_file_id를 NULL로 설정
     NOW(),
     NOW()
 );
@@ -145,7 +142,7 @@ INSERT INTO conversation (
     '2025-11-06 18:05:00',
     1,
     NULL,
-    NULL,
+    NULL,  -- ✅ conv_file_id를 NULL로 설정
     NOW(),
     NOW()
 );
@@ -189,7 +186,7 @@ INSERT INTO conversation (
     '2025-11-05 20:10:00',
     1,
     NULL,
-    NULL,
+    NULL,  -- ✅ conv_file_id를 NULL로 설정
     NOW(),
     NOW()
 );

@@ -13,7 +13,7 @@
 4. update_conversation()          - 대화 내용 업데이트
 5. get_user_by_id()              - Analysis: 사용자 정보 조회
 6. get_family_by_id()            - Analysis: 가족 정보 조회
-7. save_analysis_result()        - Analysis: 분석 결과 저장 (INSERT)
+7. save_analysis_result()        - Analysis: 분석 결과 저장 (INSERT) ← 🔧 수정됨
 8. update_analysis_result()      - QA: 분석 결과 업데이트 (UPDATE)
 9. get_analysis_by_conv_id()     - 분석 결과 조회
 """
@@ -300,9 +300,15 @@ def save_analysis_result(
     """
     ✅ analysis_result 테이블에 분석 결과 저장 (INSERT)
     
+    🔧 수정 사항 (2025-11-07):
+    - user_id 타입 불일치 해결
+    - conversation.user_id: INTEGER
+    - analysis_result.user_id: UUID
+    - INTEGER → UUID 자동 변환 로직 추가
+    
     Args:
         db: SQLAlchemy 세션
-        user_id: 사용자 ID (UUID)
+        user_id: 사용자 ID (INTEGER 또는 UUID 문자열)
         conv_id: 대화 ID (UUID)
         summary: 분석 요약
         style_analysis: 스타일 분석 (JSONB)
@@ -318,7 +324,40 @@ def save_analysis_result(
     사용처:
         - Analysis/nodes.py의 AnalysisSaver
     """
+    import json
+    
     analysis_id = uuid.uuid4()
+    
+    # =========================================
+    # 🔧 수정: user_id 타입 변환 로직
+    # =========================================
+    # 이유: DB 스키마 불일치
+    # - conversation.user_id: INTEGER (1, 2, 3...)
+    # - analysis_result.user_id: UUID
+    # 
+    # 해결: INTEGER를 받으면 UUID로 변환
+    # =========================================
+    
+    if user_id:
+        # user_id가 문자열 숫자(INTEGER)인지 확인
+        user_id_str = str(user_id)
+        
+        if user_id_str.isdigit():
+            # INTEGER인 경우: UUID로 변환
+            # uuid.uuid5()를 사용해 동일한 user_id는 항상 동일한 UUID 생성
+            user_uuid = str(uuid.uuid5(uuid.NAMESPACE_DNS, f"user_{user_id_str}"))
+            print(f"   🔧 [CRUD] user_id 변환: {user_id_str} (INTEGER) → {user_uuid} (UUID)")
+        else:
+            # 이미 UUID 형식이면 그대로 사용
+            user_uuid = user_id_str
+            print(f"   ✅ [CRUD] user_id 유지: {user_uuid} (UUID)")
+    else:
+        # user_id가 없으면 에러
+        raise ValueError("❌ user_id가 필요합니다!")
+    
+    # =========================================
+    # ✅ DB INSERT 실행
+    # =========================================
     
     query = text("""
         INSERT INTO analysis_result (
@@ -333,10 +372,9 @@ def save_analysis_result(
         RETURNING analysis_id, user_id, conv_id, summary, score, confidence_score
     """)
     
-    import json
     result = db.execute(query, {
         "analysis_id": str(analysis_id),
-        "user_id": user_id,
+        "user_id": user_uuid,  # ← 🔧 변환된 UUID 사용
         "conv_id": conv_id,
         "summary": summary,
         "style_analysis": json.dumps(style_analysis, ensure_ascii=False),
@@ -352,7 +390,7 @@ def save_analysis_result(
     row = result.fetchone()
     return {
         "analysis_id": str(row[0]),
-        "user_id": row[1],
+        "user_id": str(row[1]),
         "conv_id": row[2],
         "summary": row[3],
         "score": row[4],
@@ -436,7 +474,7 @@ def update_analysis_result(
     row = result.fetchone()
     return {
         "analysis_id": str(row[0]),
-        "user_id": row[1],
+        "user_id": str(row[1]),
         "conv_id": row[2],
         "summary": row[3],
         "score": row[4],
@@ -470,7 +508,7 @@ def get_analysis_by_conv_id(db: Session, conv_id: str) -> Optional[Dict[str, Any
         import json
         return {
             "analysis_id": str(result[0]),
-            "user_id": result[1],
+            "user_id": str(result[1]),
             "conv_id": result[2],
             "summary": result[3],
             "style_analysis": json.loads(result[4]) if result[4] else {},

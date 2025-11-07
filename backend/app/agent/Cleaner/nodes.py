@@ -1,48 +1,76 @@
+# app/agent/Cleaner/nodes.py
 from __future__ import annotations
 from dataclasses import dataclass
 from datetime import datetime
 from typing import Any, Dict, List, Tuple
 from app.core.config import settings  # ✅ LLM 키 사용
 from langchain_openai import ChatOpenAI  # ✅ LLM 연결
-import uuid  # ✅ ConversationSaver용 UUID 생성
+import uuid
 
 try:
     import pandas as pd
 except Exception:
     pd = None
 
-
-# =========================================
-# ✅ 샘플 대화 (노이즈 일부 포함)
-# =========================================
-SAMPLE_DIALOG = [
-    ("201", "오늘 하루 어땠어?/\d\d", "2025-11-04 18:10:00"),
-    ("202", "음… 그냥 평범했어. 회사 일 좀 많았어.", "2025-11-04 18:11:10"),
-    ("201", "요즘 피곤해 보이 네. 괜찮아?", "2025-11-04 18:12:00"),
-    ("202", "응, 괜찮아. 그냥 잠을 좀 못 잤어.", "2025-11-04 18:13:00"),
-    ("203", "엄마아아, 나 숙제 다 했어!", "2025-11-04 18:14:20"),
-    ("201", "우리 아들 최고야이네! 이제 놀아도 돼~", "2025-11-04 18:15:00"),
-    ("202", "하하, 고마워. 너 덕분에 힘난다.", "2025-11-04 18:16:40"),
-]
+# ✅ DB 연동 추가
+from sqlalchemy.orm import Session
+from app.agent.crud import (
+    get_conversation_by_id,
+    get_conversation_by_pk,
+    conversation_to_dataframe,
+)
 
 
 # =========================================
-# ✅ RawFetcher
+# ✅ RawFetcher (DB 연동)
 # =========================================
 @dataclass
 class RawFetcher:
-    """샘플 데이터를 불러와 DataFrame으로 반환"""
-    def fetch(self, *args, **kwargs) -> Any:
-        if pd is not None:
-            df = pd.DataFrame(
-                [{"speaker": s, "text": t, "timestamp": ts} for s, t, ts in SAMPLE_DIALOG]
-            )
-            return df
-        return SAMPLE_DIALOG
+    """
+    ✅ DB에서 conversation 조회
+    
+    변경 사항:
+    - 기존: SAMPLE_DIALOG (하드코딩)
+    - 변경: DB에서 conversation 조회
+    """
+    def fetch(self, db: Session = None, conv_id: str = None, pk_id: int = None, *args, **kwargs) -> Any:
+        """
+        DB에서 conversation 조회 후 DataFrame 반환
+        
+        Args:
+            db: SQLAlchemy 세션
+            conv_id: 대화 UUID (선택)
+            pk_id: 대화 PK ID (선택)
+        
+        Returns:
+            DataFrame (speaker, text, timestamp)
+        """
+        if db is None:
+            raise ValueError("❌ RawFetcher: db 세션이 필요합니다.")
+        
+        # ✅ DB에서 conversation 조회
+        if conv_id:
+            conversation = get_conversation_by_id(db, conv_id)
+        elif pk_id:
+            conversation = get_conversation_by_pk(db, pk_id)
+        else:
+            raise ValueError("❌ RawFetcher: conv_id 또는 pk_id를 제공해야 합니다.")
+        
+        if not conversation:
+            raise ValueError(f"❌ RawFetcher: conversation을 찾을 수 없습니다. (conv_id={conv_id}, pk_id={pk_id})")
+        
+        print(f"✅ [RawFetcher] 대화 조회 성공: {conversation['cont_title'][:50]}...")
+        
+        # ✅ conversation → DataFrame 변환
+        df = conversation_to_dataframe(conversation)
+        
+        print(f"   → DataFrame 생성: {len(df)}개 발화")
+        
+        return df
 
 
 # =========================================
-# ✅ RawInspector
+# ✅ RawInspector (기존 유지)
 # =========================================
 @dataclass
 class RawInspector:
@@ -78,7 +106,7 @@ class RawInspector:
 
 
 # =========================================
-# ✅ ConversationCleaner (LLM 연결)
+# ✅ ConversationCleaner (기존 유지)
 # =========================================
 @dataclass
 class ConversationCleaner:
@@ -114,7 +142,7 @@ class ConversationCleaner:
 
 
 # =========================================
-# ✅ ConversationValidator (LLM 판단)
+# ✅ ConversationValidator (기존 유지)
 # =========================================
 @dataclass
 class ConversationValidator:
@@ -152,54 +180,32 @@ class ConversationValidator:
 
 
 # =========================================
-# ✅ ConversationSaver (DB 매핑형 구조로 리팩토링)
+# ✅ ConversationSaver (수정 - DB 이미 있으므로 스킵)
 # =========================================
 @dataclass
 class ConversationSaver:
-    """conversation 테이블 구조에 맞게 정제된 데이터를 변환"""
+    """
+    ✅ conversation 테이블에 저장 (이미 DB에 있으므로 현재는 스킵)
+    
+    변경 사항:
+    - 기존: DataFrame → conversation 테이블 INSERT
+    - 변경: 이미 DB에 있으므로 메타데이터만 state에 저장
+    """
     def save(self, df: Any, state=None) -> Dict[str, Any]:
+        """
+        이미 DB에 conversation이 존재하므로 스킵
+        state에 메타데이터만 저장
+        """
         try:
-            if pd is not None and isinstance(df, pd.DataFrame):
-                conv_id = uuid.uuid4()
-                raw_id = uuid.uuid4()  # ✅ 추후 raw table 연동 시 수정
-                created_at = datetime.utcnow()
-                updated_at = created_at
-
-                conv_start = pd.to_datetime(df["timestamp"]).min()
-                conv_end = pd.to_datetime(df["timestamp"]).max()
-
-                cont_content = "\n".join(
-                    [f"{r['speaker']}: {r['text']}" for _, r in df.iterrows()]
-                )
-                cont_title = df.iloc[0]["text"][:30] + "..."
-
-                user_id = getattr(state, "user_id", None)
-                conv_create_id = user_id
-
-                record = {
-                    "conv_id": str(conv_id),
-                    "cont_title": cont_title,
-                    "cont_content": cont_content,
-                    "conv_start": conv_start,
-                    "conv_end": conv_end,
-                    "conv_create_id": str(conv_create_id),
-                    "created_at": created_at,
-                    "updated_at": updated_at,
-                    "user_id": str(user_id),
-                    "raw_id": str(raw_id),
-                }
-
-                conv_df = pd.DataFrame([record])
-                state.meta["conversation_df"] = conv_df
-
+            # ✅ 이미 DB에 저장되어 있으므로 메타정보만 반환
+            if state and hasattr(state, "conv_id"):
                 return {
-                    "status": "saved",
-                    "conversation_id": str(conv_id),
-                    "rows": len(conv_df),
-                    "record": record,
+                    "status": "already_saved",
+                    "conversation_id": state.conv_id,
+                    "message": "대화는 이미 DB에 저장되어 있습니다.",
                 }
-
-            return {"status": "noop"}
+            
+            return {"status": "skipped"}
 
         except Exception as e:
             return {"status": "error", "error": str(e)}
