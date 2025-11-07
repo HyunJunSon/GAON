@@ -21,9 +21,9 @@ type FileDropzoneProps = {
 
 // 1.2. 매개변수 기본값을 지정해서 아무 값도 안줘도 작동하도록 함
 export default function FileDropzone({
-  acceptExt = ['.txt'],
-  acceptMime = ['text/plain'],
-  maxMB = 5,
+  acceptExt = ['.txt', '.pdf', '.docx'], // 백엔드와 동기화
+  acceptMime = ['text/plain', 'application/pdf', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'], // 백엔드와 동기화
+  maxMB = 50, // 백엔드와 동기화 (50MB)
   multiple = false,
   onFileSelect,
   onError,
