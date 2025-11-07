@@ -33,7 +33,7 @@ async def upload_conversation_file(
             message="파일이 성공적으로 업로드되고 처리되었습니다.",
             conversation_id=conversation.id,
             file_id=db_file.id,
-            processing_status=db_file.processing_status,
+            status=db_file.processing_status,
             gcs_file_path=db_file.gcs_file_path
         )
     except HTTPException:

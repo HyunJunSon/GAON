@@ -87,7 +87,7 @@ def test_upload_conversation_file_with_auth(mock_service_class, client_with_auth
     data = response.json()
     assert data["conversation_id"] == 1
     assert data["file_id"] == 1
-    assert data["processing_status"] == "completed"
+    assert data["status"] == "completed"  # processing_status -> status로 변경
     
     # 서비스가 올바른 user_id로 호출되었는지 확인
     mock_service.upload_file_and_create_conversation.assert_called_once()
