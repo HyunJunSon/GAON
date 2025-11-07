@@ -1,11 +1,7 @@
 from pydantic import BaseModel
 from typing import Optional, List, Dict, Any
 from datetime import datetime
-
-
-# 지원하는 파일 형식 및 제한사항
-ALLOWED_FILE_TYPES = {"txt", "pdf", "docx"}
-MAX_FILE_SIZE = 50 * 1024 * 1024  # 50MB
+from app.core.config import settings
 
 
 class ConversationFileResponse(BaseModel):
@@ -37,3 +33,14 @@ class ConversationAnalysisResponse(BaseModel):
     dialog: List[Dict[str, Any]]
     status: str
     updated_at: datetime
+
+
+# 파일 업로드 설정을 settings에서 가져오는 헬퍼 함수들
+def get_allowed_file_types() -> List[str]:
+    """허용된 파일 형식 목록 반환"""
+    return settings.allowed_file_types
+
+
+def get_max_file_size() -> int:
+    """최대 파일 크기 반환"""
+    return settings.max_file_size

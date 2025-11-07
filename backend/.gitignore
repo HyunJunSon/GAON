@@ -71,6 +71,8 @@ poetry.lock
 
 # Environments
 .env
+.env.yaml
+**/.env.yaml
 .venv
 env/
 venv/
@@ -143,3 +145,6 @@ gcp_service_account_key.json
 
 # 테스트용 데이터
 test-raw/data/
+
+# Cloud Function 환경 변수 파일 (민감 정보 포함)
+**/.env.yaml

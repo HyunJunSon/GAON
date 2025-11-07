@@ -5,7 +5,6 @@ from fastapi import Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordBearer
 from jose import JWTError, jwt
 from sqlalchemy.orm import Session
-import bcrypt
 
 from app.core.config import settings
 from app.core.database import get_db
@@ -15,19 +14,9 @@ from app.domains.auth import auth_schema as schemas
 # OAuth2 비밀번호 인증 스키마 설정, tokenUrl은 토큰을 얻기 위한 엔드포인트를 가리킵니다.
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/auth/login")
 
-# 메모리 내 토큰 블랙리스트 (프로덕션 환경에서는 Redis 또는 DB 사용 권장)
+# ⚠️ 메모리 내 토큰 블랙리스트 - 프로덕션에서는 Redis/DB 사용 필수
+# 현재 구현은 서버 재시작 시 블랙리스트가 초기화되는 문제가 있음
 blacklist = set()
-
-
-def hash_password(plain_password: str) -> str:
-    """새로운 비밀번호를 해싱합니다."""
-    hashed_password = bcrypt.hashpw(plain_password.encode('utf-8'), bcrypt.gensalt())
-    return hashed_password.decode('utf-8')
-
-def verify_password(plain_password: str, hashed_password: str) -> bool:
-    """일반 비밀번호와 해시된 비밀번호를 비교하여 유효성을 검사합니다."""
-    return bcrypt.checkpw(plain_password.encode('utf-8'), hashed_password.encode('utf-8'))
-
 
 def create_access_token(data: dict, expires_delta: Optional[timedelta] = None):
     """새로운 액세스 토큰을 생성합니다."""
