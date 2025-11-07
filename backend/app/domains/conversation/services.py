@@ -92,67 +92,6 @@ class ConversationFileService:
             if 'gcs_path' in locals():
                 self.file_processor.delete_from_gcs(gcs_path)
             raise HTTPException(status_code=500, detail=f"파일 처리 중 오류가 발생했습니다: {str(e)}")
-        """파일 업로드 및 처리"""
-        
-        # 1. 기본 유효성 검사
-        if not file.filename:
-            raise HTTPException(status_code=400, detail="파일명이 없습니다.")
-        
-        file_extension = file.filename.split('.')[-1].lower()
-        if file_extension not in ALLOWED_FILE_TYPES:
-            raise HTTPException(
-                status_code=400, 
-                detail=f"지원하지 않는 파일 형식입니다. 지원 형식: {', '.join(ALLOWED_FILE_TYPES)}"
-            )
-
-        # 2. 파일 내용 읽기
-        file_content = await file.read()
-        file_size = len(file_content)
-        
-        if file_size > MAX_FILE_SIZE:
-            raise HTTPException(
-                status_code=400, 
-                detail=f"파일 크기가 너무 큽니다. 최대 크기: {MAX_FILE_SIZE // (1024*1024)}MB"
-            )
-
-        # 3. 파일 내용 유효성 검사
-        if not self.file_processor.validate_file_content(file_content, file_extension):
-            raise HTTPException(status_code=400, detail="파일이 손상되었거나 유효하지 않습니다.")
-
-        try:
-            # 4. GCS에 업로드
-            gcs_path = self.file_processor.upload_to_gcs(file_content, user_id, file.filename)
-            
-            # 5. 텍스트 추출
-            raw_content = self.file_processor.extract_text(file_content, file_extension)
-            
-            # 6. DB에 저장
-            db_file = ConversationFile(
-                conversation_id=conversation_id,
-                gcs_file_path=gcs_path,
-                original_filename=file.filename,
-                file_type=file_extension,
-                file_size=file_size,
-                processing_status="processing",
-                raw_content=raw_content
-            )
-            
-            self.db.add(db_file)
-            self.db.commit()
-            self.db.refresh(db_file)
-            
-            # 7. 처리 완료 상태 업데이트
-            db_file.processing_status = "completed"
-            db_file.processed_date = datetime.now()
-            self.db.commit()
-            
-            return db_file
-            
-        except Exception as e:
-            # 실패 시 GCS에서 파일 삭제
-            if 'gcs_path' in locals():
-                self.file_processor.delete_from_gcs(gcs_path)
-            raise HTTPException(status_code=500, detail=f"파일 처리 중 오류가 발생했습니다: {str(e)}")
 
     def get_file_by_id(self, file_id: int) -> ConversationFile:
         """파일 ID로 조회"""
