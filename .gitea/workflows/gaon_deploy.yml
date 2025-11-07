@@ -22,13 +22,13 @@ jobs:
     - name: Checkout repository
       uses: actions/checkout@v3
       with:
-        fetch-depth: 2
+        fetch-depth: 0
     
     - name: Check changed files
       id: changes
       run: |
         # 최근 2개 커밋에서 변경된 파일들 확인 (머지 커밋 대응)
-        CHANGED_FILES=$(git diff --name-only HEAD~2 HEAD)
+        CHANGED_FILES=$(git diff --name-only ${{ github.event.before }} ${{ github.sha }} || git ls-files)
         
         echo "backend_changed=$(echo "$CHANGED_FILES" | grep -q '^backend/' && echo 'true' || echo 'false')" >> $GITHUB_OUTPUT
         echo "frontend_changed=$(echo "$CHANGED_FILES" | grep -q '^frontend/' && echo 'true' || echo 'false')" >> $GITHUB_OUTPUT
