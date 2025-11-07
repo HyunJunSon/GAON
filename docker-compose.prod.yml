@@ -25,7 +25,7 @@ services:
     image: ${FRONTEND_IMAGE:-asia-northeast3-docker.pkg.dev/gaon-477004/gaon-docker-hub/frontend:latest}
     container_name: gaon-frontend
     environment:
-      - NEXT_PUBLIC_API_URL=http://localhost:8000
+      - NEXT_PUBLIC_API_URL=""
     depends_on:
       - gaon_backend
     restart: unless-stopped

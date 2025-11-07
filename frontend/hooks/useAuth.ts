@@ -22,11 +22,10 @@ export function useLogin() {
   return useMutation({
     mutationFn: login,
     onSuccess: (data) => {
-      // 1) 토큰 저장
-      authStorage.set(data.accessToken);
-      // 2) me 캐시 바로 주입(UX 빠르게) or 무효화 후 재요청
-      qc.setQueryData(qk.auth.me, data.user);
-      // 또는: qc.invalidateQueries({ queryKey: qk.auth.me });
+      // 1) 토큰 저장 (백엔드 응답 형식에 맞춤)
+      authStorage.set(data.access_token);
+      // 2) me 정보 무효화하여 재요청
+      qc.invalidateQueries({ queryKey: qk.auth.me });
     },
   });
 }

@@ -6,7 +6,7 @@ import { authStorage } from "@/utils/authStorage";
  * - JSON 응답/에러 정규화
  * - (추후) 인증 토큰/401 처리 추가 가능
  */
-const BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL?.replace(/\/$/, '') || '';
+const BASE_URL = process.env.NEXT_PUBLIC_API_URL?.replace(/\/$/, '') || 'http://localhost:8000';
 
 type FetchOptions = RequestInit & { json?: unknown, auth?: boolean };
 

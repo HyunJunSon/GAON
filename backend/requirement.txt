@@ -6,11 +6,12 @@ python-multipart==0.0.12
 # === Authentication & Security ===
 passlib>=1.7.4
 argon2-cffi==25.1.0
+python-jose[cryptography]==3.3.0
 
 # === Database ===
 sqlalchemy==2.0.43
 alembic==1.13.2
-psycopg2-binary==2.9.9
+psycopg2-binary
 asyncpg==0.30.0
 pgvector==0.3.6
 greenlet==3.2.4
@@ -21,8 +22,8 @@ pydantic-settings==2.11.0
 python-dotenv==1.1.1
 PyYAML==6.0.2
 orjson==3.11.3
-jinja2==3.1.4
 email-validator==2.3.0
+jinja2==3.1.4
 
 # === HTTP & Parsing ===
 httpx==0.28.1

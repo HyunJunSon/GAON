@@ -20,7 +20,7 @@ export default function SignupPage() {
   })
   const onSubmit = async (data: SignupInput) => {
     mutate(
-      { name: data.name, email: data.email, password: data.password, confirmPassword: data.confirmPassword },
+      { name: data.name, email: data.email, password: data.password, confirmPassword: data.confirmPassword , termsAgreed: data.termsAgreed },
       {
         onSuccess: () => {
           // 성공 시 서버 에러 초기화
