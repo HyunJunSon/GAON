@@ -16,7 +16,7 @@ from app.agent.crud import (
 
 
 # =========================================
-# ✅ UserFetcher (DB 연동)
+# ✅ UserFetcher (DB 연동) - 수정 없음
 # =========================================
 @dataclass
 class UserFetcher:
@@ -55,10 +55,7 @@ class UserFetcher:
 
 
 # =========================================
-# ✅ FamilyChecker (DB 연동) --> 임시로 항상 Faslse 반환하게 구현됨
-# =========================================
-# =========================================
-# ✅ FamilyChecker (가족 기능 비활성화)
+# ✅ FamilyChecker (가족 기능 비활성화) - 수정 없음
 # =========================================
 @dataclass
 class FamilyChecker:
@@ -85,7 +82,7 @@ class FamilyChecker:
 
 
 # =========================================
-# ✅ RelationResolver_DB (비활성화)
+# ✅ RelationResolver_DB (비활성화) - 수정 없음
 # =========================================
 @dataclass
 class RelationResolver_DB:
@@ -112,7 +109,7 @@ class RelationResolver_DB:
 
 
 # =========================================
-# ✅ RelationResolver_LLM (기존 유지)
+# ✅ RelationResolver_LLM (기존 유지) - 수정 없음
 # =========================================
 @dataclass
 class RelationResolver_LLM:
@@ -162,25 +159,40 @@ class RelationResolver_LLM:
 
 
 # =========================================
-# ✅ Analyzer
+# 🔧 Analyzer (사용자 중심 분석) - 전체 수정
 # =========================================
 @dataclass
 class Analyzer:
-    """감정/스타일/통계 분석"""
+    """
+    감정/스타일/통계 분석
+    
+    🔧 수정 사항:
+    1. user_id 파라미터 추가
+    2. 사용자만 style_analysis에 저장
+    3. 사용자 vs 상대방 비교 통계
+    4. score는 사용자 말하기 점수
+    """
     verbose: bool = False
 
-    def analyze(self, conversation_df: pd.DataFrame, relations: List[Dict[str, Any]]) -> Dict[str, Any]:
+    # 🔧 수정: user_id 파라미터 추가
+    def analyze(
+        self,
+        conversation_df: pd.DataFrame,
+        relations: List[Dict[str, Any]],
+        user_id: int  # ← 🔧 추가
+    ) -> Dict[str, Any]:
         """
-        LLM으로 대화 분석
+        LLM으로 대화 분석 (사용자 중심)
         
         🔧 수정 사항:
-        1. statistics 생성 (단어 수, 평균 문장 길이 등)
-        2. style_analysis 생성 (화자별 말투/성향/관심사)
-        3. summary 생성 (LLM 기반 대화 요약)
+        - user_id 기준 분석
+        - 전체 대화 맥락 파악
+        - 사용자 vs 상대방 비교
         
         Args:
             conversation_df: 대화 DataFrame
             relations: 관계 정보
+            user_id: 분석 의뢰 사용자 ID
         
         Returns:
             분석 결과 (DB 스키마 준수)
@@ -188,100 +200,156 @@ class Analyzer:
         llm = ChatOpenAI(model="gpt-4o-mini", api_key=settings.openai_api_key)
         
         # =========================================
-        # 1️⃣ statistics 생성 (기본 통계)
+        # 🔧 추가: 사용자/상대방 DataFrame 분리
         # =========================================
-        # 이유: 대화의 정량적 특징 분석
+        # 이유: 사용자 중심 분석 + 비교 분석
         # =========================================
         
-        all_texts = " ".join(conversation_df["text"].tolist())
-        words = all_texts.split()
+        user_df = conversation_df[conversation_df["speaker"] == str(user_id)]
+        others_df = conversation_df[conversation_df["speaker"] != str(user_id)]
         
+        if user_df.empty:
+            raise ValueError(f"❌ user_id={user_id}의 발화가 없습니다!")
+        
+        if self.verbose:
+            print(f"   👤 사용자 발화: {len(user_df)}개")
+            print(f"   👥 상대방 발화: {len(others_df)}개")
+        
+        # =========================================
+        # 🔧 수정: statistics 생성 (사용자 vs 상대방 비교)
+        # =========================================
+        # 이유: 사용자의 대화 패턴을 상대와 비교
+        # =========================================
+        
+        # 사용자 통계
+        user_texts = " ".join(user_df["text"].tolist())
+        user_words = user_texts.split()
+        
+        user_stats = {
+            "word_count": len(user_words),
+            "avg_sentence_length": round(len(user_words) / len(user_df), 1),
+            "unique_words": len(set(user_words)),
+            "top_words": self._get_top_words(user_texts, top_n=5)
+        }
+        
+        # 상대방 통계
+        if not others_df.empty:
+            others_texts = " ".join(others_df["text"].tolist())
+            others_words = others_texts.split()
+            
+            others_stats = {
+                "word_count": len(others_words),
+                "avg_sentence_length": round(len(others_words) / len(others_df), 1),
+                "unique_words": len(set(others_words)),
+            }
+        else:
+            others_stats = {
+                "word_count": 0,
+                "avg_sentence_length": 0,
+                "unique_words": 0,
+            }
+        
+        # 비교 분석
+        comparison = self._generate_comparison(user_stats, others_stats)
+        
+        # 🔧 수정: statistics 구조 변경
         statistics = {
-            "word_count": len(words),  # 총 단어 수
-            "avg_sentence_length": round(len(words) / len(conversation_df), 1),  # 평균 문장 길이
-            "unique_words": len(set(words)),  # 고유 단어 수
-            "top_words": self._get_top_words(all_texts, top_n=5)  # 빈도 높은 단어 5개
+            "user": user_stats,
+            "others": others_stats,
+            "comparison": comparison
         }
         
         if self.verbose:
-            print(f"   📊 [Statistics] 단어 수: {statistics['word_count']}, "
-                  f"고유 단어: {statistics['unique_words']}")
+            print(f"   📊 [Statistics] 사용자 단어: {user_stats['word_count']}, "
+                  f"상대방 단어: {others_stats['word_count']}")
         
         # =========================================
-        # 2️⃣ style_analysis 생성 (화자별 분석)
+        # 🔧 수정: style_analysis 생성 (사용자만)
         # =========================================
-        # 이유: 각 화자의 말투/성향/관심사 분석
-        # =========================================
-        
-        style_analysis = {}
-        
-        # 화자별로 분석
-        unique_speakers = conversation_df["speaker"].unique()
-        
-        for speaker in unique_speakers:
-            speaker_texts = conversation_df[conversation_df["speaker"] == speaker]["text"].tolist()
-            speaker_text_joined = "\n".join(speaker_texts)
-            
-            # LLM 프롬프트
-            prompt = f"""
-다음 대화에서 화자 {speaker}의 말투, 성향, 관심사를 분석해줘.
-
-화자 {speaker}의 발화:
-{speaker_text_joined}
-
-아래 형식으로 JSON 응답해줘:
-{{
-  "말투_특징_분석": "존댓말/반말 사용, 특정 표현 습관 등",
-  "대화_성향_및_감정_표현": "긍정적/부정적, 격려/비판 성향 등",
-  "주요_관심사": "대화 주제와 관심사"
-}}
-"""
-            
-            try:
-                response = llm.invoke(prompt)
-                content = response.content if hasattr(response, "content") else str(response)
-                
-                if self.verbose:
-                    print(f"   🗣️ [Style Analysis] 화자 {speaker}: {content[:100]}...")
-                
-                # JSON 파싱 시도
-                import json
-                try:
-                    speaker_analysis = json.loads(content)
-                except:
-                    # JSON 파싱 실패 시 fallback
-                    speaker_analysis = {
-                        "말투_특징_분석": content[:100],
-                        "대화_성향_및_감정_표현": "분석 중",
-                        "주요_관심사": "분석 중"
-                    }
-                
-                style_analysis[str(speaker)] = speaker_analysis
-                
-            except Exception as e:
-                print(f"⚠️ 화자 {speaker} 스타일 분석 LLM 실패: {e}")
-                style_analysis[str(speaker)] = {
-                    "말투_특징_분석": "분석 실패",
-                    "대화_성향_및_감정_표현": "분석 실패",
-                    "주요_관심사": "분석 실패"
-                }
-        
-        # =========================================
-        # 3️⃣ summary 생성 (전체 대화 요약)
-        # =========================================
-        # 이유: 대화 전체 맥락 파악
+        # 이유: 사용자의 말하기 스타일 분석
+        # 맥락: 전체 대화 포함하여 분석
         # =========================================
         
-        full_text = "\n".join([
+        # 전체 대화 맥락
+        full_context = "\n".join([
             f"화자 {row['speaker']}: {row['text']}"
             for _, row in conversation_df.iterrows()
         ])
         
+        # 사용자 발화
+        user_texts_joined = "\n".join(user_df["text"].tolist())
+        
+        # 🔧 수정: LLM 프롬프트 개선
+        style_prompt = f"""
+다음은 대화 전체 맥락과 분석 대상 사용자의 발화입니다.
+**사용자 ID {user_id}**의 말투, 성향, 관심사를 분석해주세요.
+
+**전체 대화 맥락:**
+{full_context[:500]}...
+
+**분석 대상 사용자 (ID: {user_id})의 발화:**
+{user_texts_joined}
+
+**통계 정보:**
+- 사용자 평균 문장 길이: {user_stats['avg_sentence_length']}
+- 상대방 평균 문장 길이: {others_stats['avg_sentence_length']}
+- 사용자 단어 수: {user_stats['word_count']}
+- 상대방 단어 수: {others_stats['word_count']}
+
+아래 형식으로 JSON 응답해주세요:
+{{
+  "말투_특징_분석": "존댓말/반말 사용, 특정 표현 습관, 문장 길이 특징 등",
+  "대화_성향_및_감정_표현": "긍정적/부정적, 격려/비판 성향, 감정 표현 방식 등",
+  "주요_관심사": "대화 주제와 관심사",
+  "대화_비교_분석": "상대방 대비 사용자의 대화 특징 (간결함, 상세함, 주도성 등)"
+}}
+"""
+        
+        try:
+            response = llm.invoke(style_prompt)
+            content = response.content if hasattr(response, "content") else str(response)
+            
+            if self.verbose:
+                print(f"   🗣️ [Style Analysis] 사용자: {content[:100]}...")
+            
+            # JSON 파싱 시도
+            import json
+            try:
+                user_analysis = json.loads(content)
+            except:
+                # JSON 파싱 실패 시 fallback
+                user_analysis = {
+                    "말투_특징_분석": content[:100],
+                    "대화_성향_및_감정_표현": "분석 중",
+                    "주요_관심사": "분석 중",
+                    "대화_비교_분석": "분석 중"
+                }
+            
+            # 🔧 수정: user_id만 저장
+            style_analysis = {
+                str(user_id): user_analysis
+            }
+            
+        except Exception as e:
+            print(f"⚠️ 사용자 스타일 분석 LLM 실패: {e}")
+            style_analysis = {
+                str(user_id): {
+                    "말투_특징_분석": "분석 실패",
+                    "대화_성향_및_감정_표현": "분석 실패",
+                    "주요_관심사": "분석 실패",
+                    "대화_비교_분석": "분석 실패"
+                }
+            }
+        
+        # =========================================
+        # 3️⃣ summary 생성 (전체 대화 요약) - 기존 유지
+        # =========================================
+        
         summary_prompt = f"""
-다음 대화를 100-200자로 요약해줘. 주요 주제와 분위기를 포함해줘.
+다음 대화를 100-200자로 요약해주세요. 주요 주제와 분위기를 포함해주세요.
 
 대화:
-{full_text}
+{full_context}
 
 요약 (100-200자):
 """
@@ -299,14 +367,15 @@ class Analyzer:
             summary = "대화 요약 생성 실패"
         
         # =========================================
-        # 4️⃣ score 계산 (간단한 점수 산정)
+        # 🔧 수정: score 계산 (사용자 말하기 점수)
         # =========================================
-        # 이유: 대화 품질 점수화
+        # 이유: 사용자의 말하기 능력 평가
         # =========================================
         
-        # 간단한 점수 로직 (추후 개선 가능)
-        score = min(1.0, (statistics["word_count"] / 100) * 0.5 + 0.5)
-        score = round(score, 2)
+        score = self._calculate_user_score(user_stats, others_stats, user_analysis)
+        
+        if self.verbose:
+            print(f"   🎯 [Score] 사용자 말하기 점수: {score:.2f}")
         
         # =========================================
         # ✅ 최종 결과 반환
@@ -318,6 +387,100 @@ class Analyzer:
             "statistics": statistics,
             "score": score,
         }
+    
+    # 🔧 추가: 비교 분석 텍스트 생성
+    def _generate_comparison(self, user_stats: Dict, others_stats: Dict) -> str:
+        """
+        사용자 vs 상대방 비교 분석 텍스트 생성
+        
+        Args:
+            user_stats: 사용자 통계
+            others_stats: 상대방 통계
+        
+        Returns:
+            비교 분석 텍스트
+        """
+        comparisons = []
+        
+        # 단어 수 비교
+        if others_stats["word_count"] > 0:
+            word_ratio = user_stats["word_count"] / others_stats["word_count"]
+            if word_ratio < 0.7:
+                comparisons.append("사용자는 상대방보다 말을 적게 함")
+            elif word_ratio > 1.3:
+                comparisons.append("사용자는 상대방보다 말을 많이 함")
+            else:
+                comparisons.append("사용자와 상대방의 대화량이 비슷함")
+        
+        # 문장 길이 비교
+        if others_stats["avg_sentence_length"] > 0:
+            len_diff = user_stats["avg_sentence_length"] - others_stats["avg_sentence_length"]
+            if len_diff < -2:
+                comparisons.append("사용자는 짧은 문장을 선호")
+            elif len_diff > 2:
+                comparisons.append("사용자는 긴 문장을 선호")
+        
+        return ", ".join(comparisons) if comparisons else "비교 데이터 부족"
+    
+    # 🔧 추가: 사용자 말하기 점수 계산
+    def _calculate_user_score(
+        self,
+        user_stats: Dict,
+        others_stats: Dict,
+        user_analysis: Dict
+    ) -> float:
+        """
+        사용자 말하기 점수 계산
+        
+        Args:
+            user_stats: 사용자 통계
+            others_stats: 상대방 통계
+            user_analysis: 사용자 스타일 분석
+        
+        Returns:
+            말하기 점수 (0.0 ~ 1.0)
+        
+        평가 기준:
+        1. 어휘 다양성 (unique_words / word_count)
+        2. 대화 참여도 (user vs others 비율)
+        3. 문장 구조 (avg_sentence_length)
+        """
+        score_components = []
+        
+        # 1. 어휘 다양성 (0 ~ 0.4점)
+        if user_stats["word_count"] > 0:
+            vocab_diversity = user_stats["unique_words"] / user_stats["word_count"]
+            vocab_score = min(0.4, vocab_diversity * 0.8)
+            score_components.append(vocab_score)
+        
+        # 2. 대화 참여도 (0 ~ 0.3점)
+        if others_stats["word_count"] > 0:
+            participation_ratio = user_stats["word_count"] / (user_stats["word_count"] + others_stats["word_count"])
+            # 0.4 ~ 0.6 비율이 이상적
+            if 0.4 <= participation_ratio <= 0.6:
+                participation_score = 0.3
+            else:
+                participation_score = 0.3 * (1 - abs(participation_ratio - 0.5) * 2)
+            score_components.append(participation_score)
+        
+        # 3. 문장 구조 (0 ~ 0.3점)
+        # 5 ~ 10 단어가 이상적
+        avg_len = user_stats["avg_sentence_length"]
+        if 5 <= avg_len <= 10:
+            structure_score = 0.3
+        elif avg_len < 5:
+            structure_score = 0.3 * (avg_len / 5)
+        else:
+            structure_score = 0.3 * (10 / avg_len)
+        score_components.append(structure_score)
+        
+        # 최종 점수
+        final_score = sum(score_components)
+        
+        # 0.5 ~ 1.0 범위로 정규화
+        normalized_score = 0.5 + (final_score * 0.5)
+        
+        return round(min(1.0, max(0.0, normalized_score)), 2)
     
     def _get_top_words(self, text: str, top_n: int = 5) -> List[str]:
         """
@@ -349,7 +512,7 @@ class Analyzer:
 
 
 # =========================================
-# ✅ ScoreEvaluator (기존 유지)
+# ✅ ScoreEvaluator (기존 유지) - 수정 없음
 # =========================================
 @dataclass
 class ScoreEvaluator:
@@ -369,17 +532,18 @@ class ScoreEvaluator:
 
 
 # =========================================
-# ✅ AnalysisSaver (DB 연동)
+# 🔧 AnalysisSaver (DB 연동) - 부분 수정
 # =========================================
 @dataclass
 class AnalysisSaver:
     """
     ✅ DB에 분석 결과 저장
     
-    변경 사항:
-    - 기존: Mock analysis_result_df
-    - 변경: DB analysis_result 테이블 INSERT
+    🔧 수정 사항:
+    - statistics 저장 (빈 dict → 실제 데이터)
     """
+    verbose: bool = False  # 🔧 추가
+    
     def save(self, db: Session, result: Dict[str, Any], state) -> Dict[str, Any]:
         """
         analysis_result 테이블에 INSERT
@@ -396,14 +560,14 @@ class AnalysisSaver:
             return {"status": "no_result"}
         
         try:
-            # ✅ DB INSERT
+            # 🔧 수정: statistics 실제 데이터 저장
             saved = save_analysis_result(
                 db=db,
                 user_id=str(state.user_id),
                 conv_id=str(state.conv_id),
                 summary=result.get("summary", ""),
                 style_analysis=result.get("style_analysis", {}),
-                statistics={},  # 추후 추가
+                statistics=result.get("statistics", {}),  # ← 🔧 수정
                 score=result.get("score", 0.0),
                 confidence_score=0.0,  # QA에서 업데이트
                 conversation_count=len(state.conversation_df) if state.conversation_df is not None else 0,
@@ -411,6 +575,18 @@ class AnalysisSaver:
             )
             
             print(f"✅ [AnalysisSaver] DB 저장 완료: analysis_id={saved['analysis_id']}")
+            
+            # 🔧 추가: 저장된 데이터 상세 출력
+            if self.verbose:
+                print(f"   → summary: {result.get('summary', '')[:50]}...")
+                print(f"   → score: {result.get('score', 0):.2f}")
+                
+                # statistics 확인
+                stats = result.get("statistics", {})
+                if stats:
+                    user_stats = stats.get("user", {})
+                    print(f"   → 사용자 단어 수: {user_stats.get('word_count', 0)}")
+                    print(f"   → 사용자 평균 문장 길이: {user_stats.get('avg_sentence_length', 0)}")
             
             # ✅ state에 저장
             state.meta["analysis_id"] = saved["analysis_id"]

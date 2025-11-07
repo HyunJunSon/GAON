@@ -17,7 +17,7 @@ from .nodes import (
 )
 
 # =====================================
-# ✅ State 정의 (DB 세션 추가)
+# ✅ State 정의 (DB 세션 추가) - 수정 없음
 # =====================================
 @dataclass
 class AnalysisState:
@@ -52,7 +52,7 @@ class AnalysisGraph:
         self.llmresolver = RelationResolver_LLM(verbose)
         self.analyzer = Analyzer(verbose)
         self.evaluator = ScoreEvaluator()
-        self.saver = AnalysisSaver()
+        self.saver = AnalysisSaver(verbose)  # 🔧 수정: verbose 전달
 
         self.graph = StateGraph(AnalysisState)
         self.graph.add_node("fetch_user", self.node_fetch_user)
@@ -143,14 +143,30 @@ class AnalysisGraph:
         print(f"   → 추론된 관계: {len(state.relations)}명")
         return state
 
+    # 🔧 수정: node_analyze()
     def node_analyze(self, state: AnalysisState):
         """
-        ✅ 감정·스타일 분석 수행
+        ✅ 감정·스타일 분석 수행 (사용자 중심)
+        
+        🔧 수정 사항:
+        - user_id를 Analyzer에 전달
         """
         if self.verbose:
             print("\n🧮 [Analyzer] 감정·스타일 분석 수행 중...")
+            print(f"   👤 분석 대상 사용자: {state.user_id}")
         
-        result = self.analyzer.analyze(state.conversation_df, state.relations)
+        # =========================================
+        # 🔧 수정: user_id 파라미터 추가
+        # =========================================
+        # 이유: Analyzer가 사용자 중심 분석 수행
+        # =========================================
+        
+        result = self.analyzer.analyze(
+            conversation_df=state.conversation_df,
+            relations=state.relations,
+            user_id=state.user_id  # ← 🔧 추가
+        )
+        
         state.analysis_result = result
         
         print(f"   ✅ 분석 완료: score={result.get('score', 0):.2f}")
@@ -169,7 +185,7 @@ class AnalysisGraph:
         return state
 
     # =====================================
-    # ✅ 실행 메서드 (DB 세션 주입)
+    # ✅ 실행 메서드 (DB 세션 주입) - 수정 없음
     # =====================================
     
     def run(self, db: Session, conversation_df: pd.DataFrame, user_id: int, conv_id: str):
