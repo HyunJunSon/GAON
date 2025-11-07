@@ -10,6 +10,8 @@ $ python embedding_save.py --create-table-if-missing\
 summary_rag.py -> \
 summary_rag.py 실행시 data_analysis의 analysis_id 최신에 따른 summary부분만 벡터화 시켜서 ref_handbook_snippet 책의 pgvector KNN 검색 후 같은 section_id는 chunk_ix 순으로 자동 스티칭 후 상위 섹션들 프리뷰(본문 앞부분 + citation) 출력
 (검색 결과 미리보기단계)
+https://1drv.ms/i/c/1d4e36e4fcb36e7c/EXpWXBJKidVEq6VwOkGQAGUBldj3Nd07vkX7gCA1bLJnUQ?e=FptfLb
+
 
 retriever.py 실행시 data_analysis의 interest, tone, top_words, summary를 고려하여 책 가져옴\
 텍스트 인덱스(FTS, trigram)\
