@@ -45,3 +45,4 @@ docker-compose up -d
 docker-compose -f docker-compose.prod.yml up -d
 ```
 
+# Deploy with login fixes Fri Nov  7 11:03:10 KST 2025
