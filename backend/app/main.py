@@ -2,7 +2,7 @@ from fastapi import FastAPI
 from starlette.middleware.cors import CORSMiddleware
 
 from .core.config import settings
-from .domains.auth.user_router import auth_router
+from .domains.auth.auth_router import router as auth_router
 from .domains.conversation.router import router as conversation_router
 
 # 모든 모델 import (SQLAlchemy 관계 설정을 위해 필요)

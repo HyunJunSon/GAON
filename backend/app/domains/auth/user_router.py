@@ -7,12 +7,11 @@ from . import user_crud, user_schema
 from ...utils.logger import auth_logger
 from ...utils.exceptions import UserAlreadyExistsException
 
-auth_router = APIRouter(
+signup_router = APIRouter(
     prefix="/api/auth",
 )
 
-
-@auth_router.post("/signup", status_code=status.HTTP_204_NO_CONTENT)
+@signup_router.post("/signup", status_code=status.HTTP_204_NO_CONTENT)
 def user_create(_user_create: user_schema.UserCreate, db: Session = Depends(get_db)):
     auth_logger.info(f"회원가입 시도: { _user_create.name } - { _user_create.email }")
     
