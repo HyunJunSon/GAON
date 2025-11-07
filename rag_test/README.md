@@ -7,6 +7,10 @@ chunking.py 실행시 가장 작은 목차 분류를 기준으로 600~800자 청
 embedding_save.py 실행시 임베드 텍스트를 벡터화하고 전체 jsonl을 postgresql에 저장함\
 $ python embedding_save.py --create-table-if-missing\
 retriever.py 실행시 data_analysis의 interest, tone, top_words, summary를 고려하여 책 가져옴\
+텍스트 인덱스(FTS, trigram)\
+CREATE INDEX IF NOT EXISTS idx_snip_fts ON ref_handbook_snippet USING GIN (to_tsvector('simple', embed_text)); \
+CREATE INDEX IF NOT EXISTS idx_snip_trgm ON ref_handbook_snippet USING GIN (embed_text gin_trgm_ops); \
+벡터 인덱스(pgvector)\
 
 (청킹은 임베딩 효율 때문에 필수 (짧을수록 의미 명확)
 문맥 손실은 post-processing에서 재조립으로 해결
