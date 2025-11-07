@@ -22,18 +22,19 @@ jobs:
     - name: Checkout repository
       uses: actions/checkout@v3
       with:
-        fetch-depth: 2
+        fetch-depth: 0
     
     - name: Check changed files
       id: changes
       run: |
-        # 안전한 변경사항 감지
-        if git rev-parse --verify HEAD~1 >/dev/null 2>&1; then
-          CHANGED_FILES=$(git diff --name-only HEAD~1 HEAD)
+        # 더 안전한 변경사항 감지
+        if [ "${{ github.event.before }}" != "0000000000000000000000000000000000000000" ]; then
+          CHANGED_FILES=$(git diff --name-only ${{ github.event.before }} ${{ github.sha }})
         else
-          CHANGED_FILES=$(git show --name-only --format="" HEAD)
+          CHANGED_FILES=$(git ls-files)
         fi
         
+        echo "Changed files: $CHANGED_FILES"
         echo "backend_changed=$(echo "$CHANGED_FILES" | grep -q '^backend/' && echo 'true' || echo 'false')" >> $GITHUB_OUTPUT
         echo "frontend_changed=$(echo "$CHANGED_FILES" | grep -q '^frontend/' && echo 'true' || echo 'false')" >> $GITHUB_OUTPUT
         echo "migration_changed=$(echo "$CHANGED_FILES" | grep -q '^backend/alembic/versions/' && echo 'true' || echo 'false')" >> $GITHUB_OUTPUT
