@@ -21,6 +21,7 @@ class RealtimeSession(Base):
     id = Column(Integer, primary_key=True)
     room_id = Column(String, unique=True, nullable=False)
     family_id = Column(Integer, ForeignKey("family.id"), nullable=False)
+    display_name = Column(String, nullable=True)  # 사용자 친화적인 이름
     created_at = Column(DateTime, default=datetime.now)
     ended_at = Column(DateTime, nullable=True)
     status = Column(Enum(SessionStatus), default=SessionStatus.ACTIVE)

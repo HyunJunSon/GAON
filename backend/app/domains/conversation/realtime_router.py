@@ -6,21 +6,99 @@ from typing import Dict, Any
 from app.core.database import get_db
 from .websocket_manager import manager
 from .realtime_services import RealtimeService
-from .realtime_models import MessageType
+from .realtime_models import MessageType, SessionStatus
 from .realtime_schemas import SessionResponse
 
 
 router = APIRouter(prefix="/api/conversations/realtime", tags=["realtime"])
 
 
+@router.get("/sessions/family/{family_id}")
+def get_family_sessions(
+    family_id: int,
+    db: Session = Depends(get_db)
+):
+    """가족의 모든 활성 세션 목록 조회"""
+    service = RealtimeService(db)
+    active_sessions = service.get_active_sessions_by_family(family_id)
+    
+    sessions = []
+    for session in active_sessions:
+        # 각 세션의 참여자 수 계산
+        participant_count = len(manager.get_room_users(session.room_id))
+        
+        sessions.append({
+            "id": session.id,
+            "room_id": session.room_id,
+            "family_id": session.family_id,
+            "display_name": session.display_name,
+            "created_at": session.created_at.isoformat(),
+            "status": session.status.value,
+            "participant_count": participant_count,
+            "participants": manager.get_room_users(session.room_id)
+        })
+    
+    return {"sessions": sessions}
+
+
+@router.get("/sessions/active/{family_id}", response_model=SessionResponse)
+def get_active_session(
+    family_id: int,
+    db: Session = Depends(get_db)
+):
+    """가족의 활성 세션 조회"""
+    service = RealtimeService(db)
+    active_sessions = service.get_active_sessions_by_family(family_id)
+    
+    if not active_sessions:
+        raise HTTPException(status_code=404, detail="No active session found")
+    
+    # 가장 최근 세션 반환
+    session = active_sessions[0]
+    return SessionResponse(
+        id=session.id,
+        room_id=session.room_id,
+        family_id=session.family_id,
+        created_at=session.created_at,
+        ended_at=session.ended_at,
+        status=session.status
+    )
+
+
+@router.post("/sessions/{room_id}/join")
+def join_session(
+    room_id: str,
+    db: Session = Depends(get_db)
+):
+    """기존 세션에 참여"""
+    service = RealtimeService(db)
+    session = service.get_session_by_room_id(room_id)
+    
+    if not session:
+        raise HTTPException(status_code=404, detail="Session not found")
+    
+    if session.status != SessionStatus.ACTIVE:
+        raise HTTPException(status_code=400, detail="Session is not active")
+    
+    return SessionResponse(
+        id=session.id,
+        room_id=session.room_id,
+        family_id=session.family_id,
+        created_at=session.created_at,
+        ended_at=session.ended_at,
+        status=session.status
+    )
+
+
 @router.post("/sessions", response_model=SessionResponse)
 def create_realtime_session(
     family_id: int,
+    room_name: str = "가족 대화방",
     db: Session = Depends(get_db)
 ):
     """새로운 실시간 대화 세션 생성"""
     service = RealtimeService(db)
-    session = service.create_session(family_id)
+    session = service.create_session(family_id, room_name)
     
     return SessionResponse(
         id=session.id,
@@ -49,15 +127,34 @@ async def websocket_endpoint(
         await websocket.close(code=4004, reason="Session not found")
         return
     
+    # 사용자 이름 조회 (직접 psycopg2 사용)
+    try:
+        from app.core.config import settings
+        import psycopg2
+        
+        database_url = settings.database_url or f"postgresql://{settings.db_user}:{settings.db_password}@{settings.db_host}:{settings.db_port}/{settings.db_name}"
+        clean_url = database_url.replace('+psycopg2', '') if '+psycopg2' in database_url else database_url
+        
+        conn = psycopg2.connect(clean_url)
+        cur = conn.cursor()
+        cur.execute('SELECT name FROM users WHERE id = %s', (user_id,))
+        result = cur.fetchone()
+        user_name = result[0] if result else f"사용자{user_id}"
+        cur.close()
+        conn.close()
+    except Exception as e:
+        user_name = f"사용자{user_id}"
+    
     # 연결 수락
-    await manager.connect(websocket, room_id, user_id, family_id)
+    await manager.connect(websocket, room_id, user_id, family_id, user_name)
     
     # 입장 메시지 브로드캐스트
     join_message = {
         "type": "user_joined",
         "data": {
             "user_id": user_id,
-            "message": f"사용자 {user_id}님이 입장했습니다.",
+            "user_name": user_name,
+            "message": f"{user_name}님이 입장했습니다.",
             "users": manager.get_room_users(room_id)
         }
     }
@@ -86,6 +183,7 @@ async def websocket_endpoint(
                     "data": {
                         "id": db_message.id,
                         "user_id": user_id,
+                        "user_name": user_name,
                         "message": content,
                         "timestamp": db_message.timestamp.isoformat()
                     }
@@ -112,11 +210,15 @@ async def websocket_endpoint(
         manager.disconnect(websocket)
         
         # 퇴장 메시지 브로드캐스트
+        user_info = manager.user_info.get(websocket)
+        user_name = user_info.get("user_name", f"사용자{user_id}") if user_info else f"사용자{user_id}"
+        
         leave_message = {
             "type": "user_left",
             "data": {
                 "user_id": user_id,
-                "message": f"사용자 {user_id}님이 퇴장했습니다.",
+                "user_name": user_name,
+                "message": f"{user_name}님이 퇴장했습니다.",
                 "users": manager.get_room_users(room_id)
             }
         }
@@ -138,23 +240,27 @@ def end_session(
     return {"message": "Session ended successfully", "session_id": session.id}
 
 
-@router.get("/sessions/{room_id}/export")
-def export_conversation(
+@router.post("/sessions/{room_id}/analyze")
+def analyze_conversation(
     room_id: str,
     db: Session = Depends(get_db)
 ):
-    """대화 내용 텍스트로 내보내기"""
+    """실시간 대화 분석"""
     service = RealtimeService(db)
     session = service.get_session_by_room_id(room_id)
     
     if not session:
         raise HTTPException(status_code=404, detail="Session not found")
     
+    # 대화 내용을 텍스트로 변환
     conversation_text = service.export_conversation_as_text(session.id)
     
+    if not conversation_text.strip():
+        raise HTTPException(status_code=400, detail="No conversation to analyze")
+    
     return {
-        "session_id": session.id,
-        "room_id": room_id,
+        "message": "대화 분석이 시작되었습니다.",
         "conversation_text": conversation_text,
+        "session_id": session.id,
         "message_count": len(service.get_session_messages(session.id))
     }

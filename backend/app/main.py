@@ -5,6 +5,7 @@ from .core.config import settings
 from .domains.auth.auth_router import router as auth_router
 from .domains.conversation.router import router as conversation_router
 from .domains.conversation.realtime_router import router as realtime_router
+from .domains.family.router import router as family_router
 
 # 모든 모델 import (SQLAlchemy 관계 설정을 위해 필요)
 from .domains.auth.user_models import User
@@ -35,3 +36,4 @@ def health_check():
 app.include_router(auth_router)
 app.include_router(conversation_router)
 app.include_router(realtime_router)
+app.include_router(family_router)

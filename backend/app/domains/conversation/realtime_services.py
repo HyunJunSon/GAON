@@ -12,14 +12,27 @@ class RealtimeService:
     def __init__(self, db: Session):
         self.db = db
 
-    def create_session(self, family_id: int) -> RealtimeSession:
-        """새로운 실시간 대화 세션 생성"""
+    def create_session(self, family_id: int, room_name: str = "가족 대화방") -> RealtimeSession:
+        """새로운 실시간 대화 세션 생성 또는 기존 활성 세션 반환"""
+        # 같은 가족의 활성 세션이 있는지 확인
+        existing_session = self.db.query(RealtimeSession).filter(
+            and_(
+                RealtimeSession.family_id == family_id,
+                RealtimeSession.status == SessionStatus.ACTIVE
+            )
+        ).first()
+        
+        if existing_session:
+            return existing_session
+        
+        # 활성 세션이 없으면 새로 생성
         room_id = f"room_{uuid.uuid4().hex[:8]}"
         
         session = RealtimeSession(
             room_id=room_id,
             family_id=family_id,
-            status=SessionStatus.ACTIVE
+            status=SessionStatus.ACTIVE,
+            display_name=room_name
         )
         
         self.db.add(session)

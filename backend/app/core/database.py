@@ -1,34 +1,39 @@
-import os
 from sqlalchemy import create_engine
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker, Session
 
-# DATABASE_URL 환경변수 직접 사용 (보안상 더 안전)
-DATABASE_URL = os.getenv("DATABASE_URL")
-
-if not DATABASE_URL:
-    # 환경변수가 없을 경우 개별 설정값으로 구성
-    from .config import settings
-    DATABASE_URL = f"postgresql+psycopg2://{settings.db_user}:{settings.db_password}@{settings.db_host}:{settings.db_port}/{settings.db_name}"
-
-# 데이터베이스 엔진 생성 - 연결 풀 설정 포함
-engine = create_engine(
-    DATABASE_URL,
-    pool_size=10,              # 연결 풀 크기
-    max_overflow=20,           # 최대 오버플로우 연결
-    pool_pre_ping=True,        # 연결 확인
-    pool_recycle=300,          # 연결 재사용 시간(초)
-)
-
-SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
-
 Base = declarative_base()
 
+# 전역 변수들
+_engine = None
+_SessionLocal = None
+
+def get_engine():
+    """엔진을 지연 초기화"""
+    global _engine
+    if _engine is None:
+        from .config import settings
+        database_url = settings.database_url or f"postgresql+psycopg2://{settings.db_user}:{settings.db_password}@{settings.db_host}:{settings.db_port}/{settings.db_name}"
+        _engine = create_engine(
+            database_url,
+            pool_size=10,
+            max_overflow=20,
+            pool_pre_ping=True,
+            pool_recycle=300,
+        )
+    return _engine
+
+def get_session_local():
+    """SessionLocal을 지연 초기화"""
+    global _SessionLocal
+    if _SessionLocal is None:
+        _SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=get_engine())
+    return _SessionLocal
 
 def get_db():
+    SessionLocal = get_session_local()
     db = SessionLocal()
     try:
         yield db
     finally:
         db.close()
-

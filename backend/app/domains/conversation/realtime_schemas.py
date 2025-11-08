@@ -29,6 +29,7 @@ class SessionResponse(BaseModel):
     id: int
     room_id: str
     family_id: int
+    display_name: Optional[str] = None
     created_at: datetime
     ended_at: Optional[datetime]
     status: SessionStatus

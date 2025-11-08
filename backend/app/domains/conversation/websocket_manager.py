@@ -11,7 +11,7 @@ class ConnectionManager:
         # websocket -> user_info
         self.user_info: Dict[WebSocket, dict] = {}
 
-    async def connect(self, websocket: WebSocket, room_id: str, user_id: int, family_id: int):
+    async def connect(self, websocket: WebSocket, room_id: str, user_id: int, family_id: int, user_name: str = None):
         await websocket.accept()
         
         if room_id not in self.active_connections:
@@ -20,6 +20,7 @@ class ConnectionManager:
         self.active_connections[room_id].append(websocket)
         self.user_info[websocket] = {
             "user_id": user_id,
+            "user_name": user_name or f"사용자{user_id}",
             "family_id": family_id,
             "room_id": room_id,
             "joined_at": datetime.now()

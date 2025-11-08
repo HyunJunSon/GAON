@@ -62,7 +62,7 @@ class VectorDBManager:
         """
         # 설정에서 연결 정보 가져오기
         if connection_string is None:
-            connection_string = settings.database_url
+            connection_string = settings.database_url or f"postgresql+psycopg2://{settings.db_user}:{settings.db_password}@{settings.db_host}:{settings.db_port}/{settings.db_name}"
             
         # pgvector 확장을 고려하여 엔진 생성
         self.engine = create_engine(connection_string)

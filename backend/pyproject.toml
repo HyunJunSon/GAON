@@ -82,7 +82,6 @@ dependencies = [
     "docx>=0.2.4",
 ]
 [tool.uv]
-venv = "gaon-venv"
 
 [tool.setuptools]
 packages = ["app"]
