@@ -24,11 +24,12 @@ class ConversationFileResponse(BaseModel):
 
 
 class FileUploadResponse(BaseModel):
-    message: str
-    conversation_id: int
+    """파일 업로드 응답 - 프론트엔드와 일치"""
+    conversation_id: int  # snake_case로 변경
     file_id: int
-    processing_status: str
-    gcs_file_path: str
+    status: str  # processing_status -> status로 변경
+    message: str
+    gcs_file_path: Optional[str] = None
 
 
 class ConversationAnalysisResponse(BaseModel):
