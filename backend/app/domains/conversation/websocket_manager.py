@@ -56,11 +56,11 @@ class ConnectionManager:
         if room_id not in self.active_connections:
             return []
         
-        users = []
+        users = set()  # 중복 제거를 위해 set 사용
         for ws in self.active_connections[room_id]:
             if ws in self.user_info:
-                users.append(self.user_info[ws]["user_id"])
-        return users
+                users.add(self.user_info[ws]["user_id"])
+        return list(users)
 
 
 manager = ConnectionManager()
