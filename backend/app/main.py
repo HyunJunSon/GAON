@@ -4,11 +4,13 @@ from starlette.middleware.cors import CORSMiddleware
 from .core.config import settings
 from .domains.auth.auth_router import router as auth_router
 from .domains.conversation.router import router as conversation_router
+from .domains.conversation.realtime_router import router as realtime_router
 
 # 모든 모델 import (SQLAlchemy 관계 설정을 위해 필요)
 from .domains.auth.user_models import User
 from .domains.conversation.models import Conversation
 from .domains.conversation.file_models import ConversationFile
+from .domains.conversation.realtime_models import RealtimeSession, RealtimeMessage
 from .domains.family.models import Family
 
 app = FastAPI()
@@ -32,3 +34,4 @@ def health_check():
 
 app.include_router(auth_router)
 app.include_router(conversation_router)
+app.include_router(realtime_router)
