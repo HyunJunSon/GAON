@@ -22,8 +22,13 @@ export interface ExportConversationResponse {
 
 export const realtimeApi = {
   // 세션 생성
-  createSession: async (familyId: number): Promise<CreateSessionResponse> => {
-    const response = await fetch(`${API_BASE_URL}/api/conversations/realtime/sessions?family_id=${familyId}`, {
+  createSession: async (familyId: number, roomName?: string): Promise<CreateSessionResponse> => {
+    const params = new URLSearchParams({ family_id: familyId.toString() })
+    if (roomName) {
+      params.append('room_name', roomName)
+    }
+    
+    const response = await fetch(`${API_BASE_URL}/api/conversations/realtime/sessions?${params}`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -59,6 +64,33 @@ export const realtimeApi = {
     
     if (!response.ok) {
       throw new Error('Failed to export conversation')
+    }
+    
+    return response.json()
+  },
+
+  // 가족 세션 목록 조회
+  getFamilySessions: async (familyId: number) => {
+    const response = await fetch(`${API_BASE_URL}/api/conversations/realtime/sessions/family/${familyId}`)
+    
+    if (!response.ok) {
+      throw new Error('Failed to get family sessions')
+    }
+    
+    return response.json()
+  },
+
+  // 기존 세션 참여
+  joinSession: async (roomId: string): Promise<CreateSessionResponse> => {
+    const response = await fetch(`${API_BASE_URL}/api/conversations/realtime/sessions/${roomId}/join`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+    })
+    
+    if (!response.ok) {
+      throw new Error('Failed to join session')
     }
     
     return response.json()

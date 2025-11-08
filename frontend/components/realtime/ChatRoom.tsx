@@ -1,3 +1,4 @@
+import { useState } from 'react'
 import { useRealtimeChat } from '../../hooks/useRealtimeChat'
 import { ConnectionStatus } from './ConnectionStatus'
 import { MessageList } from './MessageList'
@@ -11,6 +12,8 @@ interface ChatRoomProps {
 }
 
 export const ChatRoom = ({ familyId, userId, onSessionEnd }: ChatRoomProps) => {
+  const [roomName, setRoomName] = useState('가족 대화방')
+  
   const {
     session,
     messages,
@@ -21,7 +24,6 @@ export const ChatRoom = ({ familyId, userId, onSessionEnd }: ChatRoomProps) => {
     createSession,
     sendChatMessage,
     endSession,
-    exportConversation,
     clearError
   } = useRealtimeChat({ familyId, userId })
 
@@ -30,12 +32,31 @@ export const ChatRoom = ({ familyId, userId, onSessionEnd }: ChatRoomProps) => {
     onSessionEnd?.()
   }
 
-  const handleExport = async () => {
-    const result = await exportConversation()
-    if (result) {
-      // 내보내기 성공 시 처리 (예: 다운로드, 분석 페이지로 이동 등)
-      console.log('대화 내보내기 완료:', result)
+  const handleAnalyze = async () => {
+    if (!session) return
+    
+    try {
+      const response = await fetch(`http://localhost:8000/api/conversations/realtime/sessions/${session.room_id}/analyze`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      })
+      
+      if (response.ok) {
+        const result = await response.json()
+        alert(`분석 완료! 메시지 수: ${result.message_count}`)
+        // 필요시 분석 결과 페이지로 이동
+      } else {
+        alert('분석에 실패했습니다.')
+      }
+    } catch (error) {
+      alert('분석 중 오류가 발생했습니다.')
     }
+  }
+
+  const handleCreateSession = () => {
+    createSession(roomName)
   }
 
   // 세션이 없으면 생성 버튼 표시
@@ -49,9 +70,23 @@ export const ChatRoom = ({ familyId, userId, onSessionEnd }: ChatRoomProps) => {
           가족과 실시간으로 대화를 나누고<br />
           대화 내용을 분석해보세요
         </p>
+        
+        <div className="w-full max-w-sm mb-4">
+          <label className="block text-sm font-medium text-gray-700 mb-2">
+            채팅방 이름
+          </label>
+          <input
+            type="text"
+            value={roomName}
+            onChange={(e) => setRoomName(e.target.value)}
+            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+            placeholder="채팅방 이름을 입력하세요"
+          />
+        </div>
+        
         <button
-          onClick={createSession}
-          disabled={isLoading}
+          onClick={handleCreateSession}
+          disabled={isLoading || !roomName.trim()}
           className="px-6 py-3 bg-blue-500 text-white rounded-lg hover:bg-blue-600 disabled:bg-gray-300 disabled:cursor-not-allowed transition-colors"
         >
           {isLoading ? '세션 생성 중...' : '대화 시작하기'}
@@ -72,12 +107,12 @@ export const ChatRoom = ({ familyId, userId, onSessionEnd }: ChatRoomProps) => {
   }
 
   return (
-    <div className="flex flex-col h-96 bg-white rounded-lg border shadow-sm">
+    <div className="flex flex-col h-[600px] bg-white rounded-lg border shadow-sm">
       {/* 헤더 */}
       <div className="flex items-center justify-between p-4 border-b bg-gray-50">
         <div className="flex items-center gap-3">
           <h2 className="font-semibold text-gray-800">
-            실시간 대화 - {session.room_id}
+            {session.display_name || session.room_id}
           </h2>
           <ConnectionStatus 
             status={connectionStatus} 
@@ -85,10 +120,10 @@ export const ChatRoom = ({ familyId, userId, onSessionEnd }: ChatRoomProps) => {
         </div>
         <div className="flex gap-2">
           <button
-            onClick={handleExport}
+            onClick={handleAnalyze}
             className="px-3 py-1 text-sm bg-green-500 text-white rounded hover:bg-green-600 transition-colors"
           >
-            내보내기
+            대화 분석하기
           </button>
           <button
             onClick={handleEndSession}

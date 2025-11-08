@@ -24,6 +24,18 @@ export const MessageList = ({ messages, currentUserId }: MessageListProps) => {
   const isMyMessage = (userId: number) => userId === currentUserId
   const isSystemMessage = (userId: number) => userId === 0
 
+  const getUserColor = (userId: number) => {
+    const colors = [
+      'bg-blue-100 text-blue-800',      // 파스텔 블루
+      'bg-green-100 text-green-800',    // 파스텔 그린
+      'bg-purple-100 text-purple-800',  // 파스텔 퍼플
+      'bg-pink-100 text-pink-800',      // 파스텔 핑크
+      'bg-yellow-100 text-yellow-800',  // 파스텔 옐로우
+      'bg-indigo-100 text-indigo-800',  // 파스텔 인디고
+    ]
+    return colors[userId % colors.length]
+  }
+
   return (
     <div className="flex-1 overflow-y-auto p-4 space-y-4">
       {messages.length === 0 ? (
@@ -42,28 +54,21 @@ export const MessageList = ({ messages, currentUserId }: MessageListProps) => {
             )
           }
 
-          const isMine = isMyMessage(message.user_id)
+          const userColor = getUserColor(message.user_id)
 
           return (
-            <div
-              key={message.id}
-              className={`flex ${isMine ? 'justify-end' : 'justify-start'}`}
-            >
-              <div className={`max-w-xs lg:max-w-md ${isMine ? 'order-2' : 'order-1'}`}>
-                <div
-                  className={`px-4 py-2 rounded-lg ${
-                    isMine
-                      ? 'bg-blue-500 text-white'
-                      : 'bg-gray-200 text-gray-800'
-                  }`}
-                >
-                  <p className="text-sm">{message.message}</p>
+            <div key={message.id} className="flex justify-start">
+              <div className="max-w-xs lg:max-w-md">
+                <div className="mb-1">
+                  <span className="text-xs text-gray-600 font-medium">
+                    {message.user_name || `사용자 ${message.user_id}`}
+                  </span>
+                  <span className="text-xs text-gray-400 ml-2">
+                    {formatTime(message.timestamp)}
+                  </span>
                 </div>
-                <div className={`text-xs text-gray-500 mt-1 ${isMine ? 'text-right' : 'text-left'}`}>
-                  {!isMine && (
-                    <span className="mr-2">사용자 {message.user_id}</span>
-                  )}
-                  {formatTime(message.timestamp)}
+                <div className={`px-4 py-2 rounded-lg ${userColor}`}>
+                  <p className="text-sm">{message.message}</p>
                 </div>
               </div>
             </div>

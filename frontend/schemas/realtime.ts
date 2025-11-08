@@ -15,6 +15,7 @@ export const MessageType = {
 export const MessageSchema = z.object({
   id: z.number(),
   user_id: z.number(),
+  user_name: z.string().optional(),
   message: z.string(),
   timestamp: z.string(),
   message_type: z.enum(['text', 'system'])
@@ -24,6 +25,7 @@ export const SessionSchema = z.object({
   id: z.number(),
   room_id: z.string(),
   family_id: z.number(),
+  display_name: z.string().optional(),
   created_at: z.string(),
   ended_at: z.string().nullable(),
   status: z.enum(['active', 'ended'])

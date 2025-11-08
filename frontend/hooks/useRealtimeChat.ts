@@ -14,6 +14,41 @@ export const useRealtimeChat = ({ familyId, userId }: UseRealtimeChatProps) => {
   const [users, setUsers] = useState<number[]>([])
   const [error, setError] = useState<string | null>(null)
   const [isLoading, setIsLoading] = useState(false)
+  const [isInitialized, setIsInitialized] = useState(false)
+
+  // 컴포넌트 마운트 시 기존 활성 세션 확인
+  useEffect(() => {
+    const checkExistingSession = async () => {
+      if (isInitialized) return
+      
+      setIsLoading(true)
+      try {
+        const response = await fetch(`http://localhost:8000/api/conversations/realtime/sessions/family/${familyId}`)
+        if (response.ok) {
+          const data = await response.json()
+          if (data.sessions && data.sessions.length > 0) {
+            const activeSession = data.sessions[0]
+            setSession({
+              id: activeSession.id,
+              room_id: activeSession.room_id,
+              family_id: activeSession.family_id,
+              display_name: activeSession.display_name,
+              created_at: activeSession.created_at,
+              ended_at: activeSession.ended_at,
+              status: activeSession.status
+            })
+          }
+        }
+      } catch (error) {
+        console.log('기존 세션 확인 중 오류:', error)
+      } finally {
+        setIsLoading(false)
+        setIsInitialized(true)
+      }
+    }
+
+    checkExistingSession()
+  }, [familyId, isInitialized])
 
   // WebSocket URL 생성
   const wsUrl = session ? realtimeApi.getWebSocketUrl(session.room_id, userId, familyId) : null
