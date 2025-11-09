@@ -1,6 +1,6 @@
 # rag_test
 
-###bucket -> toc_extract -> chunking -> embedding_save
+## bucket -> toc_extract -> chunking -> embedding_save
 
 - bucket.py\
 pdf변환_downloads폴더가 생기면서 gcp에있는 pdf파일 다운됨
@@ -13,7 +13,7 @@ pdf변환_downloads폴더가 생기면서 gcp에있는 pdf파일 다운됨
 $ python embedding_save.py --create-table-if-missing\
 <img src="http://dev.wyhil.com:43000/SG-OHA-2025-TEAM-04/GAON/raw/branch/feature/%235/rag_test/20251107_172833.png" width="600"/>
 
-###summary_rag.py -> advice.py
+## summary_rag.py -> advice.py
 
 - summary_rag.py\
 data_analysis의 analysis_id 최신에 따른 summary부분만 벡터화 시켜서 ref_handbook_snippet 책의 pgvector KNN 검색 후 같은 section_id는 chunk_ix 순으로 자동 스티칭 후 상위 섹션들 프리뷰(본문 앞부분 + citation) 출력
