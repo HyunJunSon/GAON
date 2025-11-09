@@ -8,12 +8,14 @@ embedding_save.py 실행시 임베드 텍스트를 벡터화하고 전체 jsonl�
 $ python embedding_save.py --create-table-if-missing\
 <img src="http://dev.wyhil.com:43000/SG-OHA-2025-TEAM-04/GAON/raw/branch/feature/%235/rag_test/20251107_172833.png" width="600"/>
 
-summary_rag.py -> \
+summary_rag.py -> advice.py
 summary_rag.py 실행시 data_analysis의 analysis_id 최신에 따른 summary부분만 벡터화 시켜서 ref_handbook_snippet 책의 pgvector KNN 검색 후 같은 section_id는 chunk_ix 순으로 자동 스티칭 후 상위 섹션들 프리뷰(본문 앞부분 + citation) 출력
 (검색 결과 미리보기단계)
 <img src="http://dev.wyhil.com:43000/SG-OHA-2025-TEAM-04/GAON/raw/branch/feature/%235/rag_test/20251107_171549.png" width="600"/>
 
+advice.py실행시 요약 임베딩 생성 → ref_handbook_snippet.embedding에 pgvector KNN 검색 → 히트된 section_id의 섹션 전체 본문을 DB에서 재조회/스티칭 → 그 풀 텍스트 문맥으로 LLM 프롬프트 구성 → 조언 + 출처 출력, 이어서 미리보기(몇 줄)만 콘솔에 표시
 
+(생략)\
 retriever.py 실행시 data_analysis의 interest, tone, top_words, summary를 고려하여 책 가져옴\
 텍스트 인덱스(FTS, trigram)\
 CREATE INDEX IF NOT EXISTS idx_snip_fts ON ref_handbook_snippet USING GIN (to_tsvector('simple', embed_text)); \
