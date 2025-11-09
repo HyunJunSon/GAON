@@ -43,6 +43,48 @@ def fetch_latest_analysis_id_by_created(conn, user_id: str|None=None, conv_id: s
         row = cur.fetchone()
     return row[0] if row else None
 
+def fetch_full_sections(conn, table: str, section_ids: list[str]) -> list[dict]:
+    """
+    주어진 section_id 들에 대해, 섹션에 속한 모든 스니펫을 가져와
+    chunk_ix / page 순으로 정렬 → 전체 본문/인용을 재조립.
+    """
+    if not section_ids:
+        return []
+
+    sql = f"""
+      SELECT section_id, canonical_path, chunk_ix,
+             page_start, page_end, citation, full_text
+      FROM {table}
+      WHERE section_id = ANY(%s)
+      ORDER BY section_id, chunk_ix, page_start, page_end
+    """
+    with conn.cursor(cursor_factory=extras.RealDictCursor) as cur:
+        cur.execute(sql, (section_ids,))
+        rows = cur.fetchall()
+
+    by = {}
+    for r in rows:
+        g = by.setdefault(r["section_id"], {
+            "section_id": r["section_id"],
+            "canonical_path": r["canonical_path"],
+            "snippets": [],
+            "citations": set(),
+        })
+        g["snippets"].append(r)
+        if r.get("citation"):
+            g["citations"].add(r["citation"])
+
+    sections = []
+    for sec in by.values():
+        text = "\n\n".join(x["full_text"] for x in sec["snippets"] if x.get("full_text"))
+        sections.append({
+            "section_id": sec["section_id"],
+            "canonical_path": sec["canonical_path"],
+            "text": text.strip(),
+            "citations": sorted(sec["citations"]),
+        })
+    return sections
+
 # ----- Embedding / KNN / Stitch -----
 def make_query_embedding(client: OpenAI, text: str, model="text-embedding-3-small") -> list:
     t = (text or "").strip()
@@ -122,17 +164,51 @@ def main():
         qvec = make_query_embedding(client, summary)
         rows = knn_search(conn, qvec, table=table, limit=50)
 
-    sections = stitch_by_section(rows, top_k=6)
+    # ⬇️ 섹션별 최소 distance 맵 (KNN rows에서 계산)
+    best_dist_map = {}
+    for r in rows:
+        sid = r["section_id"]
+        d = r.get("distance")
+        if d is None:
+            continue
+        if sid not in best_dist_map or d < best_dist_map[sid]:
+            best_dist_map[sid] = d
+
+    # 1) 히트된 section_id 수집
+    hit_section_ids = sorted({r["section_id"] for r in rows})
+
+    # 2) 섹션 전체 본문을 DB에서 다시 가져와 재조립 (=> cite도 섹션 전체 기준)
+    with psycopg2.connect(PG_DSN) as conn2:
+        sections = fetch_full_sections(conn2, table, hit_section_ids)
+
+    # 3) 각 섹션에 KNN에서 계산한 최소 distance를 주입
+    for s in sections:
+        s["best_dist"] = best_dist_map.get(s["section_id"])
+
+    # 4) distance 기준으로 정렬 후 상위 k개만 선택
+    sections.sort(key=lambda z: (float("inf") if z.get("best_dist") is None else z["best_dist"]))
+    sections = sections[:6]
 
     print(f"\n=== ANALYSIS_ID ===\n{analysis_id}")
     print("\n=== SUMMARY (query) ===\n", summary)
     print("\n=== TOP SECTIONS ===")
     if not sections:
         print("(no sections)")
+
+    # 🔹 PREVIEW_LINES = 몇 줄까지 출력할지 
+    preview_lines = int(os.getenv("PREVIEW_LINES") or 2)
+
     for i, s in enumerate(sections, 1):
-        prev = (s["text"][:180] + "…") if len(s["text"]) > 180 else s["text"]
+        lines = s["text"].splitlines()
+        body = "\n".join(lines[:preview_lines])
+        if len(lines) > preview_lines:
+            body += "\n   … (이하 생략)"
+
         cite = "; ".join(s["citations"]) or "(no explicit page)"
-        print(f"{i}. {s['canonical_path']}  dist={s['best_dist']:.4f}\n   {prev}\n   cite: {cite}\n")
+        d = s.get("best_dist")
+        d_str = f"{d:.4f}" if isinstance(d, (int, float)) else "-"
+
+        print(f"{i}. {s['canonical_path']}  dist={d_str}\n   {body}\n   cite: {cite}\n")
 
 if __name__ == "__main__":
     main()
