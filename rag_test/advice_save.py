@@ -1,6 +1,5 @@
 # -*- coding: utf-8 -*-
-# advice2.py
-#summary_rag.py에 몇 줄만 추가해서 “검색→프롬프트→답변+출처”까지 한 번에 끝
+# advice_save.py
 
 import textwrap
 import os, sys, json
