@@ -1,4 +1,4 @@
-from typing import Optional, List
+from typing import Optional
 from pydantic_settings import BaseSettings
 
 
@@ -20,14 +20,10 @@ class Settings(BaseSettings):
     # CORS 설정
     frontend_url: str = "http://localhost:3000"
 
-    # JWT 설정 (⚠️ 운영환경에서는 반드시 강력한 키로 변경 필요)
+    # JWT 설정 (운영환경에서는 반드시 변경 필요)
     secret_key: str = "your-secret-key-change-in-production"
     algorithm: str = "HS256"
     access_token_expire_minutes: int = 30
-
-    # 파일 업로드 설정
-    max_file_size: int = 10 * 1024 * 1024  # 10MB
-    allowed_file_types: List[str] = ["pdf", "txt", "docx", "epub", "md"]
 
     # LLM 설정
     gemini_api_key: str = ""
@@ -37,6 +33,8 @@ class Settings(BaseSettings):
     langchain_endpoint: str = "https://api.smith.langchain.com"
     langchain_project: str = "Gaon"
     langchain_api_key: str = ""
+
+    # 환경 변수에서 직접 불러올 수 있도록 설정 추가
 
     class Config:
         env_file = ".env"
