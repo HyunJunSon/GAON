@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
-import { NAV_LINKS, AUTH_PAGES, type NavLink } from "./NavLinks";
+import { useNavLinks, AUTH_PAGES, type NavLink } from "./NavLinks";
 
 /**
  * 공통 네비게이션
@@ -16,7 +16,8 @@ export default function AppNavigation() {
   const pathname = usePathname();
   // 서버에서 받은 초기값으로 state 초기화 → SSR/CSR 일치
   const [authed, setAuthed] = useState<boolean>(false);
-
+  const NAV_LINKS = useNavLinks();
+  
   // 토큰 존재 여부로 로그인 상태 추정
   // 외부 변화 구독만 실행
   useEffect(() => {
@@ -60,8 +61,7 @@ export default function AppNavigation() {
 function SideNav ({ links, currentPath }: {links: NavLink[], currentPath: string}) {
   return (
     <nav className="flex flex-col gap-1">
-      {links.map(({ href, label, icon: Icon }) => {
-        const isActive = matchPath(currentPath, href);
+      {links.map(({ href, label, icon: Icon, isActive }) => {
         return (
           <Link
             key={href}
@@ -98,8 +98,7 @@ function BottomTabNav({ links, currentPath }: {links: NavLink[], currentPath: st
       style={style}
     >
       <ul className="mx-auto grid max-w-xl grid-cols-4">
-        {links.map(({ href, label, icon: Icon }) => {
-          const isActive = matchPath(currentPath, href);
+        {links.map(({ href, label, icon: Icon, isActive }) => {
           return (
             <li key={href}>
               <Link
@@ -123,10 +122,4 @@ function BottomTabNav({ links, currentPath }: {links: NavLink[], currentPath: st
       </ul>
     </nav>
   )
-}
-
-/** 경로 비교 유틸 (정확 일치 + 트레일링 슬래시 관대) */
-function matchPath(current: string, href: string) {
-  const normalize = (p: string) => (p.endsWith('/') && p !== '/' ? p.slice(0, -1) : p);
-  return normalize(current) === normalize(href);
 }
