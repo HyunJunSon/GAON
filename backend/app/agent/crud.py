@@ -403,6 +403,7 @@ def update_analysis_result(
     conv_id: str,
     summary: Optional[str] = None,
     style_analysis: Optional[Dict[str, Any]] = None,
+    statistics: Optional[Dict[str, Any]] = None,
     score: Optional[float] = None,
     confidence_score: Optional[float] = None,
     feedback: Optional[str] = None,
@@ -415,19 +416,19 @@ def update_analysis_result(
         conv_id: 대화 ID (UUID)
         summary: 새 요약 (선택)
         style_analysis: 새 스타일 분석 (선택)
+        statistics: 새 통계 정보 (선택)
         score: 새 점수 (선택)
         confidence_score: 새 신뢰도 점수 (선택)
         feedback: 새 피드백 (선택)
     
     Returns:
         업데이트된 분석 결과 (Dict) 또는 None
-    
-    사용처:
-        - QA/nodes.py의 AnalysisSaver (재분석 후 업데이트)
     """
-    # ✅ 기존 데이터 조회
+    import json
+    
+    # 기존 데이터 조회
     query_select = text("""
-        SELECT analysis_id, summary, style_analysis, score, confidence_score, feedback
+        SELECT summary, style_analysis, statistics, score, confidence_score, feedback
         FROM analysis_result
         WHERE conv_id = :conv_id
     """)
@@ -435,23 +436,24 @@ def update_analysis_result(
     result = db.execute(query_select, {"conv_id": conv_id}).fetchone()
     
     if not result:
+        print(f"   ⚠️ conv_id={conv_id}에 해당하는 분석 결과가 없습니다.")
         return None
     
-    # ✅ 업데이트할 값 준비
-    import json
-    
-    new_summary = summary if summary is not None else result[1]
-    new_style_analysis = json.dumps(style_analysis, ensure_ascii=False) if style_analysis is not None else result[2]
+    # 업데이트할 값 준비 (None이면 기존 값 유지)
+    new_summary = summary if summary is not None else result[0]
+    new_style_analysis = json.dumps(style_analysis, ensure_ascii=False) if style_analysis is not None else result[1]
+    new_statistics = json.dumps(statistics, ensure_ascii=False) if statistics is not None else result[2]
     new_score = score if score is not None else result[3]
     new_confidence_score = confidence_score if confidence_score is not None else result[4]
     new_feedback = feedback if feedback is not None else result[5]
     
-    # ✅ UPDATE 실행
+    # UPDATE 실행
     query_update = text("""
         UPDATE analysis_result
         SET 
             summary = :summary,
             style_analysis = :style_analysis,
+            statistics = :statistics,
             score = :score,
             confidence_score = :confidence_score,
             feedback = :feedback,
@@ -464,6 +466,7 @@ def update_analysis_result(
         "conv_id": conv_id,
         "summary": new_summary,
         "style_analysis": new_style_analysis,
+        "statistics": new_statistics,
         "score": new_score,
         "confidence_score": new_confidence_score,
         "feedback": new_feedback,
@@ -506,13 +509,27 @@ def get_analysis_by_conv_id(db: Session, conv_id: str) -> Optional[Dict[str, Any
     
     if result:
         import json
+        
+        # =========================================
+        # 🔧 수정: 이미 dict인 경우 json.loads() 스킵
+        # =========================================
+        def safe_json_load(value):
+            """JSON 문자열 또는 dict를 dict로 반환"""
+            if value is None:
+                return {}
+            if isinstance(value, dict):
+                return value  # 이미 dict면 그대로 반환
+            if isinstance(value, str):
+                return json.loads(value)  # 문자열이면 파싱
+            return {}
+        
         return {
             "analysis_id": str(result[0]),
             "user_id": str(result[1]),
             "conv_id": result[2],
             "summary": result[3],
-            "style_analysis": json.loads(result[4]) if result[4] else {},
-            "statistics": json.loads(result[5]) if result[5] else {},
+            "style_analysis": safe_json_load(result[4]),  # ← 🔧 수정
+            "statistics": safe_json_load(result[5]),      # ← 🔧 수정
             "score": result[6],
             "confidence_score": result[7],
             "conversation_count": result[8],
@@ -521,3 +538,4 @@ def get_analysis_by_conv_id(db: Session, conv_id: str) -> Optional[Dict[str, Any
             "updated_at": result[11],
         }
     return None
+

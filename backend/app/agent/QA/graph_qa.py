@@ -13,21 +13,19 @@ from .nodes import ScoreEvaluator, ReAnalyzer, AnalysisSaver
 # =====================================
 @dataclass
 class QAState:
-    # =========================================
-    # 🔧 수정: DB 세션 추가
-    # =========================================
-    # 이유: AnalysisSaver가 DB update 수행 필요
-    # =========================================
-    db: Optional[Session] = None  # ← 🔧 추가
+    # DB 세션 추가
+    db: Optional[Session] = None
     
     # 기존 필드
     user_id: Optional[str] = None
-    conv_id: Optional[str] = None
+    conv_id: Optional[Any] = None
     conversation_df: Optional[pd.DataFrame] = None
     analysis_result: Optional[Dict[str, Any]] = None
     confidence: float = 0.0
     reason: str = ""
+    needs_reanalysis: bool = False 
     final_result: Optional[Dict[str, Any]] = None
+    save_status: Optional[Dict[str, Any]] = None
     meta: Dict[str, Any] = field(default_factory=dict)
     verbose: bool = True
 
@@ -40,7 +38,7 @@ class QAGraph:
         self.verbose = verbose
         self.evaluator = ScoreEvaluator(verbose)
         self.reanalyzer = ReAnalyzer(verbose)
-        self.saver = AnalysisSaver()
+        self.saver = AnalysisSaver(verbose)  # ← 🔧 verbose 추가
 
         # LangGraph 구성
         self.graph = StateGraph(QAState)
@@ -61,17 +59,26 @@ class QAGraph:
         self.pipeline = self.graph.compile()
 
     # -------------------------------
-    # ✅ 노드 정의 (기존 유지)
+    # ✅ 노드 정의
     # -------------------------------
     
     def node_evaluate(self, state: QAState):
         """
         신뢰도 평가 노드
+        
+        🔧 수정: evaluate() 결과를 딕셔너리로 받기
         """
         if self.verbose:
             print("\n📈 [ScoreEvaluator] 신뢰도 평가 중...")
 
-        state.confidence, state.reason = self.evaluator.evaluate(state.analysis_result)
+        # =========================================
+        # 🔧 수정: 딕셔너리로 받아서 각 필드에 할당
+        # =========================================
+        evaluation = self.evaluator.evaluate(state.analysis_result)
+        
+        state.confidence = evaluation["confidence"]
+        state.reason = evaluation["reason"]
+        state.needs_reanalysis = evaluation.get("needs_reanalysis", False)
 
         # ✅ 근거 출력
         print(f"   ✅ 평가 결과: {state.confidence:.2f}")
@@ -105,7 +112,7 @@ class QAGraph:
         최종 결과 저장 노드
         
         🔧 수정 사항:
-        - AnalysisSaver에 DB 세션 전달
+        - AnalysisSaver에 DB 세션, conv_id, confidence, reason 전달
         """
         if self.verbose:
             print("\n💾 [AnalysisSaver] 최종 결과 저장 중...")
@@ -113,12 +120,17 @@ class QAGraph:
         result = state.final_result or state.analysis_result
         
         # =========================================
-        # 🔧 수정: DB 세션 전달
+        # 🔧 수정: save_final() 시그니처에 맞게 호출
         # =========================================
-        # 이유: AnalysisSaver가 DB update 수행
-        # =========================================
-        saved = self.saver.save_final(state.db, result, state)  # ← 🔧 db 추가
-        
+        saved = self.saver.save_final(
+            db=state.db,
+            conv_id=state.conv_id,
+            result=result,
+            confidence=state.confidence,
+            reason=state.reason
+            
+        )
+        state.save_status = saved
         print(f"   ✅ 저장 완료: {saved}")
         return state
 
@@ -128,53 +140,23 @@ class QAGraph:
     
     def run(
         self,
-        db: Session,  # ← 🔧 추가
+        db: Session,
         conversation_df: pd.DataFrame,
         analysis_result: Dict[str, Any],
         user_id: str,
         conv_id: str
-    ):
+    ) -> Dict[str, Any]:
         """
         ✅ QA 파이프라인 실행 (DB 연동)
         
-        🔧 수정 사항:
-        - db 파라미터 추가
-        - QAState에 db 주입
-        
-        Args:
-            db: SQLAlchemy 세션
-            conversation_df: 대화 DataFrame
-            analysis_result: Analysis 단계 결과
-            user_id: 사용자 ID
-            conv_id: 대화 UUID
-        
         Returns:
-            QAState (최종 상태)
-        
-        사용 예시:
-            from app.core.database_testing import SessionLocalTesting
-            
-            db = SessionLocalTesting()
-            try:
-                graph = QAGraph(verbose=True)
-                result = graph.run(
-                    db=db,
-                    conversation_df=conversation_df,
-                    analysis_result=analysis_result,
-                    user_id="1",
-                    conv_id="uuid-string"
-                )
-            finally:
-                db.close()
+            Dict[str, Any]: QA 실행 결과 딕셔너리
         """
         if self.verbose:
             print("\n🚀 [QAGraph] 실행 시작\n" + "=" * 60)
         
-        # =========================================
-        # 🔧 수정: 초기 상태에 db 추가
-        # =========================================
         state = QAState(
-            db=db,  # ← 🔧 추가
+            db=db,
             user_id=user_id,
             conv_id=conv_id,
             conversation_df=conversation_df,
@@ -188,4 +170,29 @@ class QAGraph:
         if self.verbose:
             print("\n✅ [QAGraph] 파이프라인 실행 완료\n" + "=" * 60)
         
-        return result_state
+
+        save_status = result_state.get("save_status")
+        print(f"\n[DEBUG] save_status 타입: {type(save_status)}")
+        print(f"[DEBUG] save_status 내용: {save_status}")
+        
+        # 성공 여부 판단
+        success = (
+            isinstance(save_status, dict) and 
+            save_status.get("status") == "updated"
+        )
+        print(f"[DEBUG] success 계산 결과: {success}")
+        print(f"[DEBUG] isinstance(save_status, dict): {isinstance(save_status, dict)}")
+        if isinstance(save_status, dict):
+            print(f"[DEBUG] save_status.get('status'): {save_status.get('status')}")
+        
+        
+        return {
+            "status": success,
+            "conv_id": result_state.get("conv_id"),
+            "user_id": result_state.get("user_id"),
+            "analysis_result": result_state.get("analysis_result"),
+            "confidence": result_state.get("confidence", 0.0),
+            "reason": result_state.get("reason", ""),
+            "needs_reanalysis": result_state.get("needs_reanalysis", False),
+            "final_result": save_status,  # ← DB 저장 결과
+        }
