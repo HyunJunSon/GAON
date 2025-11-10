@@ -22,13 +22,19 @@ jobs:
     - name: Checkout repository
       uses: actions/checkout@v3
       with:
-        fetch-depth: 2
+        fetch-depth: 0  # 전체 히스토리 가져오기
     
     - name: Check changed files
       id: changes
       run: |
         # 최근 2개 커밋에서 변경된 파일들 확인 (머지 커밋 대응)
-        CHANGED_FILES=$(git diff --name-only HEAD~2 HEAD)
+        # HEAD~2가 없는 경우 전체 파일을 변경된 것으로 처리
+        if git rev-parse --verify HEAD~2 >/dev/null 2>&1; then
+          CHANGED_FILES=$(git diff --name-only HEAD~2 HEAD)
+        else
+          echo "HEAD~2 not available, treating all files as changed"
+          CHANGED_FILES=$(find . -name "*.py" -o -name "*.js" -o -name "*.ts" -o -name "*.tsx" -o -name "*.json" -o -name "Dockerfile*" | grep -E "(backend/|frontend/)" | head -10)
+        fi
         
         echo "backend_changed=$(echo "$CHANGED_FILES" | grep -q '^backend/' && echo 'true' || echo 'false')" >> $GITHUB_OUTPUT
         echo "frontend_changed=$(echo "$CHANGED_FILES" | grep -q '^frontend/' && echo 'true' || echo 'false')" >> $GITHUB_OUTPUT
