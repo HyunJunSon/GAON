@@ -17,9 +17,35 @@ export type AnalysisStatus = 'queued' | 'processing' | 'ready' | 'failed';
 export type AnalysisRes = {
   conversationId: string;
   status: AnalysisStatus;
+  createdAt?: string;
   updatedAt?: string;
-  summary?: { bullets: string[] };
-  emotion?: { series: Array<{ label: string; value: number }> };
+  statistics?: {
+    user?: {
+      top_words?: string[];
+      word_count?: number;
+      unique_words?: number;
+      avg_sentence_length?: number;
+    };
+    others?: {
+      word_count?: number;
+      unique_words?: number;
+      avg_sentence_length?: number;
+    };
+    comparison?: string;
+  };
+  style_analysis?: Record<
+    string,
+    {
+      주요_관심사?: string;
+      대화_비교_분석?: string;
+      말투_특징_분석?: string;
+      대화_성향_및_감정_표현?: string;
+    }
+  >;
+  summary?: string;
+  score?: number;
+  confidence_score?: number;
+  feedback: string;
   dialog?: { raw: string };
   errorMessage?: string | null;
 }

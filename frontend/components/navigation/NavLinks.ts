@@ -28,9 +28,6 @@ export function getNavLinks(pathname: string): NavLink[] {
       l.href === '/'
         ? pathname === '/'
         : pathname.startsWith(l.href);
-    if (l.href === '/analysis') {
-      console.log('/analysis isActive', active)
-    }
     return { ...l, isActive: active };
   });
 }

@@ -1,5 +1,6 @@
 'use client';
 
+import { useAnalysis } from '@/hooks/useAnalysis';
 import Link from 'next/link';
 import { useParams, usePathname } from 'next/navigation';
 
@@ -15,7 +16,12 @@ export default function AnalysisTabsLayout({ children }: { children: React.React
   const conversationId = Array.isArray(params.conversationId)
     ? params.conversationId[0]
     : (params.conversationId as string | undefined);
+  // id가 null일 수 있으므로 빈 문자열로 대체하여 훅 호출 순서를 유지합니다.
 
+  const safeId = conversationId ?? '';
+  // ✅ 페이지에서 먼저 불러왔든, 여기서 처음이든 동일 queryKey로 캐시 재사용
+  const { data, isLoading, isError, error } = useAnalysis(safeId);
+  
   // 현재 경로와 비교하여 active 판별
   const base = `/analysis/${conversationId}`;
   const tabs = [
@@ -28,7 +34,13 @@ export default function AnalysisTabsLayout({ children }: { children: React.React
     <main className="space-y-6">
       {/* 상단 헤더(필요 시 간결히) */}
       <header>
-        <h1 className="text-2xl font-semibold">분석 결과</h1>
+        <h1 className="text-2xl font-semibold inline mr-2">분석 결과</h1>
+        <div className='inline text-sm text-gray-600'>
+          {data?.confidence_score != null && <>신뢰도: <strong>{(data?.confidence_score * 100).toFixed(0)}</strong>%</>}
+          {data?.confidence_score != null && data?.updatedAt != null && ' · '}
+          {data?.updatedAt && <span>업데이트: {new Date(data?.updatedAt).toLocaleString()}</span>}
+        </div>
+
         <p className="text-sm text-gray-600">
           대화 ID: <code className="rounded bg-gray-100 px-1 py-0.5">{conversationId}</code>
         </p>
