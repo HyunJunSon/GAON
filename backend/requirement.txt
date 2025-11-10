@@ -61,7 +61,7 @@ scipy==1.14.1
 numpy==1.26.4
 networkx==3.3
 
-# === LangChain & Related ===
+# === LangChain & Related & LangGraph ===
 langchain==0.3.27
 langchain-core==0.3.79
 langchain-community==0.3.31
@@ -73,7 +73,10 @@ langchain-experimental==0.3.4
 langchain-postgres==0.0.15
 langchain-text-splitters==0.3.11
 langsmith==0.4.26
-
+langchain_google_genai
+langgraph==0.2.45
+langgraph-sdk==0.1.35
+graphviz>=0.20.3
 
 # === Google Cloud ===
 google-cloud-storage==3.4.1
@@ -87,3 +90,6 @@ typing_extensions==4.12.2
 pytest
 black
 ruff
+
+# === Data ===
+pandas
