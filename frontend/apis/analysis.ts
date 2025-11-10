@@ -35,7 +35,7 @@ export function getConversationId(res: StartAnalysisAny): string {
 }
 /** 분석 시작(파일 업로드 포함) */
 export async function startAnalysis(form: FormData) {
-  // FormData 사용 시 Content-Type은 브라우저가 자동 설정
+  // JWT 토큰은 apiFetch에서 자동으로 헤더에 포함됨
   return apiFetch<StartAnalysisRes>('/api/conversations/analyze', {
     method: 'POST',
     body: form,

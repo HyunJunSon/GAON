@@ -1,5 +1,10 @@
+interface UserInfo {
+  user_id: number
+  user_name: string
+}
+
 interface UserListProps {
-  users: number[]
+  users: UserInfo[]
   currentUserId: number
 }
 
@@ -14,17 +19,17 @@ export const UserList = ({ users, currentUserId }: UserListProps) => {
         참여자 ({users.length}명)
       </h3>
       <div className="flex flex-wrap gap-2">
-        {users.map((userId) => (
+        {users.map((user) => (
           <span
-            key={userId}
+            key={user.user_id}
             className={`inline-flex items-center px-2 py-1 rounded-full text-xs ${
-              userId === currentUserId
+              user.user_id === currentUserId
                 ? 'bg-blue-100 text-blue-800'
                 : 'bg-gray-200 text-gray-700'
             }`}
           >
             <span className="w-2 h-2 bg-green-400 rounded-full mr-1"></span>
-            {userId === currentUserId ? '나' : `사용자 ${userId}`}
+            {user.user_id === currentUserId ? '나' : user.user_name}
           </span>
         ))}
       </div>

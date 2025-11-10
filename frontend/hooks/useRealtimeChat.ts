@@ -50,8 +50,15 @@ export const useRealtimeChat = ({ familyId, userId }: UseRealtimeChatProps) => {
     checkExistingSession()
   }, [familyId, isInitialized])
 
-  // WebSocket URL 생성
-  const wsUrl = session ? realtimeApi.getWebSocketUrl(session.room_id, userId, familyId) : null
+  // WebSocket URL 생성 (세션이 있고 초기화가 완료된 경우에만)
+  const wsUrl = session && isInitialized ? realtimeApi.getWebSocketUrl(session.room_id, userId, familyId) : null
+  
+  // WebSocket URL 로그
+  useEffect(() => {
+    if (wsUrl) {
+      console.log('WebSocket URL:', wsUrl);
+    }
+  }, [wsUrl]);
 
   // WebSocket 이벤트 핸들러
   const handleMessage = useCallback((wsMessage: WebSocketMessage) => {
@@ -116,10 +123,11 @@ export const useRealtimeChat = ({ familyId, userId }: UseRealtimeChatProps) => {
 
   const handleConnect = useCallback(() => {
     setError(null)
+    // 연결 시 메시지와 사용자 목록 초기화하지 않음 (기존 상태 유지)
   }, [])
 
   const handleDisconnect = useCallback(() => {
-    // 연결이 끊어졌을 때의 처리
+    // 연결이 끊어져도 사용자 목록은 유지 (재연결 시까지)
   }, [])
 
   const handleError = useCallback((error: Event) => {

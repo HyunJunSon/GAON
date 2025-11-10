@@ -1,28 +1,56 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useStartAnalysis } from '@/hooks/useAnalysis';
 import { useServerError } from '@/hooks/useServerError';
 import ErrorAlert from '@/components/ui/ErrorAlert';
 import FileDropzone from '@/components/upload/FileDropzone';
 import { ChatRoom } from '@/components/realtime/ChatRoom';
+import { ChatRoomList } from '@/components/realtime/ChatRoomList';
+import { CreateChatRoom } from '@/components/realtime/CreateChatRoom';
+import { apiFetch } from '@/apis/client';
 
-// 텍스트 업로드 전용: 확장자/타입을 제한
-const ACCEPT_MIME = ['text/plain'];
-const ACCEPT_EXT = ['.txt']; // 필요 시 .md 등 추가
-const MAX_MB = 5; // 텍스트는 작게 제한(필요 시 조정)
+// 다양한 문서 형식 지원
+const ACCEPT_MIME = ['text/plain', 'application/pdf', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'];
+const ACCEPT_EXT = ['.txt', '.pdf', '.docx'];
+const MAX_MB = 10; // 문서 파일 크기 제한
 
 type TabType = 'upload' | 'realtime';
 
 export default function ConversationPage() {
   const [activeTab, setActiveTab] = useState<TabType>('upload');
   const [file, setFile] = useState<File | null>(null);
+  const [activeSessionId, setActiveSessionId] = useState<number | null>(null);
+  const [showCreateRoom, setShowCreateRoom] = useState(false);
+  const [refreshTrigger, setRefreshTrigger] = useState(0);
+  const [userInfo, setUserInfo] = useState<{userId: number, familyId: number} | null>(null);
   const { mutate, isPending } = useStartAnalysis();
   const { serverError, handleError, clearError } = useServerError();
 
-  // 임시 사용자 정보 (실제로는 인증 컨텍스트에서 가져와야 함)
-  const userId = 1;
-  const familyId = 1;
+  // 사용자 정보 가져오기
+  useEffect(() => {
+    const fetchUserInfo = async () => {
+      try {
+        const userData = await apiFetch<{id: number, family_id: number}>('/api/auth/me');
+        console.log('사용자 데이터:', userData); // 디버그 로그
+        setUserInfo({
+          userId: userData.id,
+          familyId: userData.family_id || 1
+        });
+      } catch (error) {
+        console.error('사용자 정보 조회 실패:', error);
+        // 기본값 설정
+        setUserInfo({ userId: 1, familyId: 1 });
+      }
+    };
+    fetchUserInfo();
+  }, []);
+
+  if (!userInfo) {
+    return <div className="flex justify-center items-center h-64">로딩 중...</div>;
+  }
+
+  const { userId, familyId } = userInfo;
 
   const handleSelect = (files: File[]) => {
     clearError();
@@ -32,7 +60,7 @@ export default function ConversationPage() {
   const onStart = () => {
     if (!file) return;
     mutate(
-      { file, lang: 'ko' }, // 서버가 텍스트를 음성과 동일 엔드포인트에서 처리한다고 가정
+      { file, lang: 'ko' },
       { onError: handleError }
     );
   };
@@ -72,7 +100,7 @@ export default function ConversationPage() {
                 : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
             }`}
           >
-            실시간 대화
+            채팅
           </button>
         </nav>
       </div>
@@ -90,7 +118,7 @@ export default function ConversationPage() {
               multiple={false}
               onFileSelect={handleSelect}
               onError={(msg) => handleError(new Error(msg))}
-              placeholder="여기로 .txt 파일을 드래그하거나 클릭하여 선택하세요."
+              placeholder="여기로 파일을 드래그하거나 클릭하여 선택하세요. (.txt, .pdf, .docx 지원)"
             />
 
             <div className="rounded border bg-white px-4 py-3 text-sm text-gray-700">
@@ -115,11 +143,38 @@ export default function ConversationPage() {
 
       {activeTab === 'realtime' && (
         <section>
-          <ChatRoom
+          <ChatRoomList
             familyId={familyId}
             userId={userId}
-            onSessionEnd={handleSessionEnd}
+            onJoinRoom={(sessionId) => setActiveSessionId(sessionId)}
+            onCreateRoom={() => setShowCreateRoom(true)}
+            refreshTrigger={refreshTrigger}
           />
+          
+          {showCreateRoom && (
+            <CreateChatRoom
+              familyId={familyId}
+              userId={userId}
+              onRoomCreated={(sessionId) => {
+                setActiveSessionId(sessionId);
+                setShowCreateRoom(false);
+                setRefreshTrigger(prev => prev + 1); // 목록 새로고침
+              }}
+              onCancel={() => setShowCreateRoom(false)}
+            />
+          )}
+          
+          {activeSessionId && userInfo && (
+            <ChatRoom
+              sessionId={activeSessionId}
+              familyId={userInfo.familyId}
+              userId={userInfo.userId}
+              onSessionEnd={() => {
+                setActiveSessionId(null);
+                setRefreshTrigger(prev => prev + 1);
+              }}
+            />
+          )}
         </section>
       )}
     </main>

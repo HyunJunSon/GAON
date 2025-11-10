@@ -53,14 +53,6 @@ export const useWebSocket = ({
       ws.onclose = () => {
         setConnectionStatus('disconnected')
         onDisconnect?.()
-
-        // 자동 재연결 시도
-        if (reconnectAttempts < maxReconnectAttempts) {
-          reconnectTimeoutRef.current = setTimeout(() => {
-            setReconnectAttempts(prev => prev + 1)
-            connect()
-          }, reconnectDelay)
-        }
       }
 
       ws.onerror = (error) => {
@@ -71,7 +63,7 @@ export const useWebSocket = ({
       setConnectionStatus('error')
       console.error('WebSocket connection failed:', error)
     }
-  }, [url, onMessage, onConnect, onDisconnect, onError, reconnectAttempts])
+  }, [url, onMessage, onConnect, onDisconnect, onError])
 
   const disconnect = useCallback(() => {
     if (reconnectTimeoutRef.current) {

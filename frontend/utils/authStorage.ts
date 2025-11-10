@@ -7,6 +7,7 @@ const TOKEN_KEY = 'ga_access_token';
 
 export const authStorage = {
   get(): string | null {
+    if (typeof window === 'undefined') return null;
     try {
       return window.localStorage.getItem(TOKEN_KEY);
     } catch {
@@ -14,6 +15,7 @@ export const authStorage = {
     }
   },
   set(token: string) {
+    if (typeof window === 'undefined') return;
     try {
       window.localStorage.setItem(TOKEN_KEY, token);
     } catch {}
@@ -21,6 +23,7 @@ export const authStorage = {
     document.cookie = 'ga_auth=1; path=/; max-age=86400; samesite=lax';
   },
   clear() {
+    if (typeof window === 'undefined') return;
     try {
       window.localStorage.removeItem(TOKEN_KEY);
     } catch {}
