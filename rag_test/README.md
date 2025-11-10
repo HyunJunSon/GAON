@@ -23,9 +23,9 @@ analysis_result의 analysis_id 최신에 따른 summary부분만 벡터화 시�
 
 - advice.py\
 요약 임베딩 생성 → ref_handbook_snippet.embedding에 pgvector KNN 검색 → 히트된 section_id의 섹션 전체 본문을 DB에서 재조회/스티칭 → 그 풀 텍스트 문맥으로 LLM 프롬프트 구성 → 조언 + 출처 출력, 이어서 미리보기(몇 줄)만 콘솔에 표시
-<img src="http://dev.wyhil.com:43000/SG-OHA-2025-TEAM-04/GAON/raw/branch/feature/%235/rag_test/20251110_133635.png" width="600"/>
-<img src="http://dev.wyhil.com:43000/SG-OHA-2025-TEAM-04/GAON/raw/branch/feature/%235/rag_test/20251110_082946.png" width="600"/>
-<img src="http://dev.wyhil.com:43000/SG-OHA-2025-TEAM-04/GAON/raw/branch/feature/%235/rag_test/20251110_083001.png" width="600"/>
+<img src="http://dev.wyhil.com:43000/SG-OHA-2025-TEAM-04/GAON/raw/branch/feature/%235/rag_test/20251110_133635.png" width="600"/>\
+<img src="http://dev.wyhil.com:43000/SG-OHA-2025-TEAM-04/GAON/raw/branch/feature/%235/rag_test/20251110_082946.png" width="600"/>\
+<img src="http://dev.wyhil.com:43000/SG-OHA-2025-TEAM-04/GAON/raw/branch/feature/%235/rag_test/20251110_083001.png" width="600"/>\
 <img src="http://dev.wyhil.com:43000/SG-OHA-2025-TEAM-04/GAON/raw/branch/feature/%235/rag_test/20251110_083014.png" width="600"/>
 
 - advice_save.py\
