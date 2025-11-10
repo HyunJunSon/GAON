@@ -29,7 +29,7 @@ analysis_result의 analysis_id 최신에 따른 summary부분만 벡터화 시�
 <img src="http://dev.wyhil.com:43000/SG-OHA-2025-TEAM-04/GAON/raw/branch/feature/%235/rag_test/20251110_083014.png" width="600"/>
 
 - advice_save.py\
-analysis_result의 analysis_id에 해당하는 feedback 저장 
+analysis_result의 analysis_id에 해당하는 feedback 저장\
 <img src="http://dev.wyhil.com:43000/SG-OHA-2025-TEAM-04/GAON/raw/branch/feature/%235/rag_test/20251110_090545.png" width="600"/>\
 <img src="http://dev.wyhil.com:43000/SG-OHA-2025-TEAM-04/GAON/raw/branch/feature/%235/rag_test/20251110_090522.png" width="600"/>
 
