@@ -9,7 +9,7 @@ pdf변환_downloads폴더가 생기면서 gcp에있는 pdf파일 다운됨
 - chunking.py\
 가장 작은 목차 분류를 기준으로 600~800자 청킹-> 임베드 텍스트(대,중,소 제목 + 본문청크)저장 (toc_out폴더의 json파일을 참고해서 pdf변환_downloads폴더의 pdf파일을 청킹함)
 - embedding_save.py\
-임베드 텍스트를 벡터화하고 전체 jsonl을 postgresql에 저장함
+임베드 텍스트를 벡터화하고 전체 jsonl을 postgresql에 저장함\
 $ python embedding_save.py --create-table-if-missing\
 <img src="http://dev.wyhil.com:43000/SG-OHA-2025-TEAM-04/GAON/raw/branch/feature/%235/rag_test/20251107_172833.png" width="600"/>\
 <img src="http://dev.wyhil.com:43000/SG-OHA-2025-TEAM-04/GAON/raw/branch/feature/%235/rag_test/20251110_165042.png" width="600"/>
