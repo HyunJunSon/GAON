@@ -11,7 +11,7 @@ pdf변환_downloads폴더가 생기면서 gcp에있는 pdf파일 다운됨
 - embedding_save.py\
 임베드 텍스트를 벡터화하고 전체 jsonl을 postgresql에 저장함
 $ python embedding_save.py --create-table-if-missing\
-<img src="http://dev.wyhil.com:43000/SG-OHA-2025-TEAM-04/GAON/raw/branch/feature/%235/rag_test/20251107_172833.png" width="600"/>
+<img src="http://dev.wyhil.com:43000/SG-OHA-2025-TEAM-04/GAON/raw/branch/feature/%235/rag_test/20251107_172833.png" width="600"/>\
 <img src="http://dev.wyhil.com:43000/SG-OHA-2025-TEAM-04/GAON/raw/branch/feature/%235/rag_test/20251110_165042.png" width="600"/>
 
 ## summary_rag.py -> advice.py -> advice_save.py
