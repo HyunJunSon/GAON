@@ -52,15 +52,19 @@ class ConnectionManager:
         except:
             self.disconnect(websocket)
 
-    def get_room_users(self, room_id: str) -> List[int]:
+    def get_room_users(self, room_id: str) -> List[dict]:
         if room_id not in self.active_connections:
             return []
         
-        users = set()  # 중복 제거를 위해 set 사용
+        users = {}  # user_id를 키로 하여 중복 제거
         for ws in self.active_connections[room_id]:
             if ws in self.user_info:
-                users.add(self.user_info[ws]["user_id"])
-        return list(users)
+                user_info = self.user_info[ws]
+                users[user_info["user_id"]] = {
+                    "user_id": user_info["user_id"],
+                    "user_name": user_info["user_name"]
+                }
+        return list(users.values())
 
 
 manager = ConnectionManager()
