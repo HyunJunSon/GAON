@@ -57,12 +57,12 @@ export default function ConversationTextUploadPage() {
             : '선택된 파일 없음'}
         </div>
       </section>
-      <div>
+      <div className='flex justify-center'>
         <button
           type="button"
           onClick={onStart}
           disabled={!file || isPending}
-          className="rounded bg-black px-4 py-2 text-white disabled:opacity-50"
+          className="rounded bg-black w-full max-w-80 px-4 py-2 text-white disabled:opacity-50"
         >
           {isPending ? '분석 시작 중…' : '분석 시작'}
         </button>
