@@ -1,0 +1,63 @@
+-- pgvector 확장을 활성화 (한 번만 실행)
+CREATE EXTENSION IF NOT EXISTS vector;
+
+-- users 테이블 생성
+CREATE TABLE users (
+    id SERIAL PRIMARY KEY,
+    name VARCHAR(255) NOT NULL,
+    password VARCHAR(255) NOT NULL,
+    email VARCHAR(255) NOT NULL UNIQUE,
+    create_date TIMESTAMP NOT NULL
+);
+
+-- family 테이블 생성
+CREATE TABLE family (
+    id SERIAL PRIMARY KEY,
+    name VARCHAR(255) NOT NULL,
+    description TEXT,
+    create_date TIMESTAMP NOT NULL
+);
+
+-- conversation 테이블 생성
+CREATE TABLE conversation (
+    id SERIAL PRIMARY KEY,
+    title VARCHAR(255) NOT NULL,
+    content TEXT,
+    user_id INTEGER REFERENCES users(id),
+    family_id INTEGER REFERENCES family(id),
+    create_date TIMESTAMP NOT NULL
+);
+
+-- conversation_file 테이블 생성 (파일 업로드 관리)
+CREATE TABLE conversation_file (
+    id SERIAL PRIMARY KEY,
+    conversation_id INTEGER REFERENCES conversation(id) ON DELETE CASCADE,
+    gcs_file_path VARCHAR(500) NOT NULL,
+    original_filename VARCHAR(255) NOT NULL,
+    file_type VARCHAR(50) NOT NULL,
+    file_size INTEGER NOT NULL,
+    processing_status VARCHAR(20) DEFAULT 'pending',
+    raw_content TEXT,
+    chunked_content JSONB,
+    upload_date TIMESTAMP DEFAULT NOW(),
+    processed_date TIMESTAMP
+);
+-- ideal_answer 테이블 생성 (RAG 시스템용)
+CREATE TABLE ideal_answer (
+    idea_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),              -- 모범답안ID
+    source TEXT,                                                     -- 원문
+    embedding VECTOR(1536),                                          -- 임베딩 (pgvector)
+    created_at TIMESTAMP DEFAULT NOW(),                              -- 생성일
+    analysisid UUID                                                  -- 분석결과ID (외래키 가능)
+);
+
+-- 인덱스 생성
+CREATE INDEX idx_ideal_answer_created_at ON ideal_answer(created_at);
+CREATE INDEX idx_ideal_answer_source ON ideal_answer USING gin(to_tsvector('english', source));
+CREATE INDEX idx_ideal_answer_embedding ON ideal_answer USING ivfflat (embedding vector_cosine_ops) WITH (lists = 100);
+
+-- conversation_file 인덱스
+CREATE INDEX idx_conversation_file_conversation_id ON conversation_file(conversation_id);
+CREATE INDEX idx_conversation_file_processing_status ON conversation_file(processing_status);
+CREATE INDEX idx_conversation_file_upload_date ON conversation_file(upload_date);
+

@@ -1,0 +1,151 @@
+# =========================================
+# 🐍 Python Gitignore Template
+# =========================================
+
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.class
+
+# C extensions
+*.so
+
+# Distribution / packaging
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
+
+# PyInstaller
+# Usually creates files like `app.spec`
+*.manifest
+*.spec
+
+# Installer logs
+pip-log.txt
+pip-delete-this-directory.txt
+
+# Unit test / coverage reports
+htmlcov/
+.tox/
+.nox/
+.coverage
+.coverage.*
+.cache
+nosetests.xml
+coverage.xml
+*.cover
+*.py,cover
+.hypothesis/
+.pytest_cache/
+cover/
+
+# Jupyter Notebook checkpoints
+.ipynb_checkpoints
+
+# pyenv
+.python-version
+
+# pipenv
+Pipfile.lock
+
+# poetry
+poetry.lock
+
+# conda
+*.conda
+*.yml
+*.yaml
+
+# Environments
+.env
+.venv
+env/
+venv/
+ENV/
+env.bak/
+venv.bak/
+
+# IDE / Editor configs
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# MyPy / pytype
+.mypy_cache/
+.dmypy.json
+dmypy.json
+.pyre/
+.pytype/
+
+# Profiling data
+.prof
+*.pstat
+*.sqlite
+
+# Logs
+*.log
+logs/
+log/
+debug.log
+
+# Local data
+data/
+*.db
+*.sqlite3
+
+# OS-specific
+.DS_Store
+Thumbs.db
+
+# =========================================
+# ✨ Project-specific (customize freely)
+# =========================================
+
+# Streamlit / FastAPI / Flask
+.streamlit/
+instance/
+*.db-journal
+
+# VS Code Python debug cache
+.vscode/
+__pypackages__/
+
+# PyCharm project settings
+.idea/
+
+# If using uv / poetry / conda
+.uv/
+*.lock
+
+.backup
+
+# Alembic configuration (contains database connection info)
+alembic.ini
+gaon-venv/
+gaon.egg-info/
+
+# gcp 서비스계정 파일
+gcp_service_account_key.json
+
+# Testing config files
+#app/core/config_testing.py
+#app/core/database_testing.py
+GAON/backend/.envt
+.envt
+
+# 테스트용 데이터
+test-raw/data/

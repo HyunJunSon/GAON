@@ -1,0 +1,142 @@
+# =========================================
+# 🏗️ Root Gitignore (공통 상위 폴더용)
+# backend / frontend 각각 별도 .gitignore 존재 시
+# 이 파일은 OS, IDE, 공통 파일만 무시하도록 제한
+# =========================================
+
+# OS-specific
+.DS_Store
+Thumbs.db
+Desktop.ini
+.setting
+# macOS metadata
+.AppleDouble
+.LSOverride
+
+# Windows metadata
+ehthumbs.db
+ehthumbs_vista.db
+
+# Temporary files
+*.tmp
+*.bak
+*.swp
+*.swo
+*.orig
+*.old
+
+# Logs
+*.log
+logs/
+log/
+
+# Environment files
+.env
+.env.local
+.env.*
+*.envrc
+
+# IDE / Editor settings
+.vscode/
+.idea/
+*.sublime-project
+*.sublime-workspace
+
+# Backup or cache files
+__pycache__/
+.cache/
+tmp/
+temp/
+
+# Python virtual environments (중복 방지용)
+# backend/.gitignore 에서도 관리
+venv/
+.venv/
+env/
+ENV/
+
+# Node / JS dependencies (frontend/.gitignore 에서도 관리)
+node_modules/
+dist/
+build/
+
+# OS zip & archive files
+*.zip
+*.tar
+*.gz
+*.7z
+*.rar
+
+# mkdocs documentation
+/site
+
+# mypy
+.mypy_cache/
+.dmypy.json
+dmypy.json
+
+# Pyre type checker
+.pyre/
+
+# pytype static type analyzer
+.pytype/
+
+# Cython debug symbols
+cython_debug/
+
+# PyCharm
+#   JetBrains specific template is maintained in a separate JetBrains.gitignore that can
+#   be found at https://github.com/github/gitignore/blob/main/Global/JetBrains.gitignore
+#   and can be added to the global gitignore or merged into this file.  For a more nuclear
+#   option (not recommended) you can uncomment the following to ignore the entire idea folder.
+# .idea/
+
+# Abstra
+#   Abstra is an AI-powered process automation framework.
+#   Ignore directories containing user credentials, local state, and settings.
+#   Learn more at https://abstra.io/docs
+.abstra/
+
+# Visual Studio Code
+#   Visual Studio Code specific template is maintained in a separate VisualStudioCode.gitignore 
+#   that can be found at https://github.com/github/gitignore/blob/main/Global/VisualStudioCode.gitignore
+#   and can be added to the global gitignore or merged into this file. However, if you prefer, 
+#   you could uncomment the following to ignore the entire vscode folder
+# .vscode/
+
+# Ruff stuff:
+.ruff_cache/
+
+# PyPI configuration file
+.pypirc
+
+# Marimo
+marimo/_static/
+marimo/_lsp/
+__marimo__/
+
+# Streamlit
+.streamlit/secrets.toml
+
+
+
+# Env
+.env
+.env.*
+!.env.example
+
+# Misc
+.DS_Store
+dist/
+coverage/
+*.pem
+
+# See https://help.github.com/articles/ignoring-files/ for more about ignoring files.
+
+# vscode
+settings.json
+
+# Others
+*.pid
+*.seed
+*.pid.lock

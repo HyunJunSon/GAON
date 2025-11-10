@@ -1,0 +1,25 @@
+name: ❓ 질문 / 일반 문의
+description: 사용 중 궁금한 점이나 논의하고 싶은 내용을 남겨주세요.
+title: "[질문] 제목을 간결하게 작성해주세요"
+labels: ["question"]
+body:
+  - type: input
+    id: title
+    attributes:
+      label: 📝 제목
+      description: 질문 내용을 간결히 요약해주세요.
+      placeholder: "예: API 토큰 갱신 방법"
+
+  - type: textarea
+    id: details
+    attributes:
+      label: 📍 상세 내용
+      description: 구체적인 질문 내용이나 상황을 설명해주세요.
+      placeholder: "문제가 발생한 상황이나 시도한 방법을 적어주세요."
+
+  - type: input
+    id: related
+    attributes:
+      label: 🗂 관련 항목
+      description: 관련된 이슈나 문서가 있다면 적어주세요.
+      placeholder: "#15, README.md"

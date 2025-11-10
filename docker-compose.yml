@@ -1,0 +1,40 @@
+version: "3.8"
+
+services:
+  gaon_backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: gaon-backend
+    env_file:
+      - ./backend/.env
+    environment:
+      - DATABASE_URL=postgresql://${DB_USER}:${DB_PASSWORD}@localhost:5432/${DB_NAME}
+      - DB_HOST=localhost
+      - DB_PORT=5432
+      - DB_USER=${DB_USER}
+      - DB_PASSWORD=${DB_PASSWORD}
+      - DB_NAME=${DB_NAME}
+      - SECRET_KEY=${SECRET_KEY}
+      - GEMINI_API_KEY=${GEMINI_API_KEY}
+      - FRONTEND_URL=${FRONTEND_URL}
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./backend/logs:/app/logs
+    restart: unless-stopped
+    network_mode: host
+
+  gaon_frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: gaon-frontend
+    environment:
+      - NEXT_PUBLIC_API_URL=http://localhost:8000
+    ports:
+      - "3000:3000"
+    depends_on:
+      - gaon_backend
+    restart: unless-stopped
+    network_mode: host
