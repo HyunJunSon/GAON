@@ -1,7 +1,6 @@
 from sqlalchemy import Column, Integer, String, DateTime, Boolean
 from sqlalchemy.orm import relationship
 from app.core.database import Base
-from app.domains.conversation.models import Conversation
 from sqlalchemy.sql import func
 
 
@@ -16,4 +15,4 @@ class User(Base):
     create_date = Column(DateTime, nullable=False, default=func.now())
     
     # Relationships 
-    conversations = relationship("Conversation", back_populates="user")
+    conversations = relationship("Conversation", secondary="user_conversations", back_populates="participants")

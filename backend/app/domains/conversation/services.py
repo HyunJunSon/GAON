@@ -1,11 +1,17 @@
 from sqlalchemy.orm import Session
+from sqlalchemy import func
 from fastapi import UploadFile, HTTPException
+from typing import List, Dict, Any
 from datetime import datetime
-from typing import List
-from .file_models import ConversationFile
+import logging
+
 from .models import Conversation
+from .file_models import ConversationFile
 from .file_processor import FileProcessor
+from app.domains.auth.user_models import User
 from app.core.config import settings
+
+logger = logging.getLogger(__name__)
 
 
 class ConversationFileService:
@@ -33,18 +39,24 @@ class ConversationFileService:
             raise HTTPException(status_code=400, detail="파일이 손상되었거나 유효하지 않습니다.")
 
         try:
+            # 사용자 존재 확인
+            user = self.db.query(User).filter(User.id == user_id).first()
+            if not user:
+                raise HTTPException(status_code=404, detail="사용자를 찾을 수 없습니다.")
+            
             # 새 conversation 생성
             conversation = Conversation(
                 title=f"대화 분석 - {file.filename}",
                 content="",  # 파일 처리 후 업데이트
-                user_id=user_id,
                 family_id=family_id,
                 create_date=datetime.now()
             )
             
             self.db.add(conversation)
-            self.db.commit()
-            self.db.refresh(conversation)
+            self.db.flush()  # ID 생성을 위해 flush
+            
+            # Many-to-Many 관계 설정 (사용자를 conversation 참여자로 추가)
+            conversation.participants.append(user)
             
             # GCS에 업로드
             gcs_path = self.file_processor.upload_to_gcs(file_content, user_id, file.filename)
@@ -70,17 +82,17 @@ class ConversationFileService:
             conversation.content = raw_content[:1000]  # 처음 1000자만 저장
             
             self.db.commit()
-            self.db.refresh(db_file)
             
+            logger.info(f"파일 업로드 완료: {file.filename}, Conversation ID: {conversation.id}")
             return conversation, db_file
             
+        except HTTPException:
+            self.db.rollback()
+            raise
         except Exception as e:
             self.db.rollback()
-            # 실패 시 GCS에서 파일 삭제
-            if 'gcs_path' in locals():
-                self.file_processor.delete_from_gcs(gcs_path)
+            logger.error(f"파일 업로드 중 오류 발생: {str(e)}")
             raise HTTPException(status_code=500, detail=f"파일 처리 중 오류가 발생했습니다: {str(e)}")
-
     def _validate_file(self, file: UploadFile) -> str:
         """파일 유효성 검사 공통 로직"""
         if not file.filename:
@@ -114,6 +126,16 @@ class ConversationFileService:
             raise HTTPException(status_code=400, detail="파일이 손상되었거나 유효하지 않습니다.")
 
         try:
+            # Conversation 존재 확인
+            conversation = self.db.query(Conversation).filter(Conversation.id == conversation_id).first()
+            if not conversation:
+                raise HTTPException(status_code=404, detail="대화를 찾을 수 없습니다.")
+            
+            # 사용자가 해당 conversation의 참여자인지 확인
+            user = self.db.query(User).filter(User.id == user_id).first()
+            if not user or user not in conversation.participants:
+                raise HTTPException(status_code=403, detail="해당 대화에 참여할 권한이 없습니다.")
+            
             # GCS에 업로드
             gcs_path = self.file_processor.upload_to_gcs(file_content, user_id, file.filename)
             
@@ -136,16 +158,19 @@ class ConversationFileService:
             self.db.commit()
             self.db.refresh(db_file)
             
+            logger.info(f"파일 추가 완료: {file.filename}, Conversation ID: {conversation_id}")
             return db_file
             
+        except HTTPException:
+            self.db.rollback()
+            raise
         except Exception as e:
-            # 실패 시 GCS에서 파일 삭제
-            if 'gcs_path' in locals():
-                self.file_processor.delete_from_gcs(gcs_path)
+            self.db.rollback()
+            logger.error(f"파일 업로드 중 오류 발생: {str(e)}")
             raise HTTPException(status_code=500, detail=f"파일 처리 중 오류가 발생했습니다: {str(e)}")
 
     def get_file_by_id(self, file_id: int) -> ConversationFile:
-        """파일 ID로 조회"""
+        """파일 ID로 파일 정보 조회"""
         db_file = self.db.query(ConversationFile).filter(ConversationFile.id == file_id).first()
         if not db_file:
             raise HTTPException(status_code=404, detail="파일을 찾을 수 없습니다.")
@@ -156,47 +181,27 @@ class ConversationFileService:
         files = (
             self.db.query(ConversationFile)
             .join(Conversation)
-            .filter(Conversation.user_id == user_id)
+            .join(Conversation.participants)
+            .filter(User.id == user_id)
             .order_by(ConversationFile.upload_date.desc())
             .all()
         )
         return files
 
-    def get_conversation_analysis(self, conversation_id: int) -> dict:
-        """대화 분석 결과 조회 (현재는 기본값 반환)"""
-        # conversation 존재 확인
+    def get_conversation_analysis(self, conversation_id: int) -> Dict[str, Any]:
+        """대화 분석 결과 조회"""
         conversation = self.db.query(Conversation).filter(Conversation.id == conversation_id).first()
         if not conversation:
             raise HTTPException(status_code=404, detail="대화를 찾을 수 없습니다.")
         
-        # TODO: 실제 LLM 분석 로직으로 교체 예정
+        # 파일들의 분석 결과 통합
+        files = self.db.query(ConversationFile).filter(ConversationFile.conversation_id == conversation_id).all()
+        
+        # 임시 분석 결과 (실제로는 LLM 분석 결과를 반환)
         return {
-            "summary": "이 대화는 가족 간의 일상적인 소통을 담고 있습니다. 전반적으로 긍정적인 분위기이며, 서로에 대한 관심과 배려가 잘 드러나고 있습니다.",
-            "emotion": {
-                "overall_sentiment": "positive",
-                "emotion_scores": {
-                    "joy": 0.7,
-                    "sadness": 0.1,
-                    "anger": 0.05,
-                    "fear": 0.05,
-                    "surprise": 0.1
-                },
-                "temperature": 75  # 감정 온도
-            },
-            "dialog": [
-                {
-                    "speaker": "사용자1",
-                    "message": "오늘 하루 어땠어?",
-                    "emotion": "neutral",
-                    "timestamp": "2024-01-01 09:00:00"
-                },
-                {
-                    "speaker": "사용자2", 
-                    "message": "좋았어! 새로운 프로젝트 시작했거든",
-                    "emotion": "joy",
-                    "timestamp": "2024-01-01 09:01:00"
-                }
-            ],
+            "summary": conversation.content[:500] + "..." if len(conversation.content) > 500 else conversation.content,
+            "emotion": {"positive": 0.7, "negative": 0.2, "neutral": 0.1},
+            "dialog": [{"speaker": "User", "content": "분석된 대화 내용"}],
             "status": "completed",
-            "updated_at": datetime.now()
+            "updated_at": conversation.create_date
         }

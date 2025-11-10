@@ -28,6 +28,37 @@ client = TestClient(app)
 @pytest.fixture(scope="module")
 def setup_database():
     Base.metadata.create_all(bind=engine)
+    
+    # 테스트용 사용자 및 가족 생성
+    from app.domains.auth.user_models import User
+    from app.domains.family.models import Family
+    from datetime import datetime
+    
+    db = TestingSessionLocal()
+    try:
+        # 테스트 사용자 생성
+        test_user = User(
+            id=1,
+            name="테스트 사용자",
+            email="test@test.com",
+            password="hashed_password",
+            terms_agreed=True,
+            create_date=datetime.now()
+        )
+        db.add(test_user)
+        
+        # 테스트 가족 생성
+        test_family = Family(
+            id=1,
+            name="테스트 가족",
+            description="테스트용 가족",
+            create_date=datetime.now()
+        )
+        db.add(test_family)
+        
+        db.commit()
+    finally:
+        db.close()
     yield
     Base.metadata.drop_all(bind=engine)
 
