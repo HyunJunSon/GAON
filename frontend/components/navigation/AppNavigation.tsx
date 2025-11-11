@@ -46,7 +46,6 @@ export default function AppNavigation() {
       {/* 데스크탑/태블릿: 좌측 사이드바 */}
       <aside className="hidden md:flex md:flex-col md:w-56 md:shrink-0 md:border-r md:border-gray-200 md:bg-white">
         <div className="sticky top-0 h-screen p-4">
-          <h2 className="mb-4 text-lg font-semibold">GAON</h2>
           <SideNav links={NAV_LINKS} currentPath={pathname} />
         </div>
       </aside>
@@ -97,7 +96,7 @@ function BottomTabNav({ links, currentPath }: {links: NavLink[], currentPath: st
       className="fixed bottom-0 left-0 right-0 z-50 border-t border-gray-200 bg-white md:hidden"
       style={style}
     >
-      <ul className="mx-auto grid max-w-xl grid-cols-4">
+      <ul className="mx-auto grid max-w-xl grid-cols-5">
         {links.map(({ href, label, icon: Icon, isActive }) => {
           return (
             <li key={href}>

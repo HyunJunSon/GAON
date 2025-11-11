@@ -14,4 +14,7 @@ export const qk = {
   analysis: {
     byId: (id: string) => ['analysis', id] as const,
   },
+  family: {
+    list: ['family', 'list'] as const
+  }
 };
