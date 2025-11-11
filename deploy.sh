@@ -30,6 +30,16 @@ sleep 5
 echo "🔄 Starting new containers..."
 docker-compose -f docker-compose.prod.yml up -d
 
+echo "⏳ Waiting for services to start..."
+sleep 10
+
+echo "🔄 Applying database migrations..."
+docker exec gaon-backend sh -c "cd /app && alembic upgrade head" || {
+    echo "🚨 Error detected! Rolling back..."
+    docker-compose -f docker-compose.prod.yml down
+    exit 1
+}
+
 echo "🧹 Cleaning up old images..."
 docker image prune -f
 

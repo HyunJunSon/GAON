@@ -3,6 +3,7 @@ RAG(Retrieval Augmented Generation) 시스템의 메인 통합 모듈
 """
 from typing import List, Dict, Any, Optional, Tuple
 from uuid import UUID
+from pathlib import Path
 
 from app.llm.rag.loaders.document_loader import DocumentLoader, Document
 from app.llm.rag.extractors.document_extractors import ExtractorFactory
@@ -98,9 +99,9 @@ class RAGSystem:
                     
                     # 벡터 데이터베이스에 저장
                     record_id = self.vector_db_manager.store_embedding(
-                        source=chunk.content,
+                        embed_text=chunk.content,
                         embedding=embedding,
-                        analysis_id=None  # 필요 시 analysis_id 전달
+                        full_text=chunk.content
                     )
                     
                     results.append({
@@ -247,13 +248,15 @@ class RAGSystem:
     
     def add_document(self, 
                     text: str, 
-                    analysis_id: Optional[UUID] = None) -> UUID:
+                    book_id: Optional[UUID] = None,
+                    metadata: Optional[Dict[str, Any]] = None) -> UUID:
         """
         단일 문서 텍스트를 임베딩하여 저장합니다.
         
         Args:
             text: 저장할 텍스트
-            analysis_id: 분석 결과 ID (선택사항)
+            book_id: 책 ID (선택사항)
+            metadata: 추가 메타데이터 (선택사항)
             
         Returns:
             저장된 레코드의 ID
@@ -264,7 +267,8 @@ class RAGSystem:
             # 1. 임베딩 생성 및 저장
             record_id = self.embedding_service.store_text_with_embedding(
                 text=text,
-                analysis_id=analysis_id
+                book_id=book_id,
+                metadata=metadata
             )
             
             logger.info(f"단일 문서 추가 완료: {record_id}")
@@ -275,13 +279,15 @@ class RAGSystem:
     
     def batch_add_documents(self, 
                            texts: List[str], 
-                           analysis_ids: Optional[List[UUID]] = None) -> List[UUID]:
+                           book_ids: Optional[List[UUID]] = None,
+                           metadata_list: Optional[List[Dict[str, Any]]] = None) -> List[UUID]:
         """
         여러 문서 텍스트를 일괄 임베딩하여 저장합니다.
         
         Args:
             texts: 저장할 텍스트 목록
-            analysis_ids: 분석 결과 ID 목록 (선택사항)
+            book_ids: 책 ID 목록 (선택사항)
+            metadata_list: 메타데이터 목록 (선택사항)
             
         Returns:
             저장된 레코드의 ID 목록
@@ -292,7 +298,8 @@ class RAGSystem:
             # 1. 임베딩 일괄 생성 및 저장
             record_ids = self.embedding_service.store_texts_with_embeddings(
                 texts=texts,
-                analysis_ids=analysis_ids
+                book_ids=book_ids,
+                metadata_list=metadata_list
             )
             
             logger.info(f"문서 일괄 추가 완료: {len(record_ids)}개 저장됨")
