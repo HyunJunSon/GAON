@@ -19,7 +19,7 @@ from app.agent.crud import (
 
 
 # =========================================
-# ✅ UserFetcher (DB 연동) - 수정 없음
+# ✅ UserFetcher (DB 연동)
 # =========================================
 @dataclass
 class UserFetcher:
@@ -36,21 +36,21 @@ class UserFetcher:
         
         Args:
             db: SQLAlchemy 세션
-            conv_state: AnalysisState (user_id 포함)
+            conv_state: AnalysisState (id 포함)
         
         Returns:
             사용자 정보 Dict
         """
-        user_id = conv_state.user_id
+        id = conv_state.id
         
-        if not user_id:
-            raise ValueError("❌ UserFetcher: user_id가 없습니다.")
+        if not id:
+            raise ValueError("❌ UserFetcher: id가 없습니다.")
         
         # ✅ DB 조회
-        user = get_user_by_id(db, user_id)
+        user = get_user_by_id(db, id)
         
         if not user:
-            raise ValueError(f"❌ UserFetcher: user_id={user_id}를 찾을 수 없습니다.")
+            raise ValueError(f"❌ UserFetcher: id={id}를 찾을 수 없습니다.")
         
         print(f"✅ [UserFetcher] 사용자 조회: {user.get('user_name')}")
         
@@ -140,7 +140,8 @@ class RelationResolver_LLM:
 {text_snippet}
 
 결과를 JSON 형태로 반환해줘.
-예: [{{"speaker":"1","relation":"엄마"}}, {{"speaker":"2","relation":"아들"}}]
+예: [{{"speaker":1,"relation":"엄마"}}, {{"speaker":2,"relation":"아들"}}]
+speaker는 반드시 int 형태로 반환해야해.
 """
         
         try:
@@ -152,8 +153,8 @@ class RelationResolver_LLM:
             
             # ✅ 간단한 fallback
             return [
-                {"speaker": "1", "relation": "참석자1"},
-                {"speaker": "2", "relation": "참석자2"}
+                {"speaker": 1, "relation": "참석자1"},
+                {"speaker": 2, "relation": "참석자2"}
             ]
             
         except Exception as e:
@@ -171,7 +172,7 @@ class Analyzer:
         감정/스타일/통계 분석
         
         🔧 수정 사항:
-        1. user_id 파라미터 추가
+        1. id 파라미터 추가
         2. 사용자만 style_analysis에 저장
         3. 사용자 vs 상대방 비교 통계
         4. score는 사용자 말하기 점수
@@ -183,7 +184,7 @@ class Analyzer:
             self,
             conversation_df: pd.DataFrame,
             relations: List[Dict[str, Any]],
-            user_id: int
+            id: int
         ) -> Dict[str, Any]:
             """
             LLM으로 대화 분석 (사용자 중심)
@@ -191,7 +192,7 @@ class Analyzer:
             Args:
                 conversation_df: 대화 DataFrame
                 relations: 관계 정보
-                user_id: 분석 의뢰 사용자 ID
+                id: 분석 의뢰 사용자 ID
             
             Returns:
                 분석 결과 (DB 스키마 준수)
@@ -202,11 +203,11 @@ class Analyzer:
             # 0️⃣ 사용자/상대방 DataFrame 분리
             # =========================================
             
-            user_df = conversation_df[conversation_df["speaker"] == str(user_id)]
-            others_df = conversation_df[conversation_df["speaker"] != str(user_id)]
+            user_df = conversation_df[conversation_df["speaker"] == int(id)]
+            others_df = conversation_df[conversation_df["speaker"] != int(id)]
             
             if user_df.empty:
-                raise ValueError(f"❌ user_id={user_id}의 발화가 없습니다!")
+                raise ValueError(f"❌ id={id}의 발화가 없습니다!")
             
             if self.verbose:
                 print(f"   👤 사용자 발화: {len(user_df)}개")
@@ -267,12 +268,12 @@ class Analyzer:
             
             style_prompt = f"""
     다음은 대화 전체 맥락과 분석 대상 사용자의 발화입니다.
-    **사용자 ID {user_id}**의 말투, 성향, 관심사를 분석해주세요.
+    **사용자 ID {id}**의 말투, 성향, 관심사를 분석해주세요.
 
     **전체 대화 맥락:**
     {full_context[:500]}...
 
-    **분석 대상 사용자 (ID: {user_id})의 발화:**
+    **분석 대상 사용자 (ID: {id})의 발화:**
     {user_texts_joined}
 
     **통계 정보:**
@@ -308,13 +309,13 @@ class Analyzer:
                     }
                 
                 style_analysis = {
-                    str(user_id): user_analysis
+                    str(id): user_analysis
                 }
                 
             except Exception as e:
                 print(f"⚠️ 사용자 스타일 분석 LLM 실패: {e}")
                 style_analysis = {
-                    str(user_id): {
+                    str(id): {
                         "말투_특징_분석": "분석 실패",
                         "대화_성향_및_감정_표현": "분석 실패",
                         "주요_관심사": "분석 실패",
@@ -341,7 +342,7 @@ class Analyzer:
             summary = self._generate_comprehensive_summary(
                 llm=llm,
                 conversation_df=conversation_df,
-                user_id=user_id,
+                id=id,
                 user_df=user_df,
                 user_stats=user_stats,
                 others_stats=others_stats,
@@ -373,7 +374,7 @@ class Analyzer:
             self,
             llm: ChatOpenAI,
             conversation_df: pd.DataFrame,
-            user_id: int,
+            id: int,
             user_df: pd.DataFrame,
             user_stats: Dict,
             others_stats: Dict,
@@ -388,7 +389,7 @@ class Analyzer:
             Args:
                 llm: LLM 인스턴스
                 conversation_df: 전체 대화 DataFrame
-                user_id: 사용자 ID
+                id: 사용자 ID
                 user_df: 사용자 발화 DataFrame
                 user_stats: 사용자 통계
                 others_stats: 상대방 통계
@@ -410,7 +411,7 @@ class Analyzer:
             # AI 프롬프트
             summary_prompt = f"""
     당신은 대화 분석 전문가입니다. 
-    제공된 통계 데이터와 실제 발화 내용을 바탕으로 **사용자 ID {user_id}**의 대화 스타일과 커뮤니케이션 능력을 심층 분석한 종합 보고서를 작성하세요.
+    제공된 통계 데이터와 실제 발화 내용을 바탕으로 **사용자 ID {id}**의 대화 스타일과 커뮤니케이션 능력을 심층 분석한 종합 보고서를 작성하세요.
 
     **분석 지침:**
     1. 단순 수치 나열이 아닌, **수치가 의미하는 바를 해석**
@@ -425,7 +426,7 @@ class Analyzer:
     📊 대화 분석 종합 리포트
     ==================================================
 
-    [분석 대상] 사용자 ID: {user_id}
+    [분석 대상] 사용자 ID: {id}
     [대화 규모] 전체 {len(conversation_df)}회 발화 (사용자: {len(user_df)}회, 상대방: {len(conversation_df) - len(user_df)}회)
 
     --------------------------------------------------
@@ -497,7 +498,7 @@ class Analyzer:
                 
                 # Fallback: 템플릿 기반 보고서
                 return self._generate_fallback_summary(
-                    user_id=user_id,
+                    id=id,
                     conversation_df=conversation_df,
                     user_df=user_df,
                     user_stats=user_stats,
@@ -509,7 +510,7 @@ class Analyzer:
         
         def _generate_fallback_summary(
             self,
-            user_id: int,
+            id: int,
             conversation_df: pd.DataFrame,
             user_df: pd.DataFrame,
             user_stats: Dict,
@@ -525,7 +526,7 @@ class Analyzer:
                 "=" * 50,
                 "📊 대화 분석 종합 리포트",
                 "=" * 50,
-                f"\n[분석 대상] 사용자 ID: {user_id}",
+                f"\n[분석 대상] 사용자 ID: {id}",
                 f"[대화 규모] 전체 {len(conversation_df)}회 발화 (사용자: {len(user_df)}회, 상대방: {len(conversation_df) - len(user_df)}회)",
                 f"\n{'-' * 50}",
                 f"🎯 말하기 점수: {score:.2f}/1.00",
@@ -552,7 +553,7 @@ class Analyzer:
             return "\n".join(summary_parts)
         
         # =========================================
-        # 기존 헬퍼 메서드들 (유지)
+        # 기존 헬퍼 메서드들
         # =========================================
         
         def _generate_comparison(self, user_stats: Dict, others_stats: Dict) -> str:
@@ -674,10 +675,14 @@ class AnalysisSaver:
             return {"status": "no_result"}
         
         try:
-            # 🔧 수정: statistics 실제 데이터 저장
+            print("💾 [DEBUG] AnalysisSaver.save() 진입")
+            print(f"💾 state.id={state.id}, conv_id={state.conv_id}")
+            print(f"💾 result keys={list(result.keys()) if result else None}")
+
+
             saved = save_analysis_result(
                 db=db,
-                user_id=str(state.user_id),
+                id=str(state.id),
                 conv_id=str(state.conv_id),
                 summary=result.get("summary", ""),
                 style_analysis=result.get("style_analysis", {}),

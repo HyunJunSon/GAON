@@ -33,40 +33,21 @@ class RawFetcher:
     - 기존: SAMPLE_DIALOG (하드코딩)
     - 변경: DB에서 conversation 조회
     """
-    def fetch(self, db: Session = None, conv_id: str = None, pk_id: int = None, *args, **kwargs) -> Any:
-        """
-        DB에서 conversation 조회 후 DataFrame 반환
-        
-        Args:
-            db: SQLAlchemy 세션
-            conv_id: 대화 UUID (선택)
-            pk_id: 대화 PK ID (선택)
-        
-        Returns:
-            DataFrame (speaker, text, timestamp)
-        """
+    def fetch(self, db: Session = None, conv_id: str = None, *args, **kwargs) -> Any:
         if db is None:
             raise ValueError("❌ RawFetcher: db 세션이 필요합니다.")
-        
-        # ✅ DB에서 conversation 조회
-        if conv_id:
-            conversation = get_conversation_by_id(db, conv_id)
-        elif pk_id:
-            conversation = get_conversation_by_pk(db, pk_id)
-        else:
-            raise ValueError("❌ RawFetcher: conv_id 또는 pk_id를 제공해야 합니다.")
-        
+        if not conv_id:
+            raise ValueError("❌ RawFetcher: conv_id(UUID)가 필요합니다.")
+
+        conversation = get_conversation_by_id(db, conv_id)
         if not conversation:
-            raise ValueError(f"❌ RawFetcher: conversation을 찾을 수 없습니다. (conv_id={conv_id}, pk_id={pk_id})")
-        
-        print(f"✅ [RawFetcher] 대화 조회 성공: {conversation['cont_title'][:50]}...")
-        
-        # ✅ conversation → DataFrame 변환
+            raise ValueError(f"❌ RawFetcher: conversation을 찾을 수 없습니다. (conv_id={conv_id})")
+
+        print(f"✅ [RawFetcher] 대화 조회 성공: {conversation['title'][:50]}...")
         df = conversation_to_dataframe(conversation)
-        
         print(f"   → DataFrame 생성: {len(df)}개 발화")
-        
         return df
+
 
 
 # =========================================
@@ -74,7 +55,7 @@ class RawFetcher:
 # =========================================
 @dataclass
 class RawInspector:
-    """화자, 업로더(user_id) 검증"""
+    """화자, 업로더(id) 검증"""
     def inspect(self, raw: Any, state=None) -> Tuple[Any, List[str]]:
         issues: List[str] = []
         if pd is not None and isinstance(raw, pd.DataFrame):
@@ -85,9 +66,9 @@ class RawInspector:
             if len(unique_speakers) < 2:
                 issues.append("not_enough_speakers")
 
-            # ✅ 업로더(user_id)가 화자 중 포함되어 있는지 확인
-            if state and getattr(state, "user_id", None):
-                if str(state.user_id) not in unique_speakers:
+            # ✅ 업로더(id)가 화자 중 포함되어 있는지 확인
+            if state and getattr(state, "id", None):
+                if str(state.id) not in unique_speakers:
                     issues.append("uploader_not_in_speakers")
             else:
                 issues.append("missing_user_id")

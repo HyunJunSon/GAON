@@ -5,10 +5,6 @@
 각 Agent의 run_*.py 모듈을 순차적으로 호출하며,
 마지막 결과를 DB에 저장합니다.
 
-🔧 수정 사항 (2025-11-07):
-- run_cleaner() 파라미터 수정
-- 각 단계 간 데이터 전달 구조 수정
-- conv_id 전달 추가
 """
 
 import os
@@ -52,16 +48,16 @@ def main():
     
     # ✅ Cleaner 결과 추출
     conv_id = cleaner_result.get("conv_id")
-    user_id = cleaner_result.get("user_id")
-    cleaned_df = cleaner_result.get("cleaned_df")  # 🔧 수정: conversation_df → cleaned_df
+    id = cleaner_result.get("id")
+    cleaned_df = cleaner_result.get("cleaned_df")  
     validated = cleaner_result.get("validated", False)
     
     # ✅ 필수 데이터 검증
     if not conv_id:
         raise ValueError("❌ Cleaner 단계에서 conv_id가 반환되지 않았습니다.")
     
-    if not user_id:
-        raise ValueError("❌ Cleaner 단계에서 user_id가 반환되지 않았습니다.")
+    if not id:
+        raise ValueError("❌ Cleaner 단계에서 id가 반환되지 않았습니다.")
     
     if cleaned_df is None or cleaned_df.empty:
         raise ValueError("❌ Cleaner 단계에서 cleaned_df가 반환되지 않았습니다.")
@@ -69,7 +65,7 @@ def main():
     if not validated:
         raise ValueError("❌ Cleaner 검증 실패: 분석 불가능한 대화입니다.")
     
-    print(f"\n✅ Cleaner 완료: conv_id={conv_id}, user_id={user_id}, 발화 수={len(cleaned_df)}")
+    print(f"\n✅ Cleaner 완료: conv_id={conv_id}, id={id}, 발화 수={len(cleaned_df)}")
 
     # =========================================
     # 2️⃣ Analysis 실행
@@ -78,8 +74,8 @@ def main():
     
     analysis_result = run_analysis(
         conv_id=conv_id,
-        user_id=user_id,
-        conversation_df=cleaned_df  # 🔧 수정: cleaned_df 전달
+        id=id,
+        conversation_df=cleaned_df  
     )
     
     print("\n📊 [Analysis 결과]")
@@ -99,10 +95,10 @@ def main():
     
     # 🔧 수정: 파라미터 구조 수정
     qa_result = run_qa(
-        analysis_result=analysis_result["analysis_result"],  # ← 🔧 수정: dict 안의 analysis_result 추출
-        conversation_df=cleaned_df,  # 🔧 수정: cleaned_df 전달
-        user_id=user_id,
-        conv_id=conv_id  # ← 🔧 추가: conv_id 전달
+        analysis_result=analysis_result["analysis_result"],  
+        conversation_df=cleaned_df,  
+        id=id,
+        conv_id=conv_id  
     )
     
     print("\n📊 [QA 결과]")
@@ -121,7 +117,7 @@ def main():
     # ✅ 최종 결과 요약
     print("\n📋 [최종 결과 요약]")
     print(f"   대화 ID: {conv_id}")
-    print(f"   사용자 ID: {user_id}")
+    print(f"   사용자 ID: {id}")
     print(f"   분석 ID: {analysis_result.get('analysis_id')}")
     print(f"   말하기 점수: {analysis_result.get('analysis_result', {}).get('score', 0):.2f}")
     print(f"   신뢰도 점수: {qa_result.get('confidence', 0):.2f}")
@@ -129,7 +125,7 @@ def main():
     
     return {
         "conv_id": conv_id,
-        "user_id": user_id,
+        "id": id,
         "analysis_id": analysis_result.get("analysis_id"),
         "score": analysis_result.get("analysis_result", {}).get("score", 0),
         "confidence": qa_result.get("confidence", 0),

@@ -17,7 +17,7 @@ class QAState:
     db: Optional[Session] = None
     
     # 기존 필드
-    user_id: Optional[str] = None
+    id: Optional[str] = None
     conv_id: Optional[Any] = None
     conversation_df: Optional[pd.DataFrame] = None
     analysis_result: Optional[Dict[str, Any]] = None
@@ -110,9 +110,6 @@ class QAGraph:
     def node_save(self, state: QAState):
         """
         최종 결과 저장 노드
-        
-        🔧 수정 사항:
-        - AnalysisSaver에 DB 세션, conv_id, confidence, reason 전달
         """
         if self.verbose:
             print("\n💾 [AnalysisSaver] 최종 결과 저장 중...")
@@ -143,7 +140,7 @@ class QAGraph:
         db: Session,
         conversation_df: pd.DataFrame,
         analysis_result: Dict[str, Any],
-        user_id: str,
+        id: str,
         conv_id: str
     ) -> Dict[str, Any]:
         """
@@ -157,7 +154,7 @@ class QAGraph:
         
         state = QAState(
             db=db,
-            user_id=user_id,
+            id=id,
             conv_id=conv_id,
             conversation_df=conversation_df,
             analysis_result=analysis_result,
@@ -189,7 +186,7 @@ class QAGraph:
         return {
             "status": success,
             "conv_id": result_state.get("conv_id"),
-            "user_id": result_state.get("user_id"),
+            "id": result_state.get("id"),
             "analysis_result": result_state.get("analysis_result"),
             "confidence": result_state.get("confidence", 0.0),
             "reason": result_state.get("reason", ""),

@@ -4,7 +4,7 @@
 """
 
 from app.agent.QA.graph_qa import QAGraph
-from app.core.database_testing import SessionLocalTesting
+from app.core.database import SessionLocal
 import pandas as pd
 import pprint
 
@@ -12,7 +12,7 @@ import pprint
 def run_qa(
     analysis_result: dict = None,
     conversation_df: pd.DataFrame = None,
-    user_id: int = None,
+    id: int = None,
     conv_id: str = None,
     verbose: bool = True
 ):
@@ -25,15 +25,15 @@ def run_qa(
     # 필수 파라미터 검증
     if not conv_id:
         raise ValueError("❌ conv_id가 필요합니다!")
-    if not user_id:
-        raise ValueError("❌ user_id가 필요합니다!")
+    if not id:
+        raise ValueError("❌ id가 필요합니다!")
     if analysis_result is None:
         raise ValueError("❌ analysis_result가 필요합니다!")
     if conversation_df is None or conversation_df.empty:
         raise ValueError("❌ conversation_df가 비어있습니다!")
     
     # DB 세션 생성
-    db = SessionLocalTesting()
+    db = SessionLocal()
     
     try:
         # QAGraph 실행
@@ -42,7 +42,7 @@ def run_qa(
             db=db,
             conversation_df=conversation_df,
             analysis_result=analysis_result,
-            user_id=str(user_id),
+            id=str(id),
             conv_id=conv_id,
         )
         
@@ -69,7 +69,7 @@ def run_qa(
         return {
             "status": False,
             "conv_id": conv_id,
-            "user_id": user_id,
+            "id": id,
             "error": str(e),
             "confidence": 0.0,
             "reason": f"QA 실행 실패: {str(e)}",
@@ -114,13 +114,13 @@ def main():
     }
     
     # DB에서 최근 대화 조회
-    db = SessionLocalTesting()
+    db = SessionLocal()
     try:
         from sqlalchemy import text
         result = db.execute(text("""
-            SELECT id, user_id 
+            SELECT id, id 
             FROM conversation 
-            ORDER BY created_at DESC 
+            ORDER BY create_date DESC 
             LIMIT 1
         """))
         row = result.fetchone()
@@ -129,9 +129,9 @@ def main():
             raise ValueError("❌ conversation 테이블에 데이터가 없습니다!")
         
         conv_id = str(row[0])
-        user_id = row[1]
+        id = row[1]
         
-        print(f"✅ 자동 선택된 대화: conv_id={conv_id}, user_id={user_id}")
+        print(f"✅ 자동 선택된 대화: conv_id={conv_id}, id={id}")
         
     finally:
         db.close()
@@ -140,7 +140,7 @@ def main():
     result = run_qa(
         analysis_result=sample_analysis_result,
         conversation_df=sample_df,
-        user_id=user_id,
+        id=id,
         conv_id=conv_id,
     )
     

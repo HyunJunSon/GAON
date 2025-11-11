@@ -12,10 +12,8 @@ from .nodes import (
     ConversationValidator,
     ConversationSaver,
 )
-try:
-    import pandas as pd
-except Exception:
-    pd = None
+import pandas as pd
+
 
 
 # =========================================
@@ -24,21 +22,19 @@ except Exception:
 @dataclass
 class CleanerState:
     # ✅ DB 관련
-    db: Optional[Session] = None  # SQLAlchemy 세션
-    conv_id: Optional[str] = None  # 대화 UUID
-    pk_id: Optional[int] = None    # 대화 PK ID
-    
+    db: Optional[Session] = None              # SQLAlchemy 세션
+    conv_id: Optional[str] = None             # 대화 UUID (PK)
+
     # DataFrame 관련
     raw_df: Optional[pd.DataFrame] = None
     inspected_df: Optional[pd.DataFrame] = None
     cleaned_df: Optional[pd.DataFrame] = None
-    
+
     # 메타데이터
-    created_at: Optional[str] = None
+    create_date: Optional[str] = None
     context: Optional[str] = None
-    user_id: Optional[str] = None               # ✅ 업로더
-    user_ids: List[str] = field(default_factory=list)  # ✅ 전체 참여자
-    
+    id: Optional[str] = None             #  user_ids: List[str] = field(default_factory=list)  # 전체 참여자
+
     # 검증 상태
     validated: bool = False
     saved: bool = False
@@ -60,6 +56,7 @@ class CleanerGraph:
         self.saver = ConversationSaver()
         self.exception_handler = ExceptionHandler()
 
+        # 그래프 정의
         self.graph = StateGraph(CleanerState)
         self.graph.add_node("fetch", self.node_fetch)
         self.graph.add_node("inspect", self.node_inspect)
@@ -67,6 +64,7 @@ class CleanerGraph:
         self.graph.add_node("validate", self.node_validate)
         self.graph.add_node("save", self.node_save)
 
+        # 실행 흐름 연결
         self.graph.set_entry_point("fetch")
         self.graph.add_edge("fetch", "inspect")
 
@@ -89,31 +87,25 @@ class CleanerGraph:
     def node_fetch(self, state: CleanerState):
         """
         ✅ DB에서 conversation 조회
-        
-        변경 사항:
-        - 기존: SAMPLE_DIALOG 로드
-        - 변경: DB에서 conv_id 또는 pk_id로 조회
+        - 변경 전: pk_id 또는 conv_id로 조회
+        - 변경 후: conv_id(UUID)로만 조회
         """
         if self.verbose:
             print("\n[1️⃣ RawFetcher] DB에서 대화 조회 중…")
-        
-        # ✅ DB 세션 확인
+
         if state.db is None:
             raise ValueError("❌ DB 세션이 없습니다!")
-        
-        # ✅ conv_id 또는 pk_id 확인
-        if not state.conv_id and not state.pk_id:
-            raise ValueError("❌ conv_id 또는 pk_id를 제공해야 합니다!")
-        
+
+        if not state.conv_id:
+            raise ValueError("❌ conv_id가 필요합니다! (PK 기준)")
+
         # ✅ RawFetcher 호출
         state.raw_df = self.fetcher.fetch(
             db=state.db,
-            conv_id=state.conv_id,
-            pk_id=state.pk_id
+            conv_id=state.conv_id
         )
-        
+
         print(f"   ✅ 대화 로드 완료: {len(state.raw_df)}개 발화")
-        
         return state
 
     def node_inspect(self, state: CleanerState):
@@ -141,12 +133,10 @@ class CleanerGraph:
         validated, issues = self.validator.validate(state.cleaned_df, state)
         state.validated = validated
         state.issues.extend(issues)
-        
         if validated:
             print(f"   ✅ 분석 가능: 대화 품질 통과")
         else:
             print(f"   ❌ 분석 불가: {issues}")
-        
         return state
 
     def node_save(self, state: CleanerState):
@@ -159,50 +149,33 @@ class CleanerGraph:
     # =========================================
     # ✅ 실행 메서드 (DB 세션 주입)
     # =========================================
-    
-    def run(self, db: Session, conv_id: str = None, pk_id: int = None, user_id: str = None):
+    def run(self, db: Session, conv_id: str, id: Optional[str] = None):
         """
         ✅ Cleaner 파이프라인 실행 (DB 연동)
         
         Args:
             db: SQLAlchemy 세션
-            conv_id: 대화 UUID (선택)
-            pk_id: 대화 PK ID (선택)
-            user_id: 업로더 ID (선택)
+            conv_id: 대화 UUID ( id: 업로더 ID (선택)
         
         Returns:
             CleanerState (최종 상태)
-        
-        사용 예시:
-            from app.core.database_testing import SessionLocalTesting
-            
-            db = SessionLocalTesting()
-            try:
-                graph = CleanerGraph(verbose=True)
-                result = graph.run(db=db, pk_id=1, user_id="1")
-                print(result.cleaned_df)
-            finally:
-                db.close()
         """
         if self.verbose:
             print("\n🚀 [CleanerGraph] 실행 시작\n" + "=" * 60)
-        
+
         # ✅ 초기 상태 생성
         state = CleanerState(
             db=db,
-            conv_id=conv_id,
-            pk_id=pk_id,
-            user_id=user_id,
+            conv_id=conv_id, id=id,
             verbose=self.verbose,
         )
 
         # ✅ 파이프라인 실행
         result_state = self.pipeline.invoke(state)
-        
+
         if self.verbose:
             print("✅ [CleanerGraph] 파이프라인 실행 완료\n" + "=" * 60)
 
-        # ✅ dict → CleanerState 변환 (필요시)
         if isinstance(result_state, dict):
             result_state = CleanerState(**result_state)
 
