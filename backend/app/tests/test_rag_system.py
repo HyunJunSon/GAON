@@ -7,7 +7,7 @@ from pathlib import Path
 from unittest.mock import MagicMock, patch
 
 from app.llm.rag import RAGSystem
-from app.llm.rag.utils import rag_logger as logger
+from app.llm.rag.logger import rag_logger as logger
 
 
 def create_test_pdf(filename: str) -> str:
@@ -102,6 +102,11 @@ def test_rag_system():
         logger.info("5. 새 문서 포함 유사도 검색 테스트 시작")
         search_results_new = rag_system.search_similar("새로운 텍스트", top_k=5)
         logger.info(f"새 문서 포함 유사도 검색 완료: {len(search_results_new)}개 결과 반환")
+        
+        # 검색 결과 구조 확인 (4개 요소: embed_text, full_text, similarity, id)
+        if search_results_new:
+            embed_text, full_text, similarity, snippet_id = search_results_new[0]
+            logger.info(f"검색 결과 예시 - 임베딩 텍스트: {embed_text[:30]}..., 유사도: {similarity:.3f}")
         
         # 테스트 파일 정리
         if os.path.exists(test_txt_file):
