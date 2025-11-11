@@ -28,6 +28,8 @@ export default function AudioRecorder({
   const [isPaused, setIsPaused] = useState(false);
   const [recordingTime, setRecordingTime] = useState(0);
   const [audioBlob, setAudioBlob] = useState<Blob | null>(null);
+  const [showConfirmDialog, setShowConfirmDialog] = useState(false);
+  const [isProcessing, setIsProcessing] = useState(false);
   
   // 참조 (기존 패턴 따름)
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
@@ -162,12 +164,33 @@ export default function AudioRecorder({
     }
   }, [stopRecording]);
 
-  // 녹음 완료 및 전송
+  // 녹음 완료 확인 다이얼로그 표시
   const handleComplete = useCallback(() => {
+    setShowConfirmDialog(true);
+  }, []);
+
+  // 최종 전송 확인
+  const handleConfirmSubmit = useCallback(async () => {
     if (audioBlob) {
-      onRecordingComplete(audioBlob);
+      setIsProcessing(true);
+      try {
+        await onRecordingComplete(audioBlob);
+        setShowConfirmDialog(false);
+        // 성공 후 상태 초기화
+        setAudioBlob(null);
+        setRecordingTime(0);
+      } catch (error) {
+        onError?.('음성 파일 전송에 실패했습니다. 다시 시도해주세요.');
+      } finally {
+        setIsProcessing(false);
+      }
     }
-  }, [audioBlob, onRecordingComplete]);
+  }, [audioBlob, onRecordingComplete, onError]);
+
+  // 전송 취소
+  const handleCancelSubmit = useCallback(() => {
+    setShowConfirmDialog(false);
+  }, []);
 
   // 기존 FileDropzone 스타일 패턴 따름
   const containerClass = `
@@ -300,6 +323,37 @@ export default function AudioRecorder({
           </div>
         )}
       </div>
+
+      {/* 확인 다이얼로그 - 기존 GAON 패턴 */}
+      {showConfirmDialog && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded p-6 max-w-sm w-full mx-4">
+            <h3 className="text-lg font-semibold mb-4">음성 녹음 완료</h3>
+            <p className="text-gray-600 mb-6">
+              녹음된 음성을 전송하시겠습니까?<br/>
+              <span className="text-sm text-gray-500">
+                녹음 시간: {formatTime(recordingTime)}
+              </span>
+            </p>
+            <div className="flex space-x-3">
+              <button
+                onClick={handleCancelSubmit}
+                disabled={isProcessing}
+                className="flex-1 px-4 py-2 bg-gray-500 text-white rounded hover:bg-gray-600 transition-colors disabled:opacity-50"
+              >
+                취소
+              </button>
+              <button
+                onClick={handleConfirmSubmit}
+                disabled={isProcessing}
+                className="flex-1 px-4 py-2 bg-black text-white rounded hover:bg-gray-800 transition-colors disabled:opacity-50"
+              >
+                {isProcessing ? '전송 중...' : '전송'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
