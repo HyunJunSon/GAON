@@ -1,5 +1,6 @@
 'use client';
 
+import FloatingPracticeCTA from '@/components/cta/FloatingPracticeCTA';
 import { useAnalysis } from '@/hooks/useAnalysis';
 import Link from 'next/link';
 import { useParams, usePathname } from 'next/navigation';
@@ -31,7 +32,7 @@ export default function AnalysisTabsLayout({ children }: { children: React.React
   ];
 
   return (
-    <main className="space-y-6">
+    <main className="space-y-6 ">
       {/* 상단 헤더(필요 시 간결히) */}
       <header>
         <h1 className="text-2xl font-semibold inline mr-2">분석 결과</h1>
@@ -78,6 +79,8 @@ export default function AnalysisTabsLayout({ children }: { children: React.React
 
       {/* 실제 탭 콘텐츠 */}
       <section>{children}</section>
+      {/* ✅ 탭 공통 하단 CTA (센티넬 포함) */}
+      <FloatingPracticeCTA />
     </main>
   );
 }
