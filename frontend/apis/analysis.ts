@@ -74,3 +74,14 @@ export async function fetchAnalysis(conversationId: string) {
     method: 'GET',
   });
 }
+
+/** 음성 파일 업로드 및 STT 처리 */
+export async function uploadAudio(audioBlob: Blob) {
+  const formData = new FormData();
+  formData.append('file', audioBlob, 'recording.webm');
+  
+  return apiFetch<StartAnalysisRes>('/api/conversation/audio', {
+    method: 'POST',
+    body: formData,
+  });
+}
