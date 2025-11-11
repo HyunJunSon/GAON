@@ -35,6 +35,8 @@ export default function AudioRecorder({
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
   const timerRef = useRef<NodeJS.Timeout | null>(null);
+  const animationRef = useRef<number | null>(null);
+  const waveformRef = useRef<HTMLDivElement | null>(null);
 
   // 타이머 업데이트
   useEffect(() => {
