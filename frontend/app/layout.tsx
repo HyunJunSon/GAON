@@ -37,7 +37,7 @@ export default function RootLayout({
             {/* 콘텐츠 영역: 가로 레이아웃, 남은 높이만 사용 */}
             <div className="mx-auto flex w-full max-w-screen-2xl flex-1 min-h-0 overflow-hidden">
               <AppNavigation />
-              <main className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden p-4 pt-1 md:p-6 md:pt-1">
+              <main className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden p-4 md:p-6">
                 {/* 전역 Provider로 모든 페이지 감싸기 */}
                 {children}
               </main>
