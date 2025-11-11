@@ -1,5 +1,6 @@
 from sqlalchemy import Column, Integer, String, Text, DateTime, ForeignKey, JSON, func
 from sqlalchemy.orm import relationship
+from sqlalchemy.dialects.postgresql import UUID
 from app.core.database import Base
 
 
@@ -7,7 +8,7 @@ class ConversationFile(Base):
     __tablename__ = "conversation_file"
 
     id = Column(Integer, primary_key=True)
-    conversation_id = Column(Integer, ForeignKey("conversation.id", ondelete="CASCADE"))
+    conv_id = Column(UUID(as_uuid=True), ForeignKey("conversation.conv_id", ondelete="CASCADE"))
     gcs_file_path = Column(String(500), nullable=False)
     original_filename = Column(String(255), nullable=False)
     file_type = Column(String(50), nullable=False)
