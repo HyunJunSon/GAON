@@ -37,7 +37,7 @@ export function middleware(req: NextRequest) {
   // CSP 헤더 추가 (오디오 녹음을 위해)
   response.headers.set(
     'Content-Security-Policy',
-    "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; font-src 'self' data:; media-src 'self' blob: data: mediastream:; connect-src 'self' http://localhost:8000; img-src 'self' data: blob:; object-src 'none';"
+    "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval'; style-src 'self' 'unsafe-inline'; font-src 'self' data:; media-src 'self' blob: data: mediastream:; connect-src 'self' https://146.56.43.80:8443; img-src 'self' data: blob:; object-src 'none';"
   );
 
   return response;
