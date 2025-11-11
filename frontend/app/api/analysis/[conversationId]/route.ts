@@ -9,9 +9,9 @@ const hitMap = new Map<string, number>();
 
 export async function GET(
   _req: Request,
-  { params }: { params: { conversationId: string } }
+  { params }: { params: Promise<{ conversationId: string }> }
 ) {
-  const { conversationId } = params;
+  const { conversationId } = await params;
   const hits = (hitMap.get(conversationId) || 0) + 1;
   hitMap.set(conversationId, hits);
 
