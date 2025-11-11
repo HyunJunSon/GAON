@@ -1,6 +1,6 @@
 // 공통 네비게이션에 사용될 링킈 정의
 // 라우트 변경시 여기서만 수정하면 됨
-import { Home, MessageSquareText, BarChart3, Rocket } from "lucide-react";
+import { Home, MessageSquareText, BarChart3, Rocket, Settings } from "lucide-react";
 import { usePathname } from "next/navigation";
 
 
@@ -19,6 +19,7 @@ const NAV_LINKS_BASE: NavLinkBase[] = [
   { href: '/conversation', label: '대화', icon: MessageSquareText },
   { href: '/analysis', label: '분석', icon: BarChart3 },
   { href: '/practice', label: '연습', icon: Rocket },
+  { href: '/setting', label: '설정', icon: Settings}
 ];
 
 // 주어진 pathname으로 isActive를 계산하여 반환 (퓨어 함수)
