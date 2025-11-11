@@ -34,7 +34,7 @@ echo "⏳ Waiting for services to start..."
 sleep 10
 
 echo "🔄 Applying database migrations..."
-docker exec gaon-backend alembic upgrade head || {
+docker exec -w /app gaon-backend alembic upgrade head || {
     echo "🚨 Error detected! Rolling back..."
     docker-compose -f docker-compose.prod.yml down
     exit 1

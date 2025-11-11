@@ -136,7 +136,7 @@ __pypackages__/
 .backup
 
 # Alembic configuration (contains database connection info)
-alembic.ini
+# alembic.ini  # 주석 처리: 배포를 위해 포함 필요
 gaon-venv/
 gaon.egg-info/
 
