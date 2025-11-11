@@ -9,7 +9,7 @@ from alembic import op
 import sqlalchemy as sa
 
 revision = 'cleanup_conv_001'
-down_revision = '2025_11_10_086f6d0bc99a'
+down_revision = '2025_11_11_audio_fields'
 branch_labels = None
 depends_on = None
 
