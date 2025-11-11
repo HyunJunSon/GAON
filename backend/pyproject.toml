@@ -13,6 +13,8 @@ dependencies = [
     # --- Authentication & Security ---
     "passlib>=1.7.4",
     "argon2-cffi==25.1.0",
+    "python-jose[cryptography]==3.5.0", # JWT 토큰 처리
+    "bcrypt==5.0.0", # 비밀번호 해싱
     # --- Database ---
     "sqlalchemy==2.0.43",
     "alembic==1.13.2",
@@ -43,7 +45,7 @@ dependencies = [
     "openai==1.106.1",
     "anthropic==0.69.0",
     "google-api-python-client==2.184.0",
-    "google-cloud-speech==2.27.0",  # Google Cloud Speech-to-Text API
+    "google-cloud-speech==2.27.0", # Google Cloud Speech-to-Text API
     "huggingface-hub==0.35.3",
     "transformers==4.42.4",
     "tokenizers==0.19.1",
