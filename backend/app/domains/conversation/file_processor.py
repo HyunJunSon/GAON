@@ -1,6 +1,6 @@
 import os
 import uuid
-from typing import BinaryIO, Tuple
+from typing import BinaryIO, Tuple, List, Dict, Any
 from google.cloud import storage
 from pypdf import PdfReader
 from docx import Document
@@ -50,6 +50,47 @@ class FileProcessor:
             return ""
         except Exception as e:
             raise ValueError(f"텍스트 추출 실패: {str(e)}")
+
+    def chunk_text(self, text: str, chunk_size: int = 1000, overlap: int = 100) -> List[Dict[str, Any]]:
+        """텍스트를 청크로 분할"""
+        if not text:
+            return []
+        
+        chunks = []
+        start = 0
+        chunk_id = 0
+        
+        while start < len(text):
+            end = start + chunk_size
+            chunk_text = text[start:end]
+            
+            # 문장 경계에서 자르기 (마지막 마침표, 느낌표, 물음표 찾기)
+            if end < len(text):
+                last_sentence_end = max(
+                    chunk_text.rfind('.'),
+                    chunk_text.rfind('!'),
+                    chunk_text.rfind('?'),
+                    chunk_text.rfind('\n')
+                )
+                if last_sentence_end > chunk_size // 2:  # 청크의 절반 이상에서 발견된 경우만
+                    chunk_text = chunk_text[:last_sentence_end + 1]
+                    end = start + last_sentence_end + 1
+            
+            chunks.append({
+                "chunk_id": chunk_id,
+                "text": chunk_text.strip(),
+                "start_pos": start,
+                "end_pos": end,
+                "length": len(chunk_text.strip())
+            })
+            
+            chunk_id += 1
+            start = end - overlap  # 오버랩 적용
+            
+            if start >= len(text):
+                break
+        
+        return chunks
 
     def upload_to_gcs(self, file_content: bytes, user_id: int, original_filename: str) -> str:
         """GCS에 파일 업로드 (폴더는 자동 생성됨)"""

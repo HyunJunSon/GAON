@@ -108,17 +108,19 @@ export default function ConversationPage() {
               placeholder="여기로 .txt 파일을 드래그하거나 클릭하여 선택하세요."
             />
 
-            <div className="mt-4 rounded border bg-white px-4 py-3 text-sm text-gray-700">
+            <div className="rounded border bg-white px-4 py-3 text-sm text-gray-700">
               {file
                 ? <>선택된 파일: <strong>{file.name}</strong> ({(file.size / 1024 / 1024).toFixed(2)} MB)</>
                 : '선택된 파일 없음'}
             </div>
-
+          </div>
+          
+          <div className='flex justify-center'>
             <button
               type="button"
               onClick={onStart}
               disabled={!file || isPending}
-              className="mt-4 rounded bg-black px-6 py-2 text-white disabled:opacity-50 hover:bg-gray-800 transition-colors"
+              className="rounded bg-black w-full max-w-80 px-4 py-2 text-white disabled:opacity-50"
             >
               {isPending ? '분석 시작 중…' : '분석 시작'}
             </button>
