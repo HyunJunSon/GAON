@@ -97,7 +97,7 @@ function BottomTabNav({ links, currentPath }: {links: NavLink[], currentPath: st
       className="fixed bottom-0 left-0 right-0 z-50 border-t border-gray-200 bg-white md:hidden"
       style={style}
     >
-      <ul className="mx-auto grid max-w-xl grid-cols-4">
+      <ul className="mx-auto grid max-w-xl grid-cols-5">
         {links.map(({ href, label, icon: Icon, isActive }) => {
           return (
             <li key={href}>
