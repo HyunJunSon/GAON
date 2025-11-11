@@ -174,7 +174,7 @@ jobs:
           # DB 마이그레이션 적용 (마이그레이션 변경사항이 있을 때)
           if [ "${{ needs.check-changes.outputs.migration_changed }}" == "true" ]; then
             echo "🔄 Applying database migrations..."
-            docker exec gaon-backend alembic upgrade head || rollback
+            docker exec -w /app gaon-backend alembic upgrade head || rollback
             echo "✅ Database migrations applied successfully!"
           fi
           
