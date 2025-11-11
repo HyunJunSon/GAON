@@ -25,3 +25,9 @@ export async function addFamily(payload: AddFamilyReq): Promise<AddFamilyRes> {
     json: payload,
   })
 }
+
+export async function removeFamily(memberId: string): Promise<{ ok: true }> {
+  return apiFetch<{ ok: true }>(`/api/family/${memberId}`, {
+    method: 'DELETE'
+  })
+}

@@ -1,6 +1,6 @@
 'use client';
 
-import { addFamily, AddFamilyReq, getFamily, GetFamilyRes } from "@/apis/family";
+import { addFamily, AddFamilyReq, getFamily, GetFamilyRes, removeFamily } from "@/apis/family";
 import { qk } from "@/constants/queryKeys";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
@@ -21,5 +21,34 @@ export function useAddFamily() {
       // 성공 시 목록 갱신
       qc.invalidateQueries({ queryKey: qk.family.list})
     }
+  })
+}
+
+export function useRemoveFamily() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (memberId: string) => removeFamily(memberId),
+    // ✅ 낙관적 업데이트
+    onMutate: async (memberId) => {
+      await qc.cancelQueries({ queryKey: qk.family.list });
+
+      const prev = qc.getQueryData<GetFamilyRes>(qk.family.list);
+      if (prev) {
+        qc.setQueryData<GetFamilyRes>(qk.family.list, {
+          members: prev.members.filter(m => m.id !== memberId),
+        });
+      }
+      return { prev };
+    },
+
+    onError: (_err, _vars, ctx) => {
+      // 롤백
+      if (ctx?.prev) qc.setQueryData(qk.family.list, ctx.prev);
+    },
+
+    onSettled: () => {
+      // 서버 정합성 재검증
+      qc.invalidateQueries({ queryKey: qk.family.list });
+    },
   })
 }

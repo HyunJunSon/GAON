@@ -2,7 +2,7 @@
 
 import ErrorAlert from "@/components/ui/ErrorAlert";
 import { useMe } from "@/hooks/useAuth";
-import { useAddFamily, useFamilyList } from "@/hooks/useFamily";
+import { useAddFamily, useFamilyList, useRemoveFamily } from "@/hooks/useFamily";
 import { useServerError } from "@/hooks/useServerError";
 import { AddFamilyInput, addFamilySchema } from "@/schemas/validators/family";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -15,6 +15,7 @@ export default function SettingPage() {
   const addMutation = useAddFamily();
   // 3. 사용자 정보
   const { data: me } = useMe();
+  const removeMutation = useRemoveFamily();
 
   const { register, handleSubmit, reset, formState: { errors, isSubmitting }} = useForm<AddFamilyInput>({
     resolver: zodResolver(addFamilySchema),
@@ -36,6 +37,20 @@ export default function SettingPage() {
     }
   };
   
+  const onRemove = async (memberId: string, name?: string) => {
+    clearError();
+    const ok = window.confirm(`${name ?? '구성원'}을(를) 삭제하시겠어요?`);
+    if (!ok) return;
+
+    try {
+      await removeMutation.mutateAsync(memberId);
+      // 낙관적 업데이트 + invalidate 처리로 리스트 갱신됨
+    } catch (e) {
+      handleError(e);
+    }
+  };
+
+
   return (
     <main className="space-y-6">
       <header className="space-y-1">
@@ -64,6 +79,17 @@ export default function SettingPage() {
                 <div className="text-sm">
                   <div className="font-medium">{m.name}</div>
                   <div className="text-gray-600">{m.email}</div>
+                </div>
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    disabled={removeMutation.isPending}
+                    onClick={() => onRemove(m.id, m.name)}
+                    className="rounded border border-red-300 px-3 py-1 text-xs text-red-600 hover:bg-red-50 disabled:opacity-50"
+                    aria-label={`${m.name} 삭제`}
+                  >
+                    삭제
+                  </button>
                 </div>
               </li>
             ))}
