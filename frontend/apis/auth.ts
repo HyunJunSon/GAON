@@ -22,8 +22,7 @@ export async function login(payload: { email: string; password: string }) {
   formData.append('username', payload.email); // OAuth2에서는 username 필드 사용
   formData.append('password', payload.password);
   
-  const BASE_URL = process.env.NEXT_PUBLIC_API_URL?.replace(/\/$/, '') || 'http://localhost:8000';
-  const response = await fetch(`${BASE_URL}/api/auth/login`, {
+  const response = await fetch('/api/auth/login', {
     method: 'POST',
     body: formData,
   });
