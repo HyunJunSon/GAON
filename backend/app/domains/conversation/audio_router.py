@@ -2,6 +2,7 @@ from fastapi import APIRouter, Depends, UploadFile, File, HTTPException, Form
 from sqlalchemy.orm import Session
 from typing import Optional
 import logging
+from datetime import datetime
 
 from app.core.database import get_db
 from app.core.security import get_current_user
@@ -78,6 +79,7 @@ async def upload_audio_conversation(
             title=f"음성 대화 - {file.filename}",
             content=stt_result["transcript"][:1000],  # 처음 1000자만 저장
             family_id=family_id,
+            create_date=datetime.now()
         )
         
         db.add(conversation)
