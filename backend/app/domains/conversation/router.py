@@ -1,6 +1,7 @@
 from fastapi import APIRouter, Depends, UploadFile, File, HTTPException, Form
 from sqlalchemy.orm import Session
 from typing import List, Optional
+from uuid import UUID
 import logging
 
 from app.core.database import get_db
@@ -37,11 +38,11 @@ async def upload_conversation_file(
             current_user.id, family_id, file
         )
         
-        logger.info(f"파일 업로드 성공: conversation_id={conversation.id}, file_id={db_file.id}")
+        logger.info(f"파일 업로드 성공: conversation_id={conversation.conv_id}, file_id={db_file.id}")
         
         return FileUploadResponse(
             message="파일이 성공적으로 업로드되고 처리되었습니다.",
-            conversation_id=conversation.id,
+            conversation_id=str(conversation.conv_id),
             file_id=db_file.id,
             status=db_file.processing_status,
             gcs_file_path=db_file.gcs_file_path
@@ -56,7 +57,7 @@ async def upload_conversation_file(
 
 @router.get("/analysis/{conversation_id}", response_model=ConversationAnalysisResponse)
 def get_conversation_analysis(
-    conversation_id: int,
+    conversation_id: UUID,
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
@@ -66,7 +67,7 @@ def get_conversation_analysis(
     service = ConversationFileService(db)
     
     try:
-        analysis_data = service.get_conversation_analysis(conversation_id)
+        analysis_data = service.get_conversation_analysis(str(conversation_id))
         logger.info(f"분석 결과 조회 성공: conversation_id={conversation_id}")
         return ConversationAnalysisResponse(**analysis_data)
     except HTTPException as e:

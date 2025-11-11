@@ -66,7 +66,7 @@ class ConversationFileService:
             
             # 파일 정보 DB에 저장
             db_file = ConversationFile(
-                conversation_id=conversation.id,
+                conv_id=conversation.conv_id,
                 gcs_file_path=gcs_path,
                 original_filename=file.filename,
                 file_type=file_extension,
@@ -107,7 +107,7 @@ class ConversationFileService:
         
         return file_extension
 
-    async def upload_file_to_conversation(self, conversation_id: int, user_id: int, file: UploadFile) -> ConversationFile:
+    async def upload_file_to_conversation(self, conv_id: str, user_id: int, file: UploadFile) -> ConversationFile:
         """기존 conversation에 파일 업로드"""
         file_extension = self._validate_file(file)
         
@@ -127,7 +127,7 @@ class ConversationFileService:
 
         try:
             # Conversation 존재 확인
-            conversation = self.db.query(Conversation).filter(Conversation.id == conversation_id).first()
+            conversation = self.db.query(Conversation).filter(Conversation.conv_id == conv_id).first()
             if not conversation:
                 raise HTTPException(status_code=404, detail="대화를 찾을 수 없습니다.")
             
@@ -144,7 +144,7 @@ class ConversationFileService:
             
             # DB에 저장
             db_file = ConversationFile(
-                conversation_id=conversation_id,
+                conv_id=conv_id,
                 gcs_file_path=gcs_path,
                 original_filename=file.filename,
                 file_type=file_extension,
@@ -158,7 +158,7 @@ class ConversationFileService:
             self.db.commit()
             self.db.refresh(db_file)
             
-            logger.info(f"파일 추가 완료: {file.filename}, Conversation ID: {conversation_id}")
+            logger.info(f"파일 추가 완료: {file.filename}, Conversation ID: {conv_id}")
             return db_file
             
         except HTTPException:
@@ -188,14 +188,14 @@ class ConversationFileService:
         )
         return files
 
-    def get_conversation_analysis(self, conversation_id: int) -> Dict[str, Any]:
+    def get_conversation_analysis(self, conv_id: str) -> Dict[str, Any]:
         """대화 분석 결과 조회"""
-        conversation = self.db.query(Conversation).filter(Conversation.id == conversation_id).first()
+        conversation = self.db.query(Conversation).filter(Conversation.conv_id == conv_id).first()
         if not conversation:
             raise HTTPException(status_code=404, detail="대화를 찾을 수 없습니다.")
         
         # 파일들의 분석 결과 통합
-        files = self.db.query(ConversationFile).filter(ConversationFile.conversation_id == conversation_id).all()
+        files = self.db.query(ConversationFile).filter(ConversationFile.conv_id == conv_id).all()
         
         # 임시 분석 결과 (실제로는 LLM 분석 결과를 반환)
         return {

@@ -21,7 +21,7 @@ export default function AudioConversationPage() {
       console.log('업로드 완료, conversationId:', conversationId);
       
       // 분석 페이지로 이동
-      router.push(`/analysis/${conversationId}`);
+      router.push(`/analysis/${conversationId}/summary`);
       
     } catch (err) {
       console.error('업로드 실패:', err);

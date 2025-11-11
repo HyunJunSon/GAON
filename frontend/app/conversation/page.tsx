@@ -44,7 +44,7 @@ export default function ConversationPage() {
       const conversationId = getConversationId(result);
       
       console.log('업로드 완료, conversationId:', conversationId);
-      router.push(`/analysis/${conversationId}`);
+      router.push(`/analysis/${conversationId}/summary`);
       
     } catch (err) {
       console.error('업로드 실패:', err);
