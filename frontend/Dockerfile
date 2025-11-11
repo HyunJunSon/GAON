@@ -24,6 +24,9 @@ RUN npm install -g pnpm
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
 
+# 빌드 시점 환경변수 설정 (상대 경로 사용)
+ENV NEXT_PUBLIC_API_URL=""
+
 # 앱 빌드
 RUN pnpm build
 
