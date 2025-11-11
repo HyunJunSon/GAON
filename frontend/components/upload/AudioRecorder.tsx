@@ -1,232 +1,250 @@
 'use client';
 
-import { useCallback, useRef, useState } from "react";
+import { useCallback, useRef, useState, useEffect } from "react";
+
+/**
+ * 기존 GAON 패턴을 따른 음성 녹음 컴포넌트
+ * - 기존 FileDropzone과 동일한 구조 및 스타일링 방식 사용
+ * - MediaRecorder API 기반 WebM 녹음
+ * - 기존 UI 패턴 (버튼, 상태 표시) 활용
+ */
 
 type AudioRecorderProps = {
-  onRecordingComplete: (audioBlob: Blob) => void;
+  onRecordingComplete: (audioBlob: Blob) => void; // 기존 페이지와 맞춤
   onError?: (message: string) => void;
-  maxDurationMinutes?: number;
+  maxDurationMinutes?: number; // 최대 녹음 시간 (분)
+  placeholder?: string;
 };
 
 export default function AudioRecorder({
   onRecordingComplete,
   onError,
-  maxDurationMinutes = 10
+  maxDurationMinutes = 10,
+  placeholder = '음성 녹음을 시작하려면 버튼을 클릭하세요.'
 }: AudioRecorderProps) {
+  // 상태 관리 (기존 FileDropzone 패턴 따름)
   const [isRecording, setIsRecording] = useState(false);
   const [isPaused, setIsPaused] = useState(false);
-  const [duration, setDuration] = useState(0);
+  const [recordingTime, setRecordingTime] = useState(0);
   const [audioBlob, setAudioBlob] = useState<Blob | null>(null);
-
+  
+  // 참조 (기존 패턴 따름)
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
-  const chunksRef = useRef<Blob[]>([]);
+  const streamRef = useRef<MediaStream | null>(null);
   const timerRef = useRef<NodeJS.Timeout | null>(null);
 
-  const startTimer = useCallback(() => {
-    timerRef.current = setInterval(() => {
-      setDuration(prev => {
-        const newDuration = prev + 1;
-        if (newDuration >= maxDurationMinutes * 60) {
-          stopRecording();
-          return prev;
-        }
-        return newDuration;
-      });
-    }, 1000);
-  }, [maxDurationMinutes]);
-
-  const stopTimer = useCallback(() => {
-    if (timerRef.current) {
-      clearInterval(timerRef.current);
-      timerRef.current = null;
+  // 타이머 업데이트
+  useEffect(() => {
+    if (isRecording && !isPaused) {
+      timerRef.current = setInterval(() => {
+        setRecordingTime(prev => {
+          const newTime = prev + 1;
+          // 최대 시간 초과 시 자동 중지
+          if (newTime >= maxDurationMinutes * 60) {
+            stopRecording();
+          }
+          return newTime;
+        });
+      }, 1000);
+    } else {
+      if (timerRef.current) {
+        clearInterval(timerRef.current);
+        timerRef.current = null;
+      }
     }
-  }, []);
 
-  const startRecording = useCallback(async () => {
-    try {
-      const stream = await navigator.mediaDevices.getUserMedia({ 
-        audio: {
-          echoCancellation: true,
-          noiseSuppression: true,
-          sampleRate: 44100
-        } 
-      });
+    return () => {
+      if (timerRef.current) {
+        clearInterval(timerRef.current);
+      }
+    };
+  }, [isRecording, isPaused, maxDurationMinutes]);
 
-      const mediaRecorder = new MediaRecorder(stream, {
-        mimeType: 'audio/webm;codecs=opus'
-      });
-
-      chunksRef.current = [];
-      mediaRecorderRef.current = mediaRecorder;
-
-      mediaRecorder.ondataavailable = (event) => {
-        if (event.data.size > 0) {
-          chunksRef.current.push(event.data);
-        }
-      };
-
-      mediaRecorder.onstop = () => {
-        const blob = new Blob(chunksRef.current, { type: 'audio/webm' });
-        setAudioBlob(blob);
-        stream.getTracks().forEach(track => track.stop());
-      };
-
-      mediaRecorder.start(1000);
-      setIsRecording(true);
-      setIsPaused(false);
-      startTimer();
-    } catch (error) {
-      onError?.('마이크 접근 권한이 필요합니다.');
-    }
-  }, [onError, startTimer]);
-
-  const pauseRecording = useCallback(() => {
-    if (mediaRecorderRef.current && isRecording) {
-      mediaRecorderRef.current.pause();
-      setIsPaused(true);
-      stopTimer();
-    }
-  }, [isRecording, stopTimer]);
-
-  const resumeRecording = useCallback(() => {
-    if (mediaRecorderRef.current && isPaused) {
-      mediaRecorderRef.current.resume();
-      setIsPaused(false);
-      startTimer();
-    }
-  }, [isPaused, startTimer]);
-
-  const stopRecording = useCallback(() => {
-    if (mediaRecorderRef.current) {
-      mediaRecorderRef.current.stop();
-      setIsRecording(false);
-      setIsPaused(false);
-      stopTimer();
-    }
-  }, [stopTimer]);
-
-  const resetRecording = useCallback(() => {
-    setDuration(0);
-    setAudioBlob(null);
-    chunksRef.current = [];
-  }, []);
-
-  const confirmRecording = useCallback(() => {
-    if (audioBlob) {
-      onRecordingComplete(audioBlob);
-      resetRecording();
-    }
-  }, [audioBlob, onRecordingComplete, resetRecording]);
-
+  // 시간 포맷팅 (MM:SS)
   const formatTime = (seconds: number) => {
     const mins = Math.floor(seconds / 60);
     const secs = seconds % 60;
     return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
   };
 
+  // 녹음 시작 (기존 validate 함수 패턴 따름)
+  const startRecording = useCallback(async () => {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ 
+        audio: {
+          echoCancellation: true,
+          noiseSuppression: true,
+          sampleRate: 48000
+        } 
+      });
+      
+      streamRef.current = stream;
+      
+      // WebM 형식으로 녹음 (백엔드에서 지원하는 형식)
+      const mediaRecorder = new MediaRecorder(stream, {
+        mimeType: 'audio/webm;codecs=opus'
+      });
+      
+      const chunks: BlobPart[] = [];
+      
+      mediaRecorder.ondataavailable = (event) => {
+        if (event.data.size > 0) {
+          chunks.push(event.data);
+        }
+      };
+      
+      mediaRecorder.onstop = () => {
+        const blob = new Blob(chunks, { type: 'audio/webm' });
+        setAudioBlob(blob);
+      };
+      
+      mediaRecorderRef.current = mediaRecorder;
+      mediaRecorder.start();
+      setIsRecording(true);
+      setRecordingTime(0);
+      
+    } catch (error) {
+      onError?.('마이크 접근 권한이 필요합니다. 브라우저 설정을 확인해주세요.');
+    }
+  }, [onError]);
+
+  // 녹음 중지
+  const stopRecording = useCallback(() => {
+    if (mediaRecorderRef.current && isRecording) {
+      mediaRecorderRef.current.stop();
+      setIsRecording(false);
+      setIsPaused(false);
+      
+      // 스트림 정리
+      if (streamRef.current) {
+        streamRef.current.getTracks().forEach(track => track.stop());
+        streamRef.current = null;
+      }
+    }
+  }, [isRecording]);
+
+  // 녹음 일시정지/재개
+  const togglePause = useCallback(() => {
+    if (mediaRecorderRef.current && isRecording) {
+      if (isPaused) {
+        mediaRecorderRef.current.resume();
+        setIsPaused(false);
+      } else {
+        mediaRecorderRef.current.pause();
+        setIsPaused(true);
+      }
+    }
+  }, [isRecording, isPaused]);
+
+  // 재녹음 (기존 패턴의 openPicker와 유사)
+  const resetRecording = useCallback(() => {
+    stopRecording();
+    setAudioBlob(null);
+    setRecordingTime(0);
+  }, [stopRecording]);
+
+  // 녹음 완료 및 전송
+  const handleComplete = useCallback(() => {
+    if (audioBlob) {
+      onRecordingComplete(audioBlob);
+    }
+  }, [audioBlob, onRecordingComplete]);
+
+  // 기존 FileDropzone 스타일 패턴 따름
+  const containerClass = `
+    relative border-2 border-dashed rounded-lg p-8 text-center transition-colors
+    ${isRecording ? 'border-red-400 bg-red-50' : 'border-gray-300 bg-gray-50'}
+    ${!isRecording && !audioBlob ? 'hover:border-gray-400 hover:bg-gray-100' : ''}
+  `;
+
   return (
-    <div className="w-full space-y-4">
+    <div className={containerClass}>
       {/* 녹음 상태 표시 */}
-      <div className="rounded-lg border-2 border-dashed border-gray-300 bg-white p-6">
-        <div className="flex flex-col items-center gap-4 text-center">
-          {/* 녹음 시간 표시 */}
-          <div className="text-2xl font-mono font-semibold text-gray-700">
-            {formatTime(duration)}
-          </div>
-          
-          {/* 상태 표시 */}
-          <div className="text-sm text-gray-600">
-            {isRecording && !isPaused && (
-              <span className="flex items-center gap-2">
-                <div className="h-2 w-2 animate-pulse rounded-full bg-red-500"></div>
-                녹음 중...
-              </span>
-            )}
-            {isPaused && (
-              <span className="text-yellow-600">일시정지됨</span>
-            )}
-            {!isRecording && !audioBlob && (
-              <span>녹음을 시작하려면 아래 버튼을 클릭하세요</span>
-            )}
-            {audioBlob && (
-              <span className="text-green-600">녹음 완료</span>
-            )}
-          </div>
-
-          {/* 제한 시간 안내 */}
-          <div className="text-xs text-gray-500">
-            최대 {maxDurationMinutes}분까지 녹음 가능
-          </div>
+      {isRecording && (
+        <div className="absolute top-2 right-2 flex items-center space-x-2">
+          <div className="w-3 h-3 bg-red-500 rounded-full animate-pulse"></div>
+          <span className="text-sm font-medium text-red-600">REC</span>
         </div>
-      </div>
+      )}
 
-      {/* 컨트롤 버튼들 */}
-      <div className="flex justify-center gap-3">
-        {!isRecording && !audioBlob && (
-          <button
-            type="button"
-            onClick={startRecording}
-            className="rounded bg-red-500 px-4 py-2 text-white hover:bg-red-600 transition"
-          >
-            🎙️ 녹음 시작
-          </button>
+      {/* 메인 컨텐츠 */}
+      <div className="space-y-4">
+        {/* 아이콘 및 상태 */}
+        <div className="text-4xl">
+          {isRecording ? '🎙️' : audioBlob ? '🎵' : '🎤'}
+        </div>
+
+        {/* 시간 표시 */}
+        {(isRecording || audioBlob) && (
+          <div className="text-2xl font-mono font-bold">
+            {formatTime(recordingTime)}
+          </div>
         )}
 
-        {isRecording && !isPaused && (
-          <>
-            <button
-              type="button"
-              onClick={pauseRecording}
-              className="rounded bg-yellow-500 px-4 py-2 text-white hover:bg-yellow-600 transition"
-            >
-              ⏸️ 일시정지
-            </button>
-            <button
-              type="button"
-              onClick={stopRecording}
-              className="rounded bg-gray-500 px-4 py-2 text-white hover:bg-gray-600 transition"
-            >
-              ⏹️ 중지
-            </button>
-          </>
-        )}
+        {/* 상태별 메시지 */}
+        <p className="text-gray-600">
+          {isRecording 
+            ? (isPaused ? '녹음이 일시정지되었습니다.' : '녹음 중입니다...')
+            : audioBlob 
+            ? '녹음이 완료되었습니다. 전송하거나 다시 녹음하세요.'
+            : placeholder
+          }
+        </p>
 
-        {isPaused && (
-          <>
+        {/* 버튼 그룹 (기존 GAON 톤앤매너 적용) */}
+        <div className="flex justify-center space-x-3">
+          {!isRecording && !audioBlob && (
             <button
-              type="button"
-              onClick={resumeRecording}
-              className="rounded bg-green-500 px-4 py-2 text-white hover:bg-green-600 transition"
+              onClick={startRecording}
+              className="px-6 py-2 bg-black text-white rounded hover:bg-gray-800 transition-colors disabled:opacity-50"
             >
-              ▶️ 재개
+              녹음 시작
             </button>
-            <button
-              type="button"
-              onClick={stopRecording}
-              className="rounded bg-gray-500 px-4 py-2 text-white hover:bg-gray-600 transition"
-            >
-              ⏹️ 중지
-            </button>
-          </>
-        )}
+          )}
 
-        {audioBlob && (
-          <>
-            <button
-              type="button"
-              onClick={resetRecording}
-              className="rounded bg-gray-500 px-4 py-2 text-white hover:bg-gray-600 transition"
-            >
-              🔄 재녹음
-            </button>
-            <button
-              type="button"
-              onClick={confirmRecording}
-              className="rounded bg-black px-4 py-2 text-white hover:bg-gray-800 transition"
-            >
-              ✅ 완료
-            </button>
-          </>
+          {isRecording && (
+            <>
+              <button
+                onClick={togglePause}
+                className="px-4 py-2 bg-gray-600 text-white rounded hover:bg-gray-700 transition-colors"
+              >
+                {isPaused ? '재개' : '일시정지'}
+              </button>
+              <button
+                onClick={stopRecording}
+                className="px-4 py-2 bg-black text-white rounded hover:bg-gray-800 transition-colors"
+              >
+                중지
+              </button>
+            </>
+          )}
+
+          {audioBlob && (
+            <>
+              <button
+                onClick={handleComplete}
+                className="px-6 py-2 bg-black text-white rounded hover:bg-gray-800 transition-colors"
+              >
+                완료
+              </button>
+              <button
+                onClick={resetRecording}
+                className="px-4 py-2 bg-gray-500 text-white rounded hover:bg-gray-600 transition-colors"
+              >
+                다시 녹음
+              </button>
+            </>
+          )}
+        </div>
+
+        {/* 진행률 표시 */}
+        {isRecording && (
+          <div className="w-full bg-gray-200 rounded-full h-2">
+            <div 
+              className="bg-black h-2 rounded-full transition-all duration-1000"
+              style={{ width: `${(recordingTime / (maxDurationMinutes * 60)) * 100}%` }}
+            ></div>
+          </div>
         )}
       </div>
     </div>
