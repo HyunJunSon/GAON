@@ -46,7 +46,6 @@ export default function AppNavigation() {
       {/* 데스크탑/태블릿: 좌측 사이드바 */}
       <aside className="hidden md:flex md:flex-col md:w-56 md:shrink-0 md:border-r md:border-gray-200 md:bg-white">
         <div className="sticky top-0 h-screen p-4">
-          <h2 className="mb-4 text-lg font-semibold">GAON</h2>
           <SideNav links={NAV_LINKS} currentPath={pathname} />
         </div>
       </aside>
