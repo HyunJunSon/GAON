@@ -22,7 +22,7 @@ class STTService:
     def transcribe_audio_with_diarization(
         self, 
         audio_content: bytes, 
-        sample_rate: int = 48000,
+        sample_rate: int = 16000,  # 더 일반적인 샘플 레이트
         language_code: str = "ko-KR",
         max_speakers: int = 2
     ) -> Dict[str, Any]:
@@ -31,7 +31,7 @@ class STTService:
         
         Args:
             audio_content: 오디오 파일의 바이트 데이터
-            sample_rate: 샘플링 레이트 (기본값: 48000Hz)
+            sample_rate: 샘플링 레이트 (기본값: 16000Hz)
             language_code: 언어 코드 (기본값: "ko-KR")
             max_speakers: 최대 화자 수 (기본값: 2)
             
@@ -48,9 +48,9 @@ class STTService:
                 max_speaker_count=max_speakers,
             )
             
-            # 인식 설정
+            # 인식 설정 - 자동 인코딩 감지 시도
             config = RecognitionConfig(
-                encoding=RecognitionConfig.AudioEncoding.WEBM_OPUS,
+                encoding=RecognitionConfig.AudioEncoding.ENCODING_UNSPECIFIED,  # 자동 감지
                 sample_rate_hertz=sample_rate,
                 language_code=language_code,
                 diarization_config=diarization_config,
@@ -60,8 +60,14 @@ class STTService:
             
             logger.info(f"STT 처리 시작 - 언어: {language_code}, 최대 화자: {max_speakers}")
             
-            # 음성 인식 실행
-            response = self.client.recognize(config=config, audio=audio)
+            try:
+                # 음성 인식 실행
+                response = self.client.recognize(config=config, audio=audio)
+            except Exception as e:
+                # 자동 감지 실패 시 WEBM_OPUS로 재시도
+                logger.warning(f"자동 인코딩 감지 실패, WEBM_OPUS로 재시도: {str(e)}")
+                config.encoding = RecognitionConfig.AudioEncoding.WEBM_OPUS
+                response = self.client.recognize(config=config, audio=audio)
             
             if not response.results:
                 logger.warning("STT 결과가 없습니다")
@@ -77,7 +83,13 @@ class STTService:
             
         except Exception as e:
             logger.error(f"STT 처리 실패: {str(e)}")
-            raise Exception(f"음성 인식 처리 중 오류가 발생했습니다: {str(e)}")
+            # 빈 결과 반환 (서버 오류 방지)
+            return {
+                "transcript": "",
+                "speaker_segments": [],
+                "duration": 0,
+                "speaker_count": 0
+            }
     
     def _parse_recognition_response(self, response) -> Dict[str, Any]:
         """
