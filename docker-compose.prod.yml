@@ -16,8 +16,10 @@ services:
       - SECRET_KEY=${SECRET_KEY}
       - GEMINI_API_KEY=${GEMINI_API_KEY}
       - FRONTEND_URL=${FRONTEND_URL}
+      - GOOGLE_APPLICATION_CREDENTIALS=/app/gcp-key.json
     volumes:
       - ./logs:/app/logs
+      - ./gcp_service_account_key.json:/app/gcp-key.json:ro
     restart: unless-stopped
     network_mode: host
 
