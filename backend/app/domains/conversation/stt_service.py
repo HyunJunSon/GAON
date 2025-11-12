@@ -82,6 +82,7 @@ class STTService:
         
         diarization_config = SpeakerDiarizationConfig(
             enable_speaker_diarization=True,
+            min_speaker_count=2,  # 최소 화자 수 명시
             max_speaker_count=max_speakers,
         )
         
@@ -121,6 +122,7 @@ class STTService:
             
             diarization_config = SpeakerDiarizationConfig(
                 enable_speaker_diarization=True,
+                min_speaker_count=2,  # 최소 화자 수 명시
                 max_speaker_count=max_speakers,
             )
             
