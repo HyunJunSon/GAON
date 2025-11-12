@@ -104,7 +104,7 @@ export default function FileDropzone({
   }
 
   return (
-    <div className="w-full">
+    <div className="w-full mb-4">
       <div
         role="button"
         tabIndex={0}

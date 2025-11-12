@@ -114,22 +114,22 @@ export default function ConversationPage() {
               placeholder="여기로 파일을 드래그하거나 클릭하여 선택하세요. (txt, pdf, docx, epub, md 지원)"
             />
 
-            <div className="rounded border bg-white px-4 py-3 text-sm text-gray-700">
+            <div className="rounded border bg-white px-4 py-3 text-sm text-gray-700 mb-4">
               {file
                 ? <>선택된 파일: <strong>{file.name}</strong> ({(file.size / 1024 / 1024).toFixed(2)} MB)</>
                 : '선택된 파일 없음'}
             </div>
-          </div>
-          
-          <div className='flex justify-center'>
-            <button
-              type="button"
-              onClick={onStart}
-              disabled={!file || isPending}
-              className="rounded bg-black w-full max-w-80 px-4 py-2 text-white disabled:opacity-50"
-            >
-              {isPending ? '분석 시작 중…' : '분석 시작'}
-            </button>
+
+            <div className='flex justify-center'>
+              <button
+                type="button"
+                onClick={onStart}
+                disabled={!file || isPending}
+                className="rounded bg-black w-full max-w-80 px-4 py-2 text-white disabled:opacity-50"
+              >
+                {isPending ? '분석 시작 중…' : '분석 시작'}
+              </button>
+            </div>
           </div>
         </section>
       )}

@@ -28,18 +28,24 @@ export default function RootLayout({
   return (
     <html lang="ko">
       <body
-        className={`min-h-dvh ${geistSans.variable} ${geistMono.variable} antialiased`}
+        className={`${geistSans.variable} ${geistMono.variable} antialiased md:overflow-hidden`}
       >
         <Providers>
-        <GlobalHeader />
-          <div className="mx-auto flex max-w-screen-2xl">
-            <AppNavigation />
-            <main className="min-h-dvh flex-1 p-4 pt-1 md:p-6 md:pt-1">
-              {/* 전역 Provider로 모든 페이지 감싸기 */}
-              {children}
-            </main>
+          <div className="flex min-h-[100svh] flex-col">
+            <GlobalHeader />
+
+            {/* 콘텐츠 영역: 가로 레이아웃, 남은 높이만 사용 */}
+            <div className="mx-auto w-full max-w-screen-2xl md:h-[calc(100dvh-48px)] md:flex md:overflow-hidden">
+              <AppNavigation />
+              <main className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden p-4 md:p-6">
+                {/* 전역 Provider로 모든 페이지 감싸기 */}
+                {children}
+              </main>
+            </div>
+
+            {/* 모바일 바텀 네비게이션 자리 확보 */}
+            <div className="h-14 md:hidden shrink-0" />
           </div>
-          <div className="h-14 md:hidden"/>
         </Providers>
       </body>
     </html>
