@@ -23,7 +23,7 @@ type FileDropzoneProps = {
 export default function FileDropzone({
   acceptExt = ['.txt', '.pdf', '.docx'], // 백엔드와 동기화
   acceptMime = ['text/plain', 'application/pdf', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'], // 백엔드와 동기화
-  maxMB = 50, // 백엔드와 동기화 (50MB)
+  maxMB = 10, // 백엔드와 동기화 (10MB)
   multiple = false,
   onFileSelect,
   onError,
