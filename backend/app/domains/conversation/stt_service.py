@@ -22,7 +22,7 @@ class STTService:
     def transcribe_audio_with_diarization(
         self, 
         audio_content: bytes, 
-        sample_rate: int = 16000,  # 더 일반적인 샘플 레이트
+        filename: str,
         language_code: str = "ko-KR",
         max_speakers: int = 2
     ) -> Dict[str, Any]:
@@ -31,7 +31,7 @@ class STTService:
         
         Args:
             audio_content: 오디오 파일의 바이트 데이터
-            sample_rate: 샘플링 레이트 (기본값: 16000Hz)
+            filename: 파일명 (확장자로 형식 판단)
             language_code: 언어 코드 (기본값: "ko-KR")
             max_speakers: 최대 화자 수 (기본값: 2)
             
@@ -39,57 +39,124 @@ class STTService:
             Dict containing transcript, speaker_segments, duration, speaker_count
         """
         try:
-            # 오디오 설정
-            audio = RecognitionAudio(content=audio_content)
+            # 파일 형식에 따른 인코딩 및 샘플 레이트 설정
+            encoding, sample_rate = self._get_audio_config(filename)
             
-            # 화자 구분 설정
-            diarization_config = SpeakerDiarizationConfig(
-                enable_speaker_diarization=True,
-                max_speaker_count=max_speakers,
-            )
+            # 파일 크기 기준으로 LongRunning API 사용 결정 (10MB 이상)
+            file_size_mb = len(audio_content) / (1024 * 1024)
             
-            # 인식 설정 - 자동 인코딩 감지 시도
-            config = RecognitionConfig(
-                encoding=RecognitionConfig.AudioEncoding.ENCODING_UNSPECIFIED,  # 자동 감지
-                sample_rate_hertz=sample_rate,
-                language_code=language_code,
-                diarization_config=diarization_config,
-                enable_automatic_punctuation=True,
-                model="latest_long"  # 긴 오디오에 최적화된 모델
-            )
+            logger.info(f"STT 처리 시작 - 파일: {filename}, 크기: {file_size_mb:.1f}MB")
             
-            logger.info(f"STT 처리 시작 - 언어: {language_code}, 최대 화자: {max_speakers}")
-            
-            try:
-                # 음성 인식 실행
-                response = self.client.recognize(config=config, audio=audio)
-            except Exception as e:
-                # 자동 감지 실패 시 WEBM_OPUS로 재시도
-                logger.warning(f"자동 인코딩 감지 실패, WEBM_OPUS로 재시도: {str(e)}")
-                config.encoding = RecognitionConfig.AudioEncoding.WEBM_OPUS
-                response = self.client.recognize(config=config, audio=audio)
-            
-            if not response.results:
-                logger.warning("STT 결과가 없습니다")
-                return {
-                    "transcript": "",
-                    "speaker_segments": [],
-                    "duration": 0,
-                    "speaker_count": 0
-                }
-            
-            # 결과 파싱
-            return self._parse_recognition_response(response)
+            # 1MB 이상이면 LongRunning API 사용
+            if file_size_mb > 1:
+                return self._transcribe_long_audio(audio_content, encoding, sample_rate, language_code, max_speakers)
+            else:
+                return self._transcribe_short_audio(audio_content, encoding, sample_rate, language_code, max_speakers)
             
         except Exception as e:
             logger.error(f"STT 처리 실패: {str(e)}")
-            # 빈 결과 반환 (서버 오류 방지)
             return {
                 "transcript": "",
                 "speaker_segments": [],
                 "duration": 0,
                 "speaker_count": 0
             }
+    
+    def _get_audio_config(self, filename: str) -> tuple:
+        """파일 확장자에 따른 오디오 설정 반환"""
+        ext = filename.lower().split('.')[-1]
+        
+        config_map = {
+            'mp3': (RecognitionConfig.AudioEncoding.MP3, 44100),
+            'wav': (RecognitionConfig.AudioEncoding.LINEAR16, 16000),
+            'webm': (RecognitionConfig.AudioEncoding.WEBM_OPUS, 48000),
+            'm4a': (RecognitionConfig.AudioEncoding.MP3, 44100),  # M4A를 MP3로 처리
+        }
+        
+        return config_map.get(ext, (RecognitionConfig.AudioEncoding.ENCODING_UNSPECIFIED, 16000))
+    
+    def _transcribe_short_audio(self, audio_content: bytes, encoding, sample_rate: int, 
+                               language_code: str, max_speakers: int) -> Dict[str, Any]:
+        """짧은 오디오 (1분 미만) 처리"""
+        audio = RecognitionAudio(content=audio_content)
+        
+        diarization_config = SpeakerDiarizationConfig(
+            enable_speaker_diarization=True,
+            max_speaker_count=max_speakers,
+        )
+        
+        config = RecognitionConfig(
+            encoding=encoding,
+            sample_rate_hertz=sample_rate,
+            language_code=language_code,
+            diarization_config=diarization_config,
+            enable_automatic_punctuation=True,
+        )
+        
+        response = self.client.recognize(config=config, audio=audio)
+        return self._parse_recognition_response(response)
+    
+    def _transcribe_long_audio(self, audio_content: bytes, encoding, sample_rate: int,
+                              language_code: str, max_speakers: int) -> Dict[str, Any]:
+        """긴 오디오 (1분 이상) 처리 - GCS 업로드 후 LongRunning API 사용"""
+        from google.cloud import storage
+        import uuid
+        import time
+        
+        try:
+            # 임시 GCS 경로에 업로드
+            bucket_name = "gaon-cloud-data"
+            temp_filename = f"temp-audio/{uuid.uuid4()}.audio"
+            
+            storage_client = storage.Client()
+            bucket = storage_client.bucket(bucket_name)
+            blob = bucket.blob(temp_filename)
+            blob.upload_from_string(audio_content)
+            
+            gcs_uri = f"gs://{bucket_name}/{temp_filename}"
+            logger.info(f"긴 오디오 파일을 GCS에 업로드: {gcs_uri}")
+            
+            # LongRunning API 설정
+            audio = RecognitionAudio(uri=gcs_uri)
+            
+            diarization_config = SpeakerDiarizationConfig(
+                enable_speaker_diarization=True,
+                max_speaker_count=max_speakers,
+            )
+            
+            config = RecognitionConfig(
+                encoding=encoding,
+                sample_rate_hertz=sample_rate,
+                language_code=language_code,
+                diarization_config=diarization_config,
+                enable_automatic_punctuation=True,
+                model="latest_long"
+            )
+            
+            # LongRunning 요청 시작
+            operation = self.client.long_running_recognize(config=config, audio=audio)
+            logger.info("LongRunning STT 작업 시작, 완료 대기 중...")
+            
+            # 결과 대기 (최대 10분)
+            response = operation.result(timeout=600)
+            
+            # 임시 파일 삭제
+            try:
+                blob.delete()
+                logger.info("임시 GCS 파일 삭제 완료")
+            except:
+                pass
+            
+            return self._parse_recognition_response(response)
+            
+        except Exception as e:
+            logger.error(f"LongRunning STT 처리 실패: {str(e)}")
+            # 임시 파일 정리 시도
+            try:
+                blob.delete()
+            except:
+                pass
+            raise
     
     def _parse_recognition_response(self, response) -> Dict[str, Any]:
         """
@@ -179,28 +246,45 @@ class STTService:
             logger.error(f"STT 응답 파싱 실패: {str(e)}")
             raise Exception(f"음성 인식 결과 처리 중 오류가 발생했습니다: {str(e)}")
     
-    def validate_audio_format(self, audio_content: bytes) -> bool:
+    def validate_audio_format(self, audio_content: bytes, filename: str) -> bool:
         """
         오디오 파일 형식이 유효한지 검증
         
         Args:
             audio_content: 오디오 파일의 바이트 데이터
+            filename: 파일명
             
         Returns:
             bool: 유효한 형식이면 True
         """
         try:
-            # WebM 파일 시그니처 확인 (간단한 검증)
             if len(audio_content) < 4:
                 return False
             
-            # WebM 파일은 EBML 헤더로 시작 (0x1A, 0x45, 0xDF, 0xA3)
-            webm_signature = b'\x1a\x45\xdf\xa3'
-            if audio_content[:4] == webm_signature:
-                return True
+            ext = filename.lower().split('.')[-1]
             
-            # 추가적인 오디오 형식 검증 로직을 여기에 추가할 수 있음
-            logger.warning("지원하지 않는 오디오 형식입니다")
+            # 파일 시그니처 검증
+            signatures = {
+                'mp3': [b'ID3', b'\xff\xfb', b'\xff\xf3', b'\xff\xf2'],  # MP3 시그니처들
+                'wav': [b'RIFF'],  # WAV 시그니처
+                'webm': [b'\x1a\x45\xdf\xa3'],  # WebM 시그니처
+                'm4a': [b'ftyp'],  # M4A 시그니처 (4바이트 오프셋)
+            }
+            
+            if ext in signatures:
+                for sig in signatures[ext]:
+                    if ext == 'm4a':
+                        # M4A는 4바이트 오프셋에서 확인
+                        if len(audio_content) >= 8 and audio_content[4:8] == sig:
+                            return True
+                    else:
+                        if audio_content.startswith(sig):
+                            return True
+                        # MP3의 경우 중간에 시그니처가 있을 수 있음
+                        if ext == 'mp3' and sig in audio_content[:1024]:
+                            return True
+            
+            logger.warning(f"지원하지 않는 오디오 형식: {filename}")
             return False
             
         except Exception as e:
