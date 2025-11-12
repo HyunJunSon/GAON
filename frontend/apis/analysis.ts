@@ -85,3 +85,38 @@ export async function uploadAudio(audioBlob: Blob) {
     body: formData,
   });
 }
+
+/** 화자 매핑 관련 타입 */
+export type SpeakerMapping = Record<string, string>;
+
+export type SpeakerSegment = {
+  speaker: number;
+  speaker_name?: string;
+  start: number;
+  end: number;
+  text: string;
+};
+
+export type SpeakerMappingResponse = {
+  conversation_id: string;
+  file_id: number;
+  speaker_mapping: SpeakerMapping;
+  speaker_count: number;
+  mapped_segments: SpeakerSegment[];
+};
+
+/** 화자 매핑 설정 */
+export async function updateSpeakerMapping(conversationId: string, speakerMapping: SpeakerMapping) {
+  return apiFetch<{ message: string }>(`/api/conversation/audio/${conversationId}/speaker-mapping`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ speaker_mapping: speakerMapping }),
+  });
+}
+
+/** 화자 매핑 조회 */
+export async function getSpeakerMapping(conversationId: string) {
+  return apiFetch<SpeakerMappingResponse>(`/api/conversation/audio/${conversationId}/speaker-mapping`, {
+    method: 'GET',
+  });
+}
