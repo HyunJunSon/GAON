@@ -142,9 +142,9 @@ jobs:
             if [ ! -z "$CURRENT_BACKEND" ] && [ ! -z "$CURRENT_FRONTEND" ]; then
               export BACKEND_IMAGE=$CURRENT_BACKEND
               export FRONTEND_IMAGE=$CURRENT_FRONTEND
-              docker-compose -f docker-compose.prod.yml up -d --no-deps gaon_backend
-              docker-compose -f docker-compose.prod.yml up -d --no-deps gaon_frontend
-              docker-compose -f docker-compose.prod.yml up -d --no-deps gaon_nginx
+              docker-compose -f docker-compose.prod.yml up -d --no-deps gaon-backend
+              docker-compose -f docker-compose.prod.yml up -d --no-deps gaon-frontend
+              docker-compose -f docker-compose.prod.yml up -d --no-deps gaon-nginx
               echo "✅ Rollback completed!"
             fi
             exit 1
@@ -174,7 +174,7 @@ jobs:
           # DB 마이그레이션 적용 (마이그레이션 변경사항이 있을 때)
           if [ "${{ needs.check-changes.outputs.migration_changed }}" == "true" ]; then
             echo "🔄 Applying database migrations..."
-            docker exec gaon-backend alembic upgrade head || rollback
+            docker exec -w /app gaon-backend alembic upgrade head || rollback
             echo "✅ Database migrations applied successfully!"
           fi
           

@@ -103,7 +103,20 @@ class FileProcessor:
             
             # GCS에 업로드 (폴더 구조는 자동으로 생성됨)
             blob = self.bucket.blob(gcs_path)
-            blob.upload_from_string(file_content)
+            
+            # 파일 확장자에 따른 Content-Type 설정
+            content_type_map = {
+                'webm': 'audio/webm',
+                'wav': 'audio/wav',
+                'mp3': 'audio/mpeg',
+                'm4a': 'audio/mp4',
+                'txt': 'text/plain',
+                'pdf': 'application/pdf',
+                'docx': 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
+            }
+            content_type = content_type_map.get(file_extension, 'application/octet-stream')
+            
+            blob.upload_from_string(file_content, content_type=content_type)
             
             return gcs_path
         except Exception as e:

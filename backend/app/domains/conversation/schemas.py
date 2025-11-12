@@ -21,7 +21,7 @@ class ConversationFileResponse(BaseModel):
 
 class FileUploadResponse(BaseModel):
     """파일 업로드 응답 - 프론트엔드와 일치"""
-    conversation_id: int  # snake_case로 변경
+    conversation_id: str  # UUID string으로 변경
     file_id: int
     status: str  # processing_status -> status로 변경
     message: str

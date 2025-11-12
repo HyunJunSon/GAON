@@ -2,6 +2,8 @@ from fastapi import APIRouter, Depends, UploadFile, File, HTTPException, Form
 from sqlalchemy.orm import Session
 from typing import Optional
 import logging
+from datetime import datetime
+from uuid import UUID
 
 from app.core.database import get_db
 from app.core.security import get_current_user
@@ -78,6 +80,7 @@ async def upload_audio_conversation(
             title=f"음성 대화 - {file.filename}",
             content=stt_result["transcript"][:1000],  # 처음 1000자만 저장
             family_id=family_id,
+            create_date=datetime.now()
         )
         
         db.add(conversation)
@@ -104,7 +107,7 @@ async def upload_audio_conversation(
         
         # 7. ConversationFile 레코드 생성 (음성 필드 포함)
         db_file = ConversationFile(
-            conversation_id=conversation.id,
+            conv_id=conversation.conv_id,
             gcs_file_path=gcs_path,
             original_filename=file.filename,
             file_type=file_extension,
@@ -122,10 +125,10 @@ async def upload_audio_conversation(
         db.add(db_file)
         db.commit()
         
-        logger.info(f"음성 파일 업로드 및 STT 처리 완료 - Conversation ID: {conversation.id}")
+        logger.info(f"음성 파일 업로드 및 STT 처리 완료 - Conversation ID: {conversation.conv_id}")
         
         return FileUploadResponse(
-            conversation_id=conversation.id,
+            conversation_id=str(conversation.conv_id),
             file_id=db_file.id,
             status="completed",
             message="음성 파일이 성공적으로 업로드되고 텍스트로 변환되었습니다.",
@@ -146,7 +149,7 @@ async def upload_audio_conversation(
 
 @router.get("/audio/{conversation_id}")
 async def get_audio_conversation_detail(
-    conversation_id: int,
+    conversation_id: UUID,
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
@@ -165,7 +168,7 @@ async def get_audio_conversation_detail(
     
     try:
         # 1. Conversation 존재 확인
-        conversation = db.query(Conversation).filter(Conversation.id == conversation_id).first()
+        conversation = db.query(Conversation).filter(Conversation.conv_id == conversation_id).first()
         if not conversation:
             raise HTTPException(status_code=404, detail="대화를 찾을 수 없습니다.")
         
@@ -176,7 +179,7 @@ async def get_audio_conversation_detail(
         # 3. 음성 파일 정보 조회
         audio_file = (
             db.query(ConversationFile)
-            .filter(ConversationFile.conversation_id == conversation_id)
+            .filter(ConversationFile.conv_id == conversation_id)
             .filter(ConversationFile.audio_url.isnot(None))  # 음성 파일만 조회
             .first()
         )
@@ -186,7 +189,7 @@ async def get_audio_conversation_detail(
         
         # 4. 상세 정보 반환
         return {
-            "conversation_id": conversation.id,
+            "conversation_id": str(conversation.conv_id),
             "title": conversation.title,
             "created_at": conversation.create_date,
             "family_id": conversation.family_id,
