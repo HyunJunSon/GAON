@@ -1,6 +1,7 @@
 'use client';
 
 import FloatingPracticeCTA from '@/components/cta/FloatingPracticeCTA';
+import ConfirmLink from '@/components/ui/ConfirmLink';
 import { useAnalysis } from '@/hooks/useAnalysis';
 import Link from 'next/link';
 import { useParams, usePathname } from 'next/navigation';
@@ -48,7 +49,7 @@ export default function AnalysisTabsLayout({ children }: { children: React.React
       </header>
 
       {/* 탭 네비 */}
-      <nav className="border-b mb-0">
+      <nav className="flex justify-between border-b mb-0">
         <ul className="flex gap-4">
           {tabs.map(({ href, label }) => {
             const active = pathname === href;
@@ -75,6 +76,14 @@ export default function AnalysisTabsLayout({ children }: { children: React.React
             );
           })}
         </ul>
+        <ConfirmLink
+            href="/conversation"
+            className="inline-block px-2 pb-2 text-sm text-gray-600 hover:text-black"
+            confirmTitle="다른 대화 분석하기"
+            confirmDesc="이동하면 기존 대화 분석결과가 사라집니다. 계속하시겠습니까?"
+          >
+            다른 대화 분석하기
+          </ConfirmLink>
       </nav>
 
       {/* 실제 탭 콘텐츠 */}
