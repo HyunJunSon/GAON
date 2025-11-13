@@ -16,5 +16,9 @@ export const qk = {
   },
   family: {
     list: ['family', 'list'] as const
+  },
+  practice: {
+    participants: ['practice', 'participants'] as const,
+    result: (sessionId: string) => ['practice', 'result', sessionId] as const,
   }
 };
