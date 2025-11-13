@@ -34,26 +34,12 @@ def toc_pdf_processor(cloud_event):
             print(f"TOC RAG는 PDF만 지원: {file_name}")
             return
         
-        # TOC 기반 RAG 시스템 import 및 실행
-        from rag_auto_selector import get_rag_auto_selector
-        from rag_manager import RAGType
+        # 리팩토링 후: 파일 처리는 더 이상 필요하지 않음
+        # TOC 기반 RAG는 검색 전용으로 변경됨
+        print(f"TOC RAG 리팩토링 완료: 파일 처리는 더 이상 수행하지 않습니다 - {file_name}")
+        print("파일 처리 로직이 제거되었습니다. 검색 전용 RAG로 변경되었습니다.")
         
-        # TOC 기반 RAG로 강제 설정
-        selector = get_rag_auto_selector()
-        rag = selector.manager.switch_to(RAGType.TOC_BASED)
-        
-        # 파일 처리
-        gcs_path = f"gs://{bucket}/{file_name}"
-        results = rag.load_and_process_file(gcs_path)
-        
-        # 결과 분석
-        success_count = sum(1 for r in results if r.get('status') == 'success')
-        error_count = len(results) - success_count
-        
-        print(f"TOC RAG 처리 완료: {file_name}")
-        print(f"목차 기반 청킹 - 성공: {success_count}개, 실패: {error_count}개")
-        
-        return f"TOC 처리 성공: {success_count}/{len(results)}개 청크"
+        return "TOC RAG 리팩토링 완료: 파일 처리 로직 제거됨"
         
     except Exception as e:
         print(f"TOC RAG 처리 실패: {str(e)}")
