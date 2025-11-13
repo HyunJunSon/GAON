@@ -4,6 +4,7 @@ rag_test의 새로운 방식을 통합한 고급 RAG 구현체
 """
 import json
 import uuid
+import tempfile
 import psycopg2
 import psycopg2.extras as extras
 from typing import List, Dict, Any, Tuple, Optional
@@ -12,6 +13,9 @@ from pathlib import Path
 from openai import OpenAI
 
 from .rag_interface import AdvancedRAGInterface, RAGConfig
+from .toc_utils import TOCExtractor
+from .toc_chunker import TOCChunker
+from .gcp_utils import GCPStorageManager
 from app.core.config import settings
 
 
@@ -23,30 +27,87 @@ class TOCBasedRAG(AdvancedRAGInterface):
         self.openai_client = OpenAI(api_key=settings.openai_api_key)
         self.db_connection = self._get_db_connection()
         
+        # 유틸리티 초기화
+        self.toc_extractor = TOCExtractor()
+        self.toc_chunker = TOCChunker()
+        self.gcp_manager = GCPStorageManager(config.extra_config.get("bucket_name"))
+        
+        # 설정
+        self.table_name = config.extra_config.get("table_name", "ref_handbook_snippet")
+        self.embedding_model = config.extra_config.get("embedding_model", "text-embedding-3-small")
+        
     def _get_db_connection(self):
         """데이터베이스 연결 생성"""
-        return psycopg2.connect(settings.database_url)
+        # SQLAlchemy 형식을 psycopg2 형식으로 변환
+        db_url = settings.database_url
+        if db_url.startswith("postgresql+psycopg2://"):
+            db_url = db_url.replace("postgresql+psycopg2://", "postgresql://")
+        return psycopg2.connect(db_url)
     
     def load_and_process_file(self, 
                              source_path: str, 
                              **kwargs) -> List[Dict[str, Any]]:
         """파일을 로드하고 TOC 기반으로 처리"""
-        # TODO: rag_test의 bucket.py + toc_extract.py + chunking.py 로직 통합
-        raise NotImplementedError("TOC 기반 파일 처리 구현 필요")
+        results = []
+        
+        try:
+            # GCP에서 파일 다운로드 (필요한 경우)
+            if source_path.startswith("gs://") or not Path(source_path).exists():
+                local_path = self.gcp_manager.download_single_file(source_path)
+            else:
+                local_path = source_path
+            
+            # 1. TOC 추출
+            toc_data = self.toc_extractor.extract_toc_from_pdf(local_path)
+            if not toc_data:
+                return [{"status": "error", "message": "TOC를 추출할 수 없습니다."}]
+            
+            # 2. TOC 기반 청킹
+            chunks = self.toc_chunker.chunk_pdf_by_toc(local_path, toc_data)
+            
+            # 3. 각 청크에 대해 임베딩 생성 및 저장
+            for chunk in chunks:
+                try:
+                    # 임베딩 생성
+                    embedding = self._create_embedding(chunk["embed_text"])
+                    
+                    # 데이터베이스에 저장
+                    chunk_id = self._save_chunk_to_db(chunk, embedding)
+                    
+                    results.append({
+                        "chunk_id": chunk_id,
+                        "section_id": chunk["section_id"],
+                        "canonical_path": chunk["canonical_path"],
+                        "status": "success"
+                    })
+                    
+                except Exception as e:
+                    results.append({
+                        "chunk_id": chunk.get("chunk_id"),
+                        "status": "error",
+                        "error": str(e)
+                    })
+            
+            # 임시 파일 정리
+            if local_path != source_path:
+                Path(local_path).unlink(missing_ok=True)
+            
+            return results
+            
+        except Exception as e:
+            return [{"status": "error", "message": f"파일 처리 실패: {str(e)}"}]
     
     def search_similar(self, 
                       query: str, 
                       top_k: int = 5, 
                       threshold: float = 0.5) -> List[Tuple[str, float, UUID]]:
         """벡터 유사도 검색"""
-        # 쿼리 임베딩 생성
         query_embedding = self._create_embedding(query)
         
-        # pgvector KNN 검색
-        sql = """
+        sql = f"""
         SELECT section_id, canonical_path, full_text, 
                embedding <=> %s::vector as distance
-        FROM ref_handbook_snippet 
+        FROM {self.table_name}
         WHERE embedding <=> %s::vector < %s
         ORDER BY embedding <=> %s::vector
         LIMIT %s
@@ -63,42 +124,46 @@ class TOCBasedRAG(AdvancedRAGInterface):
         embedding = self._create_embedding(text)
         doc_id = str(uuid.uuid4())
         
-        sql = """
-        INSERT INTO ref_handbook_snippet 
-        (section_id, canonical_path, full_text, embedding)
-        VALUES (%s, %s, %s, %s)
-        """
+        chunk_data = {
+            "chunk_id": doc_id,
+            "section_id": doc_id,
+            "canonical_path": kwargs.get('path', ''),
+            "full_text": text,
+            "embed_text": text,
+            "citation": kwargs.get('citation', ''),
+            "chunk_ix": 0,
+            "page_start": kwargs.get('page', 1),
+            "page_end": kwargs.get('page', 1)
+        }
         
-        with self.db_connection.cursor() as cur:
-            cur.execute(sql, (doc_id, kwargs.get('path', ''), text, embedding))
-            self.db_connection.commit()
-        
+        self._save_chunk_to_db(chunk_data, embedding)
         return UUID(doc_id)
     
     def batch_add_documents(self, texts: List[str], **kwargs) -> List[UUID]:
         """여러 문서 일괄 추가"""
         doc_ids = []
-        for text in texts:
-            doc_id = self.add_document(text, **kwargs)
+        for i, text in enumerate(texts):
+            doc_kwargs = {k: v[i] if isinstance(v, list) else v for k, v in kwargs.items()}
+            doc_id = self.add_document(text, **doc_kwargs)
             doc_ids.append(doc_id)
         return doc_ids
     
     def search_by_analysis_result(self, 
                                  analysis_id: str, 
                                  **kwargs) -> List[Dict[str, Any]]:
-        """분석 결과 기반 검색 (summary_rag.py 로직)"""
-        # 분석 결과 조회
+        """분석 결과 기반 검색"""
         analysis = self._fetch_analysis_by_id(analysis_id)
         if not analysis:
             return []
         
-        # 요약 텍스트로 임베딩 생성
         summary = analysis.get('summary', '')
         if not summary:
             return []
         
         # 벡터 검색
-        results = self.search_similar(summary, **kwargs)
+        top_k = kwargs.get('top_k', 10)
+        threshold = kwargs.get('threshold', 0.5)
+        results = self.search_similar(summary, top_k, threshold)
         
         # 섹션별로 그룹화하고 스티칭
         section_ids = list(set([result[2] for result in results]))
@@ -109,20 +174,18 @@ class TOCBasedRAG(AdvancedRAGInterface):
     def generate_advice(self, 
                        analysis_id: str, 
                        **kwargs) -> Dict[str, Any]:
-        """조언 생성 (advice.py 로직)"""
-        # 관련 섹션 검색
+        """조언 생성"""
         sections = self.search_by_analysis_result(analysis_id, **kwargs)
         
         if not sections:
             return {"advice": "관련 정보를 찾을 수 없습니다.", "sources": []}
         
-        # 분석 결과 조회
         analysis = self._fetch_analysis_by_id(analysis_id)
         
-        # 프롬프트 구성
+        # 컨텍스트 구성
         context = "\n\n".join([
             f"[{sec['canonical_path']}]\n{sec['full_text']}" 
-            for sec in sections
+            for sec in sections[:3]  # 상위 3개 섹션만 사용
         ])
         
         prompt = f"""
@@ -133,30 +196,39 @@ class TOCBasedRAG(AdvancedRAGInterface):
 {context}
 
 위 정보를 바탕으로 구체적이고 실용적인 조언을 제공해주세요.
+조언은 한국어로 작성하고, 실제 적용 가능한 방법을 포함해주세요.
 """
         
-        # OpenAI API 호출
-        response = self.openai_client.chat.completions.create(
-            model="gpt-4",
-            messages=[{"role": "user", "content": prompt}],
-            temperature=0.7
-        )
-        
-        advice = response.choices[0].message.content
-        sources = [{"path": sec['canonical_path'], "citation": sec.get('citations', [])} 
-                  for sec in sections]
-        
-        return {
-            "advice": advice,
-            "sources": sources,
-            "analysis_id": analysis_id
-        }
+        try:
+            response = self.openai_client.chat.completions.create(
+                model="gpt-4",
+                messages=[{"role": "user", "content": prompt}],
+                temperature=0.7,
+                max_tokens=1000
+            )
+            
+            advice = response.choices[0].message.content
+            sources = [{"path": sec['canonical_path'], "citations": sec.get('citations', [])} 
+                      for sec in sections]
+            
+            return {
+                "advice": advice,
+                "sources": sources,
+                "analysis_id": analysis_id
+            }
+            
+        except Exception as e:
+            return {
+                "advice": f"조언 생성 중 오류가 발생했습니다: {str(e)}",
+                "sources": [],
+                "analysis_id": analysis_id
+            }
     
     def save_feedback(self, 
                      analysis_id: str, 
                      feedback: str, 
                      **kwargs) -> bool:
-        """피드백 저장 (advice_save.py 로직)"""
+        """피드백 저장"""
         try:
             sql = """
             UPDATE analysis_result 
@@ -175,10 +247,43 @@ class TOCBasedRAG(AdvancedRAGInterface):
     def _create_embedding(self, text: str) -> List[float]:
         """OpenAI 임베딩 생성"""
         response = self.openai_client.embeddings.create(
-            model=self.config.extra_config.get('embedding_model', 'text-embedding-3-small'),
+            model=self.embedding_model,
             input=text
         )
         return response.data[0].embedding
+    
+    def _save_chunk_to_db(self, chunk_data: Dict[str, Any], embedding: List[float]) -> str:
+        """청크 데이터를 데이터베이스에 저장"""
+        sql = f"""
+        INSERT INTO {self.table_name} 
+        (section_id, canonical_path, chunk_ix, page_start, page_end, 
+         citation, full_text, embedding)
+        VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
+        ON CONFLICT (section_id, chunk_ix) 
+        DO UPDATE SET 
+            canonical_path = EXCLUDED.canonical_path,
+            page_start = EXCLUDED.page_start,
+            page_end = EXCLUDED.page_end,
+            citation = EXCLUDED.citation,
+            full_text = EXCLUDED.full_text,
+            embedding = EXCLUDED.embedding
+        RETURNING section_id
+        """
+        
+        with self.db_connection.cursor() as cur:
+            cur.execute(sql, (
+                chunk_data["section_id"],
+                chunk_data["canonical_path"],
+                chunk_data["chunk_ix"],
+                chunk_data["page_start"],
+                chunk_data["page_end"],
+                chunk_data["citation"],
+                chunk_data["full_text"],
+                embedding
+            ))
+            self.db_connection.commit()
+            result = cur.fetchone()
+            return result[0] if result else chunk_data["section_id"]
     
     def _fetch_analysis_by_id(self, analysis_id: str) -> Dict[str, Any]:
         """분석 결과 조회"""
@@ -205,10 +310,10 @@ class TOCBasedRAG(AdvancedRAGInterface):
         if not section_ids:
             return []
         
-        sql = """
+        sql = f"""
         SELECT section_id, canonical_path, chunk_ix,
                page_start, page_end, citation, full_text
-        FROM ref_handbook_snippet
+        FROM {self.table_name}
         WHERE section_id = ANY(%s)
         ORDER BY section_id, chunk_ix, page_start, page_end
         """
