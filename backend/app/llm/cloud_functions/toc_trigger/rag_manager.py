@@ -78,7 +78,7 @@ class RAGManager:
                 extra_config={
                     "bucket_name": "gaon-cloud-data",
                     "embedding_model": "text-embedding-3-small",
-                    "table_name": "ideal_answer"
+                    "table_name": "ref_handbook_snippet"
                 }
             )
         else:

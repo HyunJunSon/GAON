@@ -254,34 +254,36 @@ class TOCBasedRAG(AdvancedRAGInterface):
     
     def _save_chunk_to_db(self, chunk_data: Dict[str, Any], embedding: List[float]) -> str:
         """청크 데이터를 데이터베이스에 저장"""
-        from app.llm.rag.vector_db.vector_db_manager import VectorDBManager
+        sql = f"""
+        INSERT INTO {self.table_name} 
+        (section_id, canonical_path, chunk_ix, page_start, page_end, 
+         citation, full_text, embedding)
+        VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
+        ON CONFLICT (section_id, chunk_ix) 
+        DO UPDATE SET 
+            canonical_path = EXCLUDED.canonical_path,
+            page_start = EXCLUDED.page_start,
+            page_end = EXCLUDED.page_end,
+            citation = EXCLUDED.citation,
+            full_text = EXCLUDED.full_text,
+            embedding = EXCLUDED.embedding
+        RETURNING section_id
+        """
         
-        # VectorDBManager 사용하여 저장
-        vector_manager = VectorDBManager()
-        
-        # 메타데이터 구성
-        metadata = {
-            'l1_title': chunk_data.get('l1_title'),
-            'l2_title': chunk_data.get('l2_title'), 
-            'l3_title': chunk_data.get('l3_title'),
-            'canonical_path': chunk_data.get('canonical_path'),
-            'section_id': chunk_data.get('section_id'),
-            'chunk_ix': chunk_data.get('chunk_ix'),
-            'page_start': chunk_data.get('page_start'),
-            'page_end': chunk_data.get('page_end'),
-            'citation': chunk_data.get('citation'),
-            'rag_type': 'toc_based'  # TOC 기반 RAG 타입 설정
-        }
-        
-        # 저장
-        snippet_id = vector_manager.store_embedding(
-            embed_text=chunk_data.get('embed_text', ''),
-            embedding=embedding,
-            full_text=chunk_data.get('full_text', ''),
-            **metadata
-        )
-        
-        return str(snippet_id)
+        with self.db_connection.cursor() as cur:
+            cur.execute(sql, (
+                chunk_data["section_id"],
+                chunk_data["canonical_path"],
+                chunk_data["chunk_ix"],
+                chunk_data["page_start"],
+                chunk_data["page_end"],
+                chunk_data["citation"],
+                chunk_data["full_text"],
+                embedding
+            ))
+            self.db_connection.commit()
+            result = cur.fetchone()
+            return result[0] if result else chunk_data["section_id"]
     
     def _fetch_analysis_by_id(self, analysis_id: str) -> Dict[str, Any]:
         """분석 결과 조회"""
