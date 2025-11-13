@@ -35,12 +35,22 @@ def rag_file_processor(cloud_event):
             print(f"지원하지 않는 파일 형식: {file_name}")
             return
         
-        # 리팩토링 후: 파일 처리는 더 이상 필요하지 않음
-        # Legacy RAG는 검색 전용으로 변경됨
-        print(f"Legacy RAG 리팩토링 완료: 파일 처리는 더 이상 수행하지 않습니다 - {file_name}")
-        print("파일 처리 로직이 제거되었습니다. 검색 전용 RAG로 변경되었습니다.")
+        # 실제 파일 처리 수행
+        from rag_auto_selector import process_file_with_auto_rag
         
-        return "Legacy RAG 리팩토링 완료: 파일 처리 로직 제거됨"
+        print(f"파일 처리 시작: {file_name}")
+        
+        # GCS 경로 구성
+        gcs_path = f"gs://{bucket}/{file_name}"
+        
+        # RAG 자동 선택 시스템으로 처리
+        results = process_file_with_auto_rag(gcs_path)
+        
+        print(f"파일 처리 완료: {len(results)}개 결과")
+        for i, result in enumerate(results[:3]):  # 처음 3개만 로그
+            print(f"결과 {i+1}: {result}")
+        
+        return f"파일 처리 완료: {len(results)}개 청크 생성"
         
     except Exception as e:
         print(f"RAG 처리 실패: {str(e)}")

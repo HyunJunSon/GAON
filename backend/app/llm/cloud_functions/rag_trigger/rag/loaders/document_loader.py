@@ -205,8 +205,9 @@ class DocumentLoader:
     다양한 파일 소스 및 형식을 지원합니다.
     """
     
-    def __init__(self):
+    def __init__(self, storage_adapter=None):
         self.local_file_loader = LocalFileLoader()
+        self.storage_adapter = storage_adapter
     
     def load_documents(self, source: str) -> List[Document]:
         """
@@ -215,15 +216,38 @@ class DocumentLoader:
         Args:
             source: 문서를 로드할 소스. 다음을 포함할 수 있습니다:
                     - 로컬 파일 경로
+                    - GCS 경로 (gs://bucket/path)
                     - URL (미구현)
-                    - 클라우드 스토리지 식별자 (미구현)
                     
         Returns:
             Document 객체의 리스트
         """
-        # 소스 유형 확인
-        if os.path.exists(source) or Path(source).exists():
-            # 로컬 파일 경로
+        # GCS 경로인지 확인
+        if source.startswith('gs://'):
+            if not self.storage_adapter:
+                raise ValueError("GCS 파일 로딩을 위해 storage_adapter가 필요합니다")
+            
+            # 임시 파일로 다운로드
+            import tempfile
+            with tempfile.NamedTemporaryFile(delete=False, suffix=Path(source).suffix) as tmp_file:
+                temp_path = tmp_file.name
+            
+            try:
+                # GCS에서 파일 다운로드
+                self.storage_adapter.download_file(source, temp_path)
+                # 로컬 파일로 로드
+                documents = self.local_file_loader.load(temp_path)
+                # 소스 정보 업데이트
+                for doc in documents:
+                    doc.source = source
+                return documents
+            finally:
+                # 임시 파일 정리
+                if os.path.exists(temp_path):
+                    os.unlink(temp_path)
+        
+        # 로컬 파일 경로인지 확인
+        elif os.path.exists(source) or Path(source).exists():
             return self.local_file_loader.load(source)
         else:
             # URL인지 확인
@@ -231,5 +255,4 @@ class DocumentLoader:
             if parsed.scheme in ['http', 'https']:
                 raise NotImplementedError("URL 로딩은 아직 구현되지 않았습니다")
             else:
-                # 클라우드 스토리지 경로 또는 식별자일 수 있음
-                raise NotImplementedError("클라우드 스토리지 로딩은 아직 구현되지 않았습니다")
+                raise NotImplementedError(f"지원되지 않는 소스 형식입니다: {source}")

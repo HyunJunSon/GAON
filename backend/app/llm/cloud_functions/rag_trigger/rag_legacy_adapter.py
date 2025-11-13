@@ -5,6 +5,7 @@ from typing import List, Dict, Any, Tuple
 from uuid import UUID
 
 from rag_interface import RAGInterface, RAGConfig
+from rag import RAGSystem
 
 
 class LegacyRAGAdapter(RAGInterface):
@@ -13,7 +14,7 @@ class LegacyRAGAdapter(RAGInterface):
     def __init__(self, config: RAGConfig):
         super().__init__(config)
         
-        # 기존 RAGSystem 초기화
+        # 실제 RAGSystem 초기화
         self.rag_system = RAGSystem(
             storage_type=config.storage_type,
             chunker_type=config.chunker_type,
@@ -23,29 +24,48 @@ class LegacyRAGAdapter(RAGInterface):
     def load_and_process_file(self, 
                              source_path: str, 
                              **kwargs) -> List[Dict[str, Any]]:
-        """파일을 로드하고 처리하여 임베딩 생성"""
-        chunk_kwargs = kwargs.get('chunk_kwargs', {})
-        return self.rag_system.load_and_process_file(source_path, chunk_kwargs)
+        """파일 로드 및 처리"""
+        try:
+            results = self.rag_system.load_and_process_file(source_path, **kwargs)
+            return results
+        except Exception as e:
+            return [{"error": f"파일 처리 실패: {str(e)}"}]
     
     def search_similar(self, 
                       query: str, 
-                      top_k: int = 5, 
-                      threshold: float = 0.5) -> List[Tuple[str, float, UUID]]:
-        """유사한 문서 검색"""
-        return self.rag_system.search_similar(query, top_k, threshold)
+                      top_k: int = 5,
+                      threshold: float = 0.7,
+                      **kwargs) -> List[Dict[str, Any]]:
+        """유사도 검색"""
+        try:
+            results = self.rag_system.search_similar(
+                query=query,
+                top_k=top_k,
+                threshold=threshold,
+                **kwargs
+            )
+            return results
+        except Exception as e:
+            return [{"error": f"검색 실패: {str(e)}"}]
     
     def add_document(self, 
-                    text: str, 
-                    **kwargs) -> UUID:
-        """단일 문서 추가"""
-        book_id = kwargs.get('book_id')
-        metadata = kwargs.get('metadata')
-        return self.rag_system.add_document(text, book_id, metadata)
+                    content: str, 
+                    metadata: Dict[str, Any] = None) -> str:
+        """문서 추가"""
+        try:
+            doc_id = self.rag_system.add_document(content, metadata)
+            return str(doc_id)
+        except Exception as e:
+            return f"문서 추가 실패: {str(e)}"
     
     def batch_add_documents(self, 
-                           texts: List[str], 
-                           **kwargs) -> List[UUID]:
-        """여러 문서 일괄 추가"""
-        book_ids = kwargs.get('book_ids')
-        metadata_list = kwargs.get('metadata_list')
-        return self.rag_system.batch_add_documents(texts, book_ids, metadata_list)
+                           documents: List[Tuple[str, Dict[str, Any]]]) -> List[str]:
+        """배치 문서 추가"""
+        results = []
+        for content, metadata in documents:
+            try:
+                doc_id = self.rag_system.add_document(content, metadata)
+                results.append(str(doc_id))
+            except Exception as e:
+                results.append(f"실패: {str(e)}")
+        return results

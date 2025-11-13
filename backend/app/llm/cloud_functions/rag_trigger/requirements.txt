@@ -1,5 +1,6 @@
 functions-framework==3.*
 google-cloud-storage==3.4.1
+google-cloud-secret-manager==2.21.1
 openai==1.106.1
 psycopg2-binary==2.9.9
 pgvector==0.3.6

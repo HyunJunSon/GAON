@@ -8,6 +8,20 @@ from enum import Enum
 from rag_interface import RAGInterface, AdvancedRAGInterface, RAGConfig, RAGFactory
 from rag_legacy_adapter import LegacyRAGAdapter
 
+# TOC RAG는 현재 사용하지 않으므로 더미 클래스로 대체
+class TOCBasedRAG(RAGInterface):
+    def __init__(self, config):
+        super().__init__(config)
+    
+    def load_and_process_file(self, source_path, **kwargs):
+        return [{"message": "TOC RAG는 현재 사용하지 않습니다"}]
+    
+    def search_similar(self, query, **kwargs):
+        return []
+    
+    def add_document(self, content, metadata=None):
+        return "toc-dummy"
+
 
 class RAGType(Enum):
     """RAG 시스템 타입"""
