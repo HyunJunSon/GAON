@@ -92,6 +92,9 @@ class STTService:
             language_code=language_code,
             diarization_config=diarization_config,
             enable_automatic_punctuation=True,
+            use_enhanced=True,  # 향상된 모델 사용
+            model="latest_short",  # 짧은 오디오용 모델로 변경
+            enable_word_time_offsets=True,  # 단어별 시간 정보 활성화
         )
         
         response = self.client.recognize(config=config, audio=audio)
@@ -132,7 +135,9 @@ class STTService:
                 language_code=language_code,
                 diarization_config=diarization_config,
                 enable_automatic_punctuation=True,
-                model="latest_long"
+                use_enhanced=True,  # 향상된 모델 사용
+                model="latest_long",
+                enable_word_time_offsets=True,  # 단어별 시간 정보 활성화
             )
             
             # LongRunning 요청 시작
@@ -241,12 +246,67 @@ class STTService:
                 "speaker_count": speaker_count
             }
             
+            # 화자 분리가 제대로 안 된 경우 후처리 적용
+            if speaker_count <= 1 and len(speaker_segments) > 1:
+                logger.info("화자 분리 후처리 적용 중...")
+                result = self._apply_post_processing_diarization(result)
+                speaker_count = result['speaker_count']
+            
             logger.info(f"STT 처리 완료 - 화자 수: {speaker_count}, 총 시간: {duration}초")
             return result
             
         except Exception as e:
             logger.error(f"STT 응답 파싱 실패: {str(e)}")
             raise Exception(f"음성 인식 결과 처리 중 오류가 발생했습니다: {str(e)}")
+    
+    def _apply_post_processing_diarization(self, result: Dict[str, Any]) -> Dict[str, Any]:
+        """
+        텍스트 패턴 기반 화자 분리 후처리
+        Google STT가 화자 분리를 제대로 하지 못한 경우 적용
+        """
+        segments = result['speaker_segments']
+        if not segments:
+            return result
+        
+        # 질문-답변 패턴 키워드
+        question_patterns = ['어때', '뭐', '어떤', '왜', '언제', '어디', '누구', '어떻게', '있어', '해']
+        answer_patterns = ['네', '아니요', '그래요', '맞아요', '좋아요', '싫어요', '같아요', '요', '어요']
+        
+        improved_segments = []
+        current_speaker = 0
+        
+        for i, segment in enumerate(segments):
+            text = segment['text'].strip()
+            
+            # 질문 패턴 감지
+            is_question = any(pattern in text for pattern in question_patterns)
+            # 답변 패턴 감지  
+            is_answer = any(pattern in text for pattern in answer_patterns)
+            
+            # 이전 세그먼트와 비교해서 화자 결정
+            if i > 0:
+                prev_text = segments[i-1]['text'].strip()
+                prev_is_question = any(pattern in prev_text for pattern in question_patterns)
+                
+                # 이전이 질문이고 현재가 답변이면 화자 변경
+                if prev_is_question and is_answer:
+                    current_speaker = 1 - current_speaker
+                # 현재가 질문이면 화자 변경 (질문자 교대)
+                elif is_question and not prev_is_question:
+                    current_speaker = 1 - current_speaker
+            
+            # 세그먼트 복사 후 화자 할당
+            new_segment = segment.copy()
+            new_segment['speaker'] = current_speaker
+            improved_segments.append(new_segment)
+        
+        # 결과 업데이트
+        result['speaker_segments'] = improved_segments
+        speakers = set(seg['speaker'] for seg in improved_segments)
+        result['speaker_count'] = len(speakers)
+        
+        logger.info(f"후처리 완료 - 개선된 화자 수: {result['speaker_count']}")
+        return result
     
     def validate_audio_format(self, audio_content: bytes, filename: str) -> bool:
         """

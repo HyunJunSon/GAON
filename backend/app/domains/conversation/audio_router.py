@@ -13,7 +13,7 @@ from .services import ConversationFileService
 from .models import Conversation
 from .file_models import ConversationFile
 from .schemas import FileUploadResponse
-from .speaker_schemas import SpeakerMappingRequest, SpeakerMappingResponse
+from .speaker_schemas import SpeakerMappingRequest, SpeakerMappingResponse, SpeakerSplitRequest
 
 router = APIRouter(prefix="/api/conversation", tags=["audio-conversation"])
 logger = logging.getLogger(__name__)
@@ -372,3 +372,114 @@ async def get_speaker_mapping(
             status_code=500, 
             detail=f"서버 오류가 발생했습니다: {str(e)}"
         )
+
+
+@router.post("/audio/{conversation_id}/improve-speaker-separation")
+async def improve_speaker_separation(
+    conversation_id: UUID,
+    request: SpeakerSplitRequest,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """
+    화자 분리를 개선합니다 (시간 기반 또는 수동 할당).
+    
+    Args:
+        conversation_id: 대화 ID
+        request: 화자 분리 개선 요청
+        current_user: 현재 로그인한 사용자
+        db: 데이터베이스 세션
+        
+    Returns:
+        Dict: 개선된 화자 분리 결과
+    """
+    logger.info(f"화자 분리 개선 요청 - 사용자: {current_user.id}, 대화 ID: {conversation_id}")
+    
+    try:
+        # 1. 권한 확인
+        conversation = db.query(Conversation).filter(Conversation.conv_id == conversation_id).first()
+        if not conversation or current_user not in conversation.participants:
+            raise HTTPException(status_code=403, detail="접근 권한이 없습니다.")
+        
+        # 2. 음성 파일 조회
+        audio_file = (
+            db.query(ConversationFile)
+            .filter(ConversationFile.conv_id == conversation_id)
+            .filter(ConversationFile.audio_url.isnot(None))
+            .first()
+        )
+        
+        if not audio_file or not audio_file.speaker_segments:
+            raise HTTPException(status_code=404, detail="음성 대화 데이터를 찾을 수 없습니다.")
+        
+        # 3. 화자 분리 개선 적용
+        original_segments = audio_file.speaker_segments
+        
+        if request.split_method == "time_based":
+            improved_segments = _improve_by_time_interval(original_segments, request.split_interval)
+        elif request.split_method == "manual" and request.manual_assignments:
+            improved_segments = _apply_manual_assignments(original_segments, request.manual_assignments)
+        else:
+            raise HTTPException(status_code=400, detail="지원하지 않는 분리 방법입니다.")
+        
+        # 4. 결과 저장
+        audio_file.speaker_segments = improved_segments
+        
+        # 화자 수 재계산
+        speakers = set(seg['speaker'] for seg in improved_segments)
+        audio_file.speaker_count = len(speakers)
+        
+        db.commit()
+        
+        logger.info(f"화자 분리 개선 완료 - 대화 ID: {conversation_id}, 방법: {request.split_method}")
+        
+        return {
+            "conversation_id": str(conversation_id),
+            "method": request.split_method,
+            "original_segments": len(original_segments),
+            "improved_segments": len(improved_segments),
+            "speaker_count": audio_file.speaker_count,
+            "message": "화자 분리가 개선되었습니다."
+        }
+        
+    except HTTPException:
+        db.rollback()
+        raise
+    except Exception as e:
+        db.rollback()
+        logger.error(f"화자 분리 개선 실패: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"서버 오류가 발생했습니다: {str(e)}")
+
+
+def _improve_by_time_interval(segments: list, interval: float) -> list:
+    """시간 간격 기반으로 화자 분리 개선"""
+    if not segments:
+        return segments
+    
+    improved_segments = []
+    current_speaker = 0
+    
+    for segment in segments:
+        # 시간 간격에 따라 화자 교대
+        time_slot = int(segment['start'] // interval)
+        new_speaker = time_slot % 2  # 0과 1 사이에서 교대
+        
+        new_segment = segment.copy()
+        new_segment['speaker'] = new_speaker
+        improved_segments.append(new_segment)
+    
+    return improved_segments
+
+
+def _apply_manual_assignments(segments: list, assignments: list) -> list:
+    """수동 할당 적용"""
+    improved_segments = segments.copy()
+    
+    for assignment in assignments:
+        segment_index = assignment.get('segment_index')
+        new_speaker = assignment.get('speaker')
+        
+        if 0 <= segment_index < len(improved_segments):
+            improved_segments[segment_index]['speaker'] = new_speaker
+    
+    return improved_segments

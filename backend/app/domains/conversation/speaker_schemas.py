@@ -1,5 +1,5 @@
 from pydantic import BaseModel
-from typing import Dict, Optional
+from typing import Dict, Optional, List
 from uuid import UUID
 
 
@@ -23,3 +23,15 @@ class SpeakerSegmentWithMapping(BaseModel):
     start: float
     end: float
     text: str
+
+
+class ManualSpeakerAssignment(BaseModel):
+    """수동 화자 할당 요청"""
+    segment_assignments: List[Dict[str, int]]  # [{"segment_index": 0, "speaker": 1}, ...]
+
+
+class SpeakerSplitRequest(BaseModel):
+    """화자 분리 개선 요청"""
+    split_method: str  # "time_based", "manual", "pattern_based"
+    split_interval: Optional[float] = 30.0  # 시간 기반 분리 간격 (초)
+    manual_assignments: Optional[List[Dict]] = None  # 수동 할당

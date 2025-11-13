@@ -82,6 +82,7 @@ dependencies = [
     "types-passlib>=1.7.7.20250602",
     "pip>=25.3",
     "docx>=0.2.4",
+    "pyannote-audio>=3.4.0",
 ]
 [tool.uv]
 venv = "gaon-venv"
