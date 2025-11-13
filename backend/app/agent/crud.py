@@ -1,4 +1,5 @@
 # app/agent/crud.py
+
 """
 ✅ Agent 파이프라인용 CRUD 함수
 
@@ -6,16 +7,6 @@
 - conversation, analysis_result 테이블 DB 접근 로직 중앙화
 - 각 Agent 노드(Cleaner, Analysis, QA)에서 재사용
 
-주요 함수:
-1. get_conversation_by_id()       - Cleaner: conversation 조회
-2. get_conversations_by_user()    - 사용자별 대화 목록 조회
-3. save_conversation()            - Cleaner: 정제된 대화 저장
-4. update_conversation()          - 대화 내용 업데이트
-5. get_user_by_id()              - Analysis: 사용자 정보 조회
-6. get_family_by_id()            - Analysis: 가족 정보 조회
-7. save_analysis_result()        - Analysis: 분석 결과 저장 (INSERT) 
-8. update_analysis_result()      - QA: 분석 결과 업데이트 (UPDATE)
-9. get_analysis_by_conv_id()     - 분석 결과 조회
 """
 
 from sqlalchemy.orm import Session
@@ -32,12 +23,11 @@ import pandas as pd
 
 def get_conversation_by_id(db: Session, conv_id: str) -> Optional[Dict[str, Any]]:
     """
-    ✅ conversation 테이블에서 대화 조회 (conv_id 기준)
+    🔧 수정됨: content, family_id 제거
     """
     query = text("""
         SELECT 
-            id, conv_id, title, content, family_id,
-            create_date
+            id, conv_id, title, create_date
         FROM conversation
         WHERE conv_id = :conv_id
     """)
@@ -49,25 +39,20 @@ def get_conversation_by_id(db: Session, conv_id: str) -> Optional[Dict[str, Any]
             "id": result[0],
             "conv_id": str(result[1]),
             "title": result[2],
-            "content": result[3],
-            "family_id": result[4],
-            "create_date": result[5]
+            "create_date": result[3],
         }
     return None
 
 
 def get_conversation_by_pk(db: Session, pk_id: int) -> Optional[Dict[str, Any]]:
-    """
-    ✅ conversation 테이블에서 대화 조회 (PK id 기준)
-    """
+
     query = text("""
         SELECT 
-            id, conv_id, title, content, family_id,
-            create_date
+            id, conv_id, title, create_date
         FROM conversation
         WHERE id = :pk_id
     """)
-    
+
     result = db.execute(query, {"pk_id": pk_id}).fetchone()
     
     if result:
@@ -75,22 +60,17 @@ def get_conversation_by_pk(db: Session, pk_id: int) -> Optional[Dict[str, Any]]:
             "id": result[0],
             "conv_id": str(result[1]),
             "title": result[2],
-            "content": result[3],
-            "family_id": result[4],
-            "create_date": result[5]
+            "create_date": result[3],
         }
     return None
 
 
+
 def get_conversations_by_user(db: Session, id: int, limit: int = 10) -> List[Dict[str, Any]]:
-    """
-    ✅ 사용자별 대화 목록 조회
-    """
+
     query = text("""
         SELECT 
-            id, conv_id, title, content,
-            id, family_id,
-            create_date
+            id, conv_id, title, create_date
         FROM conversation
         WHERE id = :id
         ORDER BY create_date DESC
@@ -104,83 +84,24 @@ def get_conversations_by_user(db: Session, id: int, limit: int = 10) -> List[Dic
             "id": row[0],
             "conv_id": str(row[1]),
             "title": row[2],
-            "content": row[3],
-            "family_id": row[4],
-            "create_date": row[5]
+            "create_date": row[3]
         }
         for row in results
     ]
 
 
-def conversation_to_dataframe(conversation: Dict[str, Any]) -> pd.DataFrame:
-    """
-    ✅ conversation 데이터를 DataFrame으로 변환
-       (참석자 번호를 정수형으로 파싱)
-    """
-    content = conversation["content"]
-    lines = content.strip().split("\n")
-
-    data = []
-    current_speaker = None
-    current_text = ""
-    current_timestamp = None
-
-    for line in lines:
-        line = line.strip()
-        if not line:
-            continue
-
-        # 화자 및 타임스탬프 감지 (예: "참석자 1 00:00")
-        if line.startswith("참석자"):
-            # 이전 발화 저장
-            if current_speaker is not None and current_text:
-                data.append({
-                    "speaker": current_speaker,
-                    "text": current_text.strip(),
-                    "timestamp": current_timestamp
-                })
-
-            # 새 화자 파싱
-            parts = line.split(maxsplit=2)
-            if len(parts) >= 2:
-                try:
-                    current_speaker = int(parts[1])  # 🔧 문자열 → int 변환
-                except ValueError:
-                    current_speaker = None
-                current_timestamp = parts[2] if len(parts) == 3 else "00:00"
-                current_text = ""
-        else:
-            current_text += line + " "
-
-    # 마지막 발화 저장
-    if current_speaker is not None and current_text:
-        data.append({
-            "speaker": current_speaker,
-            "text": current_text.strip(),
-            "timestamp": current_timestamp
-        })
-
-    return pd.DataFrame(data)
+# =========================================
+# 🔧 삭제됨: conversation_to_dataframe
+# → RawFetcher 내부로 이동했으므로 완전 제거
+# =========================================
 
 
 # =========================================
-# 2️⃣ User & Family 관련 CRUD
+# 2️⃣ User 관련 CRUD
 # =========================================
 
 def get_user_by_id(db: Session, id: int) -> Optional[Dict[str, Any]]:
-    """
-    ✅ users 테이블에서 사용자 정보 조회
-    
-    Args:
-        db: SQLAlchemy 세션
-        id: 사용자 ID
-    
-    Returns:
-        사용자 정보 (Dict) 또는 None
-    
-    사용처:
-        - Analysis/nodes.py의 UserFetcher
-    """
+    """사용자 정보 조회"""
     query = text("""
         SELECT id, name, email, create_date
         FROM users
@@ -199,40 +120,38 @@ def get_user_by_id(db: Session, id: int) -> Optional[Dict[str, Any]]:
     return None
 
 
-def get_family_by_id(db: Session, family_id: int) -> Optional[Dict[str, Any]]:
+
+# =========================================
+# 3️⃣ conversation_file 조회 CRUD (신규 로직)
+# =========================================
+
+def get_conversation_file_by_conv_id(db: Session, conv_id: str) -> Optional[Dict[str, Any]]:
     """
-    ✅ family 테이블에서 가족 정보 조회
-    
-    Args:
-        db: SQLAlchemy 세션
-        family_id: 가족 ID
-    
-    Returns:
-        가족 정보 (Dict) 또는 None
-    
-    사용처:
-        - Analysis/nodes.py의 FamilyChecker
+    🔥 conversation_file.raw_content 조회 (TO-BE 기준 핵심)
     """
     query = text("""
-        SELECT id, name, description, create_date
-        FROM family
-        WHERE id = :family_id
+        SELECT 
+            id, conv_id, file_type, raw_content, create_date
+        FROM conversation_file
+        WHERE conv_id = :conv_id
     """)
-    
-    result = db.execute(query, {"family_id": family_id}).fetchone()
-    
+
+    result = db.execute(query, {"conv_id": conv_id}).fetchone()
+
     if result:
         return {
-            "fam_id": result[0],
-            "fam_name": result[1],
-            "description": result[2],
-            "create_date": result[3]
+            "file_id": result[0],
+            "conv_id": result[1],
+            "file_type": result[2],
+            "raw_content": result[3],
+            "create_date": result[4]
         }
     return None
 
 
+
 # =========================================
-# 3️⃣ AnalysisResult 관련 CRUD
+# 4️⃣ AnalysisResult 관련 CRUD
 # =========================================
 
 def save_analysis_result(
@@ -248,35 +167,12 @@ def save_analysis_result(
     feedback: Optional[str] = None,
 ) -> Dict[str, Any]:
     """
-    ✅ analysis_result 테이블에 분석 결과 저장 (INSERT)
-    
-    Args:
-        db: SQLAlchemy 세션
-        id: 사용자 ID (INTEGER)
-        conv_id: 대화 ID (UUID)
-        summary: 분석 요약
-        style_analysis: 스타일 분석 (JSONB)
-        statistics: 통계 결과 (JSONB)
-        score: 점수
-        confidence_score: 신뢰도 점수
-        conversation_count: 대화 수
-        feedback: 피드백
-    
-    Returns:
-        저장된 분석 결과 (Dict)
-    
-    사용처:
-        - Analysis/nodes.py의 AnalysisSaver
+    분석 결과 INSERT
     """
     import json
     
     analysis_id = uuid.uuid4()
-    
-    
-    # =========================================
-    # ✅ DB INSERT 실행
-    # =========================================
-    
+
     query = text("""
         INSERT INTO analysis_result (
             analysis_id, id, conv_id, summary,
@@ -292,7 +188,7 @@ def save_analysis_result(
     
     result = db.execute(query, {
         "analysis_id": str(analysis_id),
-        "id": id,  # ← 🔧 변환된 UUID 사용
+        "id": id,
         "conv_id": conv_id,
         "summary": summary,
         "style_analysis": json.dumps(style_analysis, ensure_ascii=False),
@@ -316,6 +212,7 @@ def save_analysis_result(
     }
 
 
+
 def update_analysis_result(
     db: Session,
     conv_id: str,
@@ -327,24 +224,10 @@ def update_analysis_result(
     feedback: Optional[str] = None,
 ) -> Optional[Dict[str, Any]]:
     """
-    ✅ analysis_result 테이블 업데이트 (UPDATE)
-    
-    Args:
-        db: SQLAlchemy 세션
-        conv_id: 대화 ID (UUID)
-        summary: 새 요약 (선택)
-        style_analysis: 새 스타일 분석 (선택)
-        statistics: 새 통계 정보 (선택)
-        score: 새 점수 (선택)
-        confidence_score: 새 신뢰도 점수 (선택)
-        feedback: 새 피드백 (선택)
-    
-    Returns:
-        업데이트된 분석 결과 (Dict) 또는 None
+    분석 결과 UPDATE
     """
     import json
-    
-    # 기존 데이터 조회
+
     query_select = text("""
         SELECT summary, style_analysis, statistics, score, confidence_score, feedback
         FROM analysis_result
@@ -354,10 +237,8 @@ def update_analysis_result(
     result = db.execute(query_select, {"conv_id": conv_id}).fetchone()
     
     if not result:
-        print(f"   ⚠️ conv_id={conv_id}에 해당하는 분석 결과가 없습니다.")
         return None
     
-    # 업데이트할 값 준비 (None이면 기존 값 유지)
     new_summary = summary if summary is not None else result[0]
     new_style_analysis = json.dumps(style_analysis, ensure_ascii=False) if style_analysis is not None else result[1]
     new_statistics = json.dumps(statistics, ensure_ascii=False) if statistics is not None else result[2]
@@ -365,7 +246,6 @@ def update_analysis_result(
     new_confidence_score = confidence_score if confidence_score is not None else result[4]
     new_feedback = feedback if feedback is not None else result[5]
     
-    # UPDATE 실행
     query_update = text("""
         UPDATE analysis_result
         SET 
@@ -375,7 +255,7 @@ def update_analysis_result(
             score = :score,
             confidence_score = :confidence_score,
             feedback = :feedback,
-         updated_at = NOW()
+            updated_at = NOW()
         WHERE conv_id = :conv_id
         RETURNING analysis_id, id, conv_id, summary, score, confidence_score
     """)
@@ -403,16 +283,10 @@ def update_analysis_result(
     }
 
 
+
 def get_analysis_by_conv_id(db: Session, conv_id: str) -> Optional[Dict[str, Any]]:
     """
-    ✅ analysis_result 테이블에서 분석 결과 조회
-    
-    Args:
-        db: SQLAlchemy 세션
-        conv_id: 대화 ID (UUID)
-    
-    Returns:
-        분석 결과 (Dict) 또는 None
+    분석 결과 조회
     """
     query = text("""
         SELECT 
@@ -428,17 +302,13 @@ def get_analysis_by_conv_id(db: Session, conv_id: str) -> Optional[Dict[str, Any
     if result:
         import json
         
-        # =========================================
-        # 🔧 수정: 이미 dict인 경우 json.loads() 스킵
-        # =========================================
         def safe_json_load(value):
-            """JSON 문자열 또는 dict를 dict로 반환"""
             if value is None:
                 return {}
             if isinstance(value, dict):
-                return value  # 이미 dict면 그대로 반환
+                return value
             if isinstance(value, str):
-                return json.loads(value)  # 문자열이면 파싱
+                return json.loads(value)
             return {}
         
         return {
@@ -446,8 +316,8 @@ def get_analysis_by_conv_id(db: Session, conv_id: str) -> Optional[Dict[str, Any
             "id": int(result[1]),
             "conv_id": result[2],
             "summary": result[3],
-            "style_analysis": safe_json_load(result[4]), 
-            "statistics": safe_json_load(result[5]),      
+            "style_analysis": safe_json_load(result[4]),
+            "statistics": safe_json_load(result[5]),
             "score": result[6],
             "confidence_score": result[7],
             "conversation_count": result[8],
