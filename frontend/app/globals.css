@@ -1,5 +1,4 @@
 @import "tailwindcss";
-@import "tw-animate-css";
 
 @custom-variant dark (&:is(.dark *));
 /* Tailwind 지시어: 반드시 이 순서로 추가해야 레이어가 올바르게 쌓임 */

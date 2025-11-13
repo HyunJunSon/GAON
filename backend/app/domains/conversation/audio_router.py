@@ -13,6 +13,7 @@ from .services import ConversationFileService
 from .models import Conversation
 from .file_models import ConversationFile
 from .schemas import FileUploadResponse
+from .speaker_schemas import SpeakerMappingRequest, SpeakerMappingResponse, SpeakerSplitRequest
 
 router = APIRouter(prefix="/api/conversation", tags=["audio-conversation"])
 logger = logging.getLogger(__name__)
@@ -68,17 +69,22 @@ async def upload_audio_conversation(
         stt_service = STTService()
         
         # 오디오 형식 검증
-        if not stt_service.validate_audio_format(file_content):
+        if not stt_service.validate_audio_format(file_content, file.filename):
             logger.warning(f"오디오 형식 검증 실패: {file.filename}")
-            # WebM이 아닌 경우에도 처리 시도 (다른 형식도 지원)
+            # 검증 실패해도 처리 시도 (일부 파일은 시그니처가 다를 수 있음)
         
-        # STT 처리 실행
-        stt_result = stt_service.transcribe_audio_with_diarization(file_content)
+        # STT 처리 실행 (파일명 전달)
+        stt_result = stt_service.transcribe_audio_with_diarization(file_content, file.filename)
+        
+        # STT 실패 시에도 파일은 저장하되 상태 표시
+        processing_status = "completed" if stt_result["transcript"] else "stt_failed"
+        transcript_text = stt_result["transcript"] or "음성 인식 처리 실패"
         
         # 4. 새 conversation 생성
         conversation = Conversation(
             title=f"음성 대화 - {file.filename}",
-            content=stt_result["transcript"][:1000],  # 처음 1000자만 저장
+            content=transcript_text[:1000],  # 처음 1000자만 저장
+            id=current_user.id,  # 사용자 ID 저장
             family_id=family_id,
             create_date=datetime.now()
         )
@@ -112,8 +118,8 @@ async def upload_audio_conversation(
             original_filename=file.filename,
             file_type=file_extension,
             file_size=len(file_content),
-            processing_status="completed",
-            raw_content=stt_result["transcript"],
+            processing_status=processing_status,
+            raw_content=transcript_text,
             # 음성 관련 필드
             audio_url=gcs_path,  # 음성 파일과 같은 경로
             transcript=stt_result["transcript"],
@@ -216,3 +222,265 @@ async def get_audio_conversation_detail(
             status_code=500, 
             detail=f"서버 오류가 발생했습니다: {str(e)}"
         )
+
+
+@router.put("/audio/{conversation_id}/speaker-mapping", response_model=SpeakerMappingResponse)
+async def update_speaker_mapping(
+    conversation_id: UUID,
+    request: SpeakerMappingRequest,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """
+    음성 대화의 화자 매핑을 설정합니다.
+    
+    Args:
+        conversation_id: 대화 ID
+        request: 화자 매핑 정보
+        current_user: 현재 로그인한 사용자
+        db: 데이터베이스 세션
+        
+    Returns:
+        SpeakerMappingResponse: 매핑 설정 결과
+    """
+    logger.info(f"화자 매핑 설정 요청 - 사용자: {current_user.id}, 대화 ID: {conversation_id}")
+    
+    try:
+        # 1. Conversation 존재 확인
+        conversation = db.query(Conversation).filter(Conversation.conv_id == conversation_id).first()
+        if not conversation:
+            raise HTTPException(status_code=404, detail="대화를 찾을 수 없습니다.")
+        
+        # 2. 사용자 권한 확인
+        if current_user not in conversation.participants:
+            raise HTTPException(status_code=403, detail="해당 대화에 접근할 권한이 없습니다.")
+        
+        # 3. 음성 파일 정보 조회
+        audio_file = (
+            db.query(ConversationFile)
+            .filter(ConversationFile.conv_id == conversation_id)
+            .filter(ConversationFile.audio_url.isnot(None))
+            .first()
+        )
+        
+        if not audio_file:
+            raise HTTPException(status_code=404, detail="음성 대화 파일을 찾을 수 없습니다.")
+        
+        # 4. 화자 매핑 유효성 검사
+        if audio_file.speaker_count:
+            valid_speakers = {str(i) for i in range(audio_file.speaker_count)}
+            invalid_speakers = set(request.speaker_mapping.keys()) - valid_speakers
+            
+            if invalid_speakers:
+                raise HTTPException(
+                    status_code=400, 
+                    detail=f"유효하지 않은 화자 ID: {invalid_speakers}. 유효한 화자: {valid_speakers}"
+                )
+        
+        # 5. 화자 매핑 업데이트
+        audio_file.speaker_mapping = request.speaker_mapping
+        db.commit()
+        
+        logger.info(f"화자 매핑 설정 완료 - 대화 ID: {conversation_id}, 매핑: {request.speaker_mapping}")
+        
+        return SpeakerMappingResponse(
+            conversation_id=str(conversation_id),
+            file_id=audio_file.id,
+            speaker_mapping=request.speaker_mapping,
+            message="화자 매핑이 성공적으로 설정되었습니다."
+        )
+        
+    except HTTPException:
+        db.rollback()
+        raise
+    except Exception as e:
+        db.rollback()
+        logger.error(f"화자 매핑 설정 실패: {str(e)}")
+        raise HTTPException(
+            status_code=500, 
+            detail=f"서버 오류가 발생했습니다: {str(e)}"
+        )
+
+
+@router.get("/audio/{conversation_id}/speaker-mapping")
+async def get_speaker_mapping(
+    conversation_id: UUID,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """
+    음성 대화의 화자 매핑 정보를 조회합니다.
+    
+    Args:
+        conversation_id: 대화 ID
+        current_user: 현재 로그인한 사용자
+        db: 데이터베이스 세션
+        
+    Returns:
+        Dict: 화자 매핑 정보와 매핑된 세그먼트
+    """
+    logger.info(f"화자 매핑 조회 요청 - 사용자: {current_user.id}, 대화 ID: {conversation_id}")
+    
+    try:
+        # 1. Conversation 존재 확인
+        conversation = db.query(Conversation).filter(Conversation.conv_id == conversation_id).first()
+        if not conversation:
+            raise HTTPException(status_code=404, detail="대화를 찾을 수 없습니다.")
+        
+        # 2. 사용자 권한 확인
+        if current_user not in conversation.participants:
+            raise HTTPException(status_code=403, detail="해당 대화에 접근할 권한이 없습니다.")
+        
+        # 3. 음성 파일 정보 조회
+        audio_file = (
+            db.query(ConversationFile)
+            .filter(ConversationFile.conv_id == conversation_id)
+            .filter(ConversationFile.audio_url.isnot(None))
+            .first()
+        )
+        
+        if not audio_file:
+            raise HTTPException(status_code=404, detail="음성 대화 파일을 찾을 수 없습니다.")
+        
+        # 4. 매핑된 세그먼트 생성
+        mapped_segments = []
+        speaker_mapping = audio_file.speaker_mapping or {}
+        
+        if audio_file.speaker_segments:
+            for segment in audio_file.speaker_segments:
+                speaker_id = str(segment.get("speaker", ""))
+                mapped_segments.append({
+                    "speaker": segment.get("speaker"),
+                    "speaker_name": speaker_mapping.get(speaker_id),
+                    "start": segment.get("start"),
+                    "end": segment.get("end"),
+                    "text": segment.get("text")
+                })
+        
+        return {
+            "conversation_id": str(conversation_id),
+            "file_id": audio_file.id,
+            "speaker_mapping": speaker_mapping,
+            "speaker_count": audio_file.speaker_count,
+            "mapped_segments": mapped_segments
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"화자 매핑 조회 실패: {str(e)}")
+        raise HTTPException(
+            status_code=500, 
+            detail=f"서버 오류가 발생했습니다: {str(e)}"
+        )
+
+
+@router.post("/audio/{conversation_id}/improve-speaker-separation")
+async def improve_speaker_separation(
+    conversation_id: UUID,
+    request: SpeakerSplitRequest,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """
+    화자 분리를 개선합니다 (시간 기반 또는 수동 할당).
+    
+    Args:
+        conversation_id: 대화 ID
+        request: 화자 분리 개선 요청
+        current_user: 현재 로그인한 사용자
+        db: 데이터베이스 세션
+        
+    Returns:
+        Dict: 개선된 화자 분리 결과
+    """
+    logger.info(f"화자 분리 개선 요청 - 사용자: {current_user.id}, 대화 ID: {conversation_id}")
+    
+    try:
+        # 1. 권한 확인
+        conversation = db.query(Conversation).filter(Conversation.conv_id == conversation_id).first()
+        if not conversation or current_user not in conversation.participants:
+            raise HTTPException(status_code=403, detail="접근 권한이 없습니다.")
+        
+        # 2. 음성 파일 조회
+        audio_file = (
+            db.query(ConversationFile)
+            .filter(ConversationFile.conv_id == conversation_id)
+            .filter(ConversationFile.audio_url.isnot(None))
+            .first()
+        )
+        
+        if not audio_file or not audio_file.speaker_segments:
+            raise HTTPException(status_code=404, detail="음성 대화 데이터를 찾을 수 없습니다.")
+        
+        # 3. 화자 분리 개선 적용
+        original_segments = audio_file.speaker_segments
+        
+        if request.split_method == "time_based":
+            improved_segments = _improve_by_time_interval(original_segments, request.split_interval)
+        elif request.split_method == "manual" and request.manual_assignments:
+            improved_segments = _apply_manual_assignments(original_segments, request.manual_assignments)
+        else:
+            raise HTTPException(status_code=400, detail="지원하지 않는 분리 방법입니다.")
+        
+        # 4. 결과 저장
+        audio_file.speaker_segments = improved_segments
+        
+        # 화자 수 재계산
+        speakers = set(seg['speaker'] for seg in improved_segments)
+        audio_file.speaker_count = len(speakers)
+        
+        db.commit()
+        
+        logger.info(f"화자 분리 개선 완료 - 대화 ID: {conversation_id}, 방법: {request.split_method}")
+        
+        return {
+            "conversation_id": str(conversation_id),
+            "method": request.split_method,
+            "original_segments": len(original_segments),
+            "improved_segments": len(improved_segments),
+            "speaker_count": audio_file.speaker_count,
+            "message": "화자 분리가 개선되었습니다."
+        }
+        
+    except HTTPException:
+        db.rollback()
+        raise
+    except Exception as e:
+        db.rollback()
+        logger.error(f"화자 분리 개선 실패: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"서버 오류가 발생했습니다: {str(e)}")
+
+
+def _improve_by_time_interval(segments: list, interval: float) -> list:
+    """시간 간격 기반으로 화자 분리 개선"""
+    if not segments:
+        return segments
+    
+    improved_segments = []
+    current_speaker = 0
+    
+    for segment in segments:
+        # 시간 간격에 따라 화자 교대
+        time_slot = int(segment['start'] // interval)
+        new_speaker = time_slot % 2  # 0과 1 사이에서 교대
+        
+        new_segment = segment.copy()
+        new_segment['speaker'] = new_speaker
+        improved_segments.append(new_segment)
+    
+    return improved_segments
+
+
+def _apply_manual_assignments(segments: list, assignments: list) -> list:
+    """수동 할당 적용"""
+    improved_segments = segments.copy()
+    
+    for assignment in assignments:
+        segment_index = assignment.get('segment_index')
+        new_speaker = assignment.get('speaker')
+        
+        if 0 <= segment_index < len(improved_segments):
+            improved_segments[segment_index]['speaker'] = new_speaker
+    
+    return improved_segments

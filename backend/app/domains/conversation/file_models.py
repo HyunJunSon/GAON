@@ -25,6 +25,7 @@ class ConversationFile(Base):
     speaker_segments = Column(JSON, nullable=True)  # 화자별 구간 정보
     duration = Column(Integer, nullable=True)  # 총 대화시간(초)
     speaker_count = Column(Integer, nullable=True)  # 참여자 수
+    speaker_mapping = Column(JSON, nullable=True)  # 화자 매핑 정보 {"0": "아빠", "1": "딸"}
     
     # Relationships
     conversation = relationship("Conversation", back_populates="files")

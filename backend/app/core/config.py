@@ -38,6 +38,12 @@ class Settings(BaseSettings):
     langchain_project: str = "Gaon"
     langchain_api_key: str = ""
 
+    # Hugging Face 설정
+    huggingface_token: str = ""
+    
+    # 화자분리 서비스 설정
+    assemblyai_api_key: str = ""
+
     class Config:
         env_file = ".env"
         extra = "ignore"  # 알려지지 않은 변수들은 무시
