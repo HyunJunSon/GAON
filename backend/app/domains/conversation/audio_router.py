@@ -84,6 +84,7 @@ async def upload_audio_conversation(
         conversation = Conversation(
             title=f"음성 대화 - {file.filename}",
             content=transcript_text[:1000],  # 처음 1000자만 저장
+            id=current_user.id,  # 사용자 ID 저장
             family_id=family_id,
             create_date=datetime.now()
         )

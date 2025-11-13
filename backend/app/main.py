@@ -15,7 +15,11 @@ from .domains.family.models import Family
 app = FastAPI()
 
 # 설정에서 가져온 프론트엔드 URL 또는 기본값 사용
-origins = [settings.frontend_url]
+origins = [
+    settings.frontend_url,
+    "http://localhost:3000",
+    "http://127.0.0.1:3000"
+]
 
 app.add_middleware(
     CORSMiddleware,

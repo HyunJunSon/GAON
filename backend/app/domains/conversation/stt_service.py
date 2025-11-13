@@ -3,6 +3,7 @@ from typing import List, Dict, Any, Optional
 from google.cloud import speech
 from google.cloud.speech import RecognitionAudio, RecognitionConfig, SpeakerDiarizationConfig
 import io
+from .assemblyai_client import AssemblyAIClient
 
 logger = logging.getLogger(__name__)
 
@@ -14,7 +15,8 @@ class STTService:
         """STT 서비스 초기화"""
         try:
             self.client = speech.SpeechClient()
-            logger.info("Google Cloud Speech-to-Text 클라이언트 초기화 완료")
+            self.assemblyai_client = AssemblyAIClient()
+            logger.info("STT 서비스 클라이언트들 초기화 완료")
         except Exception as e:
             logger.error(f"STT 클라이언트 초기화 실패: {str(e)}")
             raise
@@ -82,7 +84,7 @@ class STTService:
         
         diarization_config = SpeakerDiarizationConfig(
             enable_speaker_diarization=True,
-            min_speaker_count=2,  # 최소 화자 수 명시
+            min_speaker_count=1,  # 최소 1명으로 변경 - 더 유연한 화자 감지
             max_speaker_count=max_speakers,
         )
         
@@ -92,8 +94,8 @@ class STTService:
             language_code=language_code,
             diarization_config=diarization_config,
             enable_automatic_punctuation=True,
-            use_enhanced=True,  # 향상된 모델 사용
-            model="latest_short",  # 짧은 오디오용 모델로 변경
+            use_enhanced=False,  # enhanced 모드 비활성화
+            model="latest_short",  # 기본 모델 사용
             enable_word_time_offsets=True,  # 단어별 시간 정보 활성화
         )
         
@@ -125,7 +127,7 @@ class STTService:
             
             diarization_config = SpeakerDiarizationConfig(
                 enable_speaker_diarization=True,
-                min_speaker_count=2,  # 최소 화자 수 명시
+                min_speaker_count=1,  # 최소 1명으로 변경 - 더 유연한 화자 감지
                 max_speaker_count=max_speakers,
             )
             
@@ -135,8 +137,8 @@ class STTService:
                 language_code=language_code,
                 diarization_config=diarization_config,
                 enable_automatic_punctuation=True,
-                use_enhanced=True,  # 향상된 모델 사용
-                model="latest_long",
+                use_enhanced=False,  # enhanced 모드 비활성화
+                model="latest_long",  # 기본 모델 사용
                 enable_word_time_offsets=True,  # 단어별 시간 정보 활성화
             )
             
@@ -352,3 +354,96 @@ class STTService:
         except Exception as e:
             logger.error(f"오디오 형식 검증 실패: {str(e)}")
             return False
+    
+    def compare_speaker_diarization_methods(
+        self, 
+        audio_content: bytes, 
+        filename: str
+    ) -> Dict[str, Any]:
+        """
+        여러 화자분리 방법 비교 테스트
+        """
+        results = {}
+        
+        try:
+            logger.info(f"화자분리 방법 비교 테스트 시작: {filename}")
+            
+            # 1. Google Cloud Speech-to-Text
+            try:
+                results["google_stt"] = self.transcribe_with_diarization(audio_content, filename)
+                logger.info("✅ Google STT 완료")
+            except Exception as e:
+                results["google_stt"] = {"error": str(e)}
+                logger.error(f"❌ Google STT 실패: {e}")
+            
+            # 2. OpenAI Whisper
+            try:
+                results["whisper"] = self.whisper_client.transcribe_with_speakers(audio_content, filename)
+                logger.info("✅ Whisper 완료")
+            except Exception as e:
+                results["whisper"] = {"error": str(e)}
+                logger.error(f"❌ Whisper 실패: {e}")
+            
+            # 3. AssemblyAI
+            try:
+                results["assemblyai"] = self.assemblyai_client.transcribe_with_speakers(audio_content, filename)
+                logger.info("✅ AssemblyAI 완료")
+            except Exception as e:
+                results["assemblyai"] = {"error": str(e)}
+                logger.error(f"❌ AssemblyAI 실패: {e}")
+            
+            # 결과 요약
+            summary = self._create_comparison_summary(results)
+            
+            return {
+                "results": results,
+                "summary": summary,
+                "filename": filename
+            }
+            
+        except Exception as e:
+            logger.error(f"화자분리 비교 테스트 실패: {e}")
+            raise Exception(f"비교 테스트 실패: {e}")
+    
+    def _create_comparison_summary(self, results: Dict) -> Dict[str, Any]:
+        """비교 결과 요약 생성"""
+        summary = {
+            "methods_tested": len(results),
+            "successful_methods": [],
+            "failed_methods": [],
+            "speaker_counts": {},
+            "segment_counts": {},
+            "processing_methods": {}
+        }
+        
+        for method, result in results.items():
+            if "error" in result:
+                summary["failed_methods"].append(method)
+            else:
+                summary["successful_methods"].append(method)
+                summary["speaker_counts"][method] = result.get("speaker_count", 0)
+                summary["segment_counts"][method] = len(result.get("segments", []))
+                summary["processing_methods"][method] = result.get("processing_method", method)
+        
+        return summary
+    def transcribe_with_speaker_diarization(
+        self, 
+        audio_content: bytes, 
+        filename: str
+    ) -> Dict[str, Any]:
+        """
+        AssemblyAI를 사용한 화자분리 음성 인식 (기본 메서드)
+        """
+        try:
+            logger.info(f"화자분리 음성 인식 시작: {filename}")
+            
+            # AssemblyAI로 화자분리 수행
+            result = self.assemblyai_client.transcribe_with_speakers(audio_content, filename)
+            
+            logger.info(f"화자분리 완료: {result['speaker_count']}명, {len(result['segments'])}개 세그먼트")
+            return result
+            
+        except Exception as e:
+            logger.error(f"화자분리 실패, Google STT로 fallback: {e}")
+            # AssemblyAI 실패 시 Google STT로 fallback
+            return self.transcribe_with_diarization(audio_content, filename)

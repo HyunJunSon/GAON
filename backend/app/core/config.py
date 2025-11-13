@@ -40,6 +40,9 @@ class Settings(BaseSettings):
 
     # Hugging Face 설정
     huggingface_token: str = ""
+    
+    # 화자분리 서비스 설정
+    assemblyai_api_key: str = ""
 
     class Config:
         env_file = ".env"
