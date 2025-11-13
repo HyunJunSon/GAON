@@ -6,6 +6,7 @@ import json
 import uuid
 import re
 import unicodedata
+import logging
 from pathlib import Path
 from typing import List, Dict, Any
 import fitz  # pymupdf
@@ -34,6 +35,9 @@ class TOCExtractor:
         """PDF에서 목차 추출"""
         doc = fitz.open(pdf_path)
         toc = doc.get_toc()
+        logging.info(f"PyMuPDF TOC 원본: {len(toc)}개 항목")
+        if toc:
+            logging.info(f"첫 번째 원본 TOC: {toc[0]}")
         doc.close()
         
         if not toc:

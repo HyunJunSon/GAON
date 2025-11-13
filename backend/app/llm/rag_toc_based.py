@@ -1,39 +1,29 @@
 """
-TOC(목차) 기반 RAG 시스템
-rag_test의 새로운 방식을 통합한 고급 RAG 구현체
+TOC(목차) 기반 RAG 시스템 - 검색 전용
+Cloud Functions에서 파일 처리를 담당하므로 검색 기능만 제공
 """
 import json
 import uuid
-import tempfile
 import psycopg2
 import psycopg2.extras as extras
 from typing import List, Dict, Any, Tuple, Optional
 from uuid import UUID
-from pathlib import Path
 from openai import OpenAI
 
 from .rag_interface import AdvancedRAGInterface, RAGConfig
-from .toc_utils import TOCExtractor
-from .toc_chunker import TOCChunker
-from .gcp_utils import GCPStorageManager
 from app.core.config import settings
 
 
 class TOCBasedRAG(AdvancedRAGInterface):
-    """목차 기반 고급 RAG 시스템"""
+    """목차 기반 고급 RAG 시스템 - 검색 전용"""
     
     def __init__(self, config: RAGConfig):
         super().__init__(config)
         self.openai_client = OpenAI(api_key=settings.openai_api_key)
         self.db_connection = self._get_db_connection()
         
-        # 유틸리티 초기화
-        self.toc_extractor = TOCExtractor()
-        self.toc_chunker = TOCChunker()
-        self.gcp_manager = GCPStorageManager(config.extra_config.get("bucket_name"))
-        
         # 설정
-        self.table_name = config.extra_config.get("table_name", "ref_handbook_snippet")
+        self.table_name = config.extra_config.get("table_name", "ideal_answer")
         self.embedding_model = config.extra_config.get("embedding_model", "text-embedding-3-small")
         
     def _get_db_connection(self):
@@ -47,55 +37,14 @@ class TOCBasedRAG(AdvancedRAGInterface):
     def load_and_process_file(self, 
                              source_path: str, 
                              **kwargs) -> List[Dict[str, Any]]:
-        """파일을 로드하고 TOC 기반으로 처리"""
-        results = []
-        
-        try:
-            # GCP에서 파일 다운로드 (필요한 경우)
-            if source_path.startswith("gs://") or not Path(source_path).exists():
-                local_path = self.gcp_manager.download_single_file(source_path)
-            else:
-                local_path = source_path
-            
-            # 1. TOC 추출
-            toc_data = self.toc_extractor.extract_toc_from_pdf(local_path)
-            if not toc_data:
-                return [{"status": "error", "message": "TOC를 추출할 수 없습니다."}]
-            
-            # 2. TOC 기반 청킹
-            chunks = self.toc_chunker.chunk_pdf_by_toc(local_path, toc_data)
-            
-            # 3. 각 청크에 대해 임베딩 생성 및 저장
-            for chunk in chunks:
-                try:
-                    # 임베딩 생성
-                    embedding = self._create_embedding(chunk["embed_text"])
-                    
-                    # 데이터베이스에 저장
-                    chunk_id = self._save_chunk_to_db(chunk, embedding)
-                    
-                    results.append({
-                        "chunk_id": chunk_id,
-                        "section_id": chunk["section_id"],
-                        "canonical_path": chunk["canonical_path"],
-                        "status": "success"
-                    })
-                    
-                except Exception as e:
-                    results.append({
-                        "chunk_id": chunk.get("chunk_id"),
-                        "status": "error",
-                        "error": str(e)
-                    })
-            
-            # 임시 파일 정리
-            if local_path != source_path:
-                Path(local_path).unlink(missing_ok=True)
-            
-            return results
-            
-        except Exception as e:
-            return [{"status": "error", "message": f"파일 처리 실패: {str(e)}"}]
+        """
+        파일 처리는 Cloud Functions에서 담당
+        이 메서드는 호환성을 위해 유지하되 처리 완료 메시지만 반환
+        """
+        return [{
+            "status": "info", 
+            "message": f"파일 처리는 Cloud Functions에서 자동으로 수행됩니다: {source_path}"
+        }]
     
     def search_similar(self, 
                       query: str, 

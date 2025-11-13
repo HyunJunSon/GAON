@@ -8,7 +8,7 @@ from pathlib import Path
 from typing import List, Optional
 from google.cloud import storage
 
-from app.core.config import settings
+from core.config import settings
 
 
 class GCPStorageManager:

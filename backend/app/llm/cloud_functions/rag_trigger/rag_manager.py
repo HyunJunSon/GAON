@@ -5,9 +5,9 @@ RAG 시스템 매니저
 from typing import Dict, Any, Optional
 from enum import Enum
 
-from rag_interface import RAGInterface, AdvancedRAGInterface, RAGConfig, RAGFactory
-from rag_legacy_adapter import LegacyRAGAdapter
-from rag_toc_based import TOCBasedRAG
+from .rag_interface import RAGInterface, AdvancedRAGInterface, RAGConfig, RAGFactory
+from .rag_legacy_adapter import LegacyRAGAdapter
+from .rag_toc_based import TOCBasedRAG
 
 
 class RAGType(Enum):

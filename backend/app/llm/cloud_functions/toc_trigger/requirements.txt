@@ -1,6 +1,16 @@
 functions-framework==3.*
 google-cloud-storage==2.*
 openai==1.*
-psycopg2-binary==2.*
+psycopg2-binary
 pymupdf==1.*
 python-dotenv==1.*
+sqlalchemy==2.*
+pgvector==0.*
+pydantic==2.*
+pydantic-settings==2.*
+numpy==1.*
+tiktoken==0.*
+langchain==0.*
+langchain-openai==0.*
+langchain-community==0.*
+langchain-text-splitters==0.*

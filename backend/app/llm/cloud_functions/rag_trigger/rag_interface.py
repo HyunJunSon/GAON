@@ -15,8 +15,6 @@ class RAGConfig:
     chunker_type: str = "recursive"
     embedding_model: str = "openai"
     vector_db_type: str = "postgresql"
-    chunk_size: int = 1000
-    chunk_overlap: int = 100
     extra_config: Dict[str, Any] = None
     
     def __post_init__(self):

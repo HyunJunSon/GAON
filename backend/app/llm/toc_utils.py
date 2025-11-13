@@ -32,33 +32,55 @@ class TOCExtractor:
     
     def extract_toc_from_pdf(self, pdf_path: str) -> List[Dict[str, Any]]:
         """PDF에서 목차 추출"""
-        doc = fitz.open(pdf_path)
-        toc = doc.get_toc()
-        doc.close()
-        
-        if not toc:
+        try:
+            print(f"[DEBUG] PDF 파일 열기 시도: {pdf_path}")
+            doc = fitz.open(pdf_path)
+            print(f"[DEBUG] PDF 문서 열기 성공, 페이지 수: {doc.page_count}")
+            
+            toc = doc.get_toc()
+            print(f"[DEBUG] TOC 추출 결과: {len(toc) if toc else 0}개 항목")
+            
+            if toc:
+                print(f"[DEBUG] 첫 번째 TOC 항목 예시: {toc[0] if toc else 'None'}")
+            
+            doc.close()
+            
+            if not toc:
+                print("[DEBUG] TOC가 비어있음 - 빈 리스트 반환")
+                return []
+            
+            results = []
+            for i, (level, title, page) in enumerate(toc):
+                print(f"[DEBUG] TOC 항목 {i}: level={level}, title='{title}', page={page}")
+                
+                if self._is_blacklisted_title(title):
+                    print(f"[DEBUG] 블랙리스트 제목으로 스킵: '{title}'")
+                    continue
+                
+                normalized_title = self._norm_title(title)
+                if not normalized_title:
+                    print(f"[DEBUG] 정규화 후 빈 제목으로 스킵: '{title}' -> '{normalized_title}'")
+                    continue
+                
+                toc_entry = {
+                    "toc_id": str(uuid.uuid4()),
+                    "level": level,
+                    "title": normalized_title,
+                    "page": page,
+                    "book_name": Path(pdf_path).stem,
+                    "safe_title": self._safe_name(normalized_title)
+                }
+                results.append(toc_entry)
+                print(f"[DEBUG] TOC 항목 추가: {toc_entry}")
+            
+            print(f"[DEBUG] 최종 TOC 결과: {len(results)}개 항목")
+            return results
+            
+        except Exception as e:
+            print(f"[ERROR] TOC 추출 중 오류 발생: {e}")
+            import traceback
+            traceback.print_exc()
             return []
-        
-        results = []
-        for level, title, page in toc:
-            if self._is_blacklisted_title(title):
-                continue
-            
-            normalized_title = self._norm_title(title)
-            if not normalized_title:
-                continue
-            
-            toc_entry = {
-                "toc_id": str(uuid.uuid4()),
-                "level": level,
-                "title": normalized_title,
-                "page": page,
-                "book_name": Path(pdf_path).stem,
-                "safe_title": self._safe_name(normalized_title)
-            }
-            results.append(toc_entry)
-        
-        return results
     
     def _is_blacklisted_title(self, raw_title: str) -> bool:
         """블랙리스트 제목 확인"""

@@ -5,8 +5,8 @@
 from typing import Dict, Any, List
 from pathlib import Path
 
-from rag_manager import get_rag_manager, RAGType, RAGConfig
-from rag_interface import RAGInterface
+from .rag_manager import get_rag_manager, RAGType, RAGConfig
+from .rag_interface import RAGInterface
 
 
 class RAGAutoSelector:

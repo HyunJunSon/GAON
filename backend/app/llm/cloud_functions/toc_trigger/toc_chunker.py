@@ -6,6 +6,7 @@ import json
 import uuid
 import re
 import unicodedata
+import logging
 from pathlib import Path
 from typing import List, Dict, Tuple, Any
 import fitz
@@ -20,6 +21,7 @@ class TOCChunker:
     
     def chunk_pdf_by_toc(self, pdf_path: str, toc_data: List[Dict]) -> List[Dict[str, Any]]:
         """TOC 기반으로 PDF 청킹"""
+        logging.info(f"청킹 시작: {len(toc_data)}개 TOC 항목")
         doc = fitz.open(pdf_path)
         
         # TOC 데이터를 계층 구조로 정리
@@ -27,23 +29,30 @@ class TOCChunker:
         
         # 리프 노드(최하위 목차)만 추출
         leaf_entries = [entry for entry in toc_data if entry["toc_id"] not in children_index]
+        logging.info(f"리프 노드: {len(leaf_entries)}개")
         
         chunks = []
-        for entry in leaf_entries:
+        for i, entry in enumerate(leaf_entries):
+            logging.info(f"처리 중 {i+1}/{len(leaf_entries)}: {entry['title']}")
             # 해당 섹션의 텍스트 추출
             section_text = self._extract_section_text(doc, entry, toc_data)
             
             if not section_text.strip():
+                logging.warning(f"빈 텍스트: {entry['title']}")
                 continue
+            
+            logging.info(f"텍스트 길이: {len(section_text)} 문자")
             
             # 계층 구조 정보 생성
             hierarchy = self._build_hierarchy(entry, parent_index)
             
             # 청킹 수행
             section_chunks = self._chunk_text(section_text, entry, hierarchy)
+            logging.info(f"생성된 청크: {len(section_chunks)}개")
             chunks.extend(section_chunks)
         
         doc.close()
+        logging.info(f"총 청크 수: {len(chunks)}")
         return chunks
     
     def _build_parent_index(self, toc_data: List[Dict]) -> Tuple[Dict[str, Dict], Dict[str, List[Dict]]]:

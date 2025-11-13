@@ -24,14 +24,9 @@ class LegacyRAGAdapter(RAGInterface):
     def load_and_process_file(self, 
                              source_path: str, 
                              **kwargs) -> List[Dict[str, Any]]:
-        """
-        파일 처리는 Cloud Functions에서 담당
-        Legacy RAG는 검색 전용으로 사용
-        """
-        return [{
-            "status": "info", 
-            "message": f"파일 처리는 Cloud Functions에서 자동으로 수행됩니다: {source_path}"
-        }]
+        """파일을 로드하고 처리하여 임베딩 생성"""
+        chunk_kwargs = kwargs.get('chunk_kwargs', {})
+        return self.rag_system.load_and_process_file(source_path, chunk_kwargs)
     
     def search_similar(self, 
                       query: str, 
