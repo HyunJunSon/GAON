@@ -7,6 +7,7 @@ import { useServerError } from '@/hooks/useServerError';
 import ErrorAlert from '@/components/ui/ErrorAlert';
 import FileDropzone from '@/components/upload/FileDropzone';
 import AudioRecorder from '@/components/upload/AudioRecorder';
+import SpeakerMappingModal from '@/components/upload/SpeakerMappingModal';
 import { uploadAudio, getConversationId } from '@/apis/analysis';
 import { useRouter } from 'next/navigation';
 
@@ -24,6 +25,9 @@ const MAX_MB = 10; // 백엔드 설정과 동일
 export default function ConversationPage() {
   const [activeTab, setActiveTab] = useState<'text' | 'audio'>('text');
   const [file, setFile] = useState<File | null>(null);
+  const [showSpeakerModal, setShowSpeakerModal] = useState(false);
+  const [currentConversationId, setCurrentConversationId] = useState<string | null>(null);
+  const [modalStatus, setModalStatus] = useState<'uploading' | 'processing' | 'ready'>('uploading');
   const { mutate, isPending } = useStartAnalysis();
   const { serverError, handleError, clearError } = useServerError();
   const router = useRouter();
@@ -46,16 +50,45 @@ export default function ConversationPage() {
     
     try {
       console.log('음성 업로드 시작:', blob.size, 'bytes');
+      
+      // 모달 표시 및 업로드 상태
+      setModalStatus('uploading');
+      setShowSpeakerModal(true);
+      
       const result = await uploadAudio(blob);
       const conversationId = getConversationId(result);
+      setCurrentConversationId(conversationId);
       
       console.log('업로드 완료, conversationId:', conversationId);
-      router.push(`/analysis/${conversationId}/summary`);
+      
+      // STT 처리 중 상태로 변경
+      setModalStatus('processing');
+      
+      // STT 완료 대기 (실제로는 폴링이나 웹소켓으로 상태 확인)
+      setTimeout(() => {
+        setModalStatus('ready');
+      }, 3000); // 임시로 3초 후 ready 상태
       
     } catch (err) {
       console.error('업로드 실패:', err);
       handleError(err instanceof Error ? err : new Error('음성 업로드 중 오류가 발생했습니다.'));
+      setShowSpeakerModal(false);
     }
+  };
+
+  const handleSpeakerMappingComplete = (mapping: Record<string, string>) => {
+    console.log('화자 맵핑 완료:', mapping);
+    
+    if (currentConversationId) {
+      // 분석 결과 페이지로 이동
+      router.push(`/analysis/${currentConversationId}/summary`);
+    }
+  };
+
+  const handleModalClose = () => {
+    setShowSpeakerModal(false);
+    setCurrentConversationId(null);
+    setModalStatus('uploading');
   };
 
   return (
@@ -150,6 +183,15 @@ export default function ConversationPage() {
           </div>
         </section>
       )}
+      
+      {/* 화자 맵핑 모달 */}
+      <SpeakerMappingModal
+        conversationId={currentConversationId || ''}
+        isOpen={showSpeakerModal}
+        onClose={handleModalClose}
+        onComplete={handleSpeakerMappingComplete}
+        status={modalStatus}
+      />
     </main>
   );
 }
