@@ -161,31 +161,44 @@ async def start_analysis_pipeline(
 
 
 async def run_agent_pipeline_async(conversation_id: str, user_id: int):
-    """비동기 Agent 파이프라인 실행"""
+    """비동기 Agent 파이프라인 실행 (재시도 로직 포함)"""
     try:
-        logger.info(f"Agent 파이프라인 실행 시작: conv_id={conversation_id}")
+        logger.info(f"재시도 가능한 Agent 파이프라인 실행 시작: conv_id={conversation_id}")
         
-        # Agent 파이프라인 실행 (별도 스레드에서)
-        loop = asyncio.get_event_loop()
-        result = await loop.run_in_executor(
-            None, 
-            execute_agent_pipeline, 
-            conversation_id
-        )
+        # 재시도 로직이 포함된 파이프라인 실행
+        from app.llm.agent.retry_pipeline import run_agent_pipeline_with_retry
         
-        logger.info(f"Agent 파이프라인 완료: conv_id={conversation_id}, result={result}")
+        result = await run_agent_pipeline_with_retry(conversation_id)
+        
+        logger.info(f"Agent 파이프라인 완료: conv_id={conversation_id}, status={result.get('status')}")
+        
+        # 성공/실패에 따른 추가 처리 (알림 등)
+        if result.get("status") == "completed":
+            logger.info(f"분석 성공: score={result.get('score')}, confidence={result.get('confidence')}")
+        else:
+            logger.error(f"분석 실패: {result.get('error')}")
+        
+        return result
         
     except Exception as e:
         logger.error(f"Agent 파이프라인 실행 실패: conv_id={conversation_id}, error={str(e)}")
+        return {"status": "failed", "error": str(e)}
 
 
 def execute_agent_pipeline(conversation_id: str):
-    """Agent 파이프라인 실행 (동기)"""
-    from app.llm.agent.main_run import main as run_agent_main
+    """Agent 파이프라인 실행 (동기) - 레거시 호환용"""
+    import asyncio
     
     # 환경 변수 설정
     import os
     os.environ["USE_TEST_DB"] = "false"
     
-    # Agent 파이프라인 실행
-    return run_agent_main()
+    # 비동기 파이프라인 실행
+    loop = asyncio.new_event_loop()
+    asyncio.set_event_loop(loop)
+    try:
+        return loop.run_until_complete(
+            run_agent_pipeline_async(conversation_id, 0)
+        )
+    finally:
+        loop.close()
