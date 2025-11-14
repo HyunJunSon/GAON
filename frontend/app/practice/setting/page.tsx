@@ -1,18 +1,15 @@
 'use client';
 
 import { useSearchParams, useRouter } from 'next/navigation';
-import { useState, useMemo } from 'react';
+import { useState, useMemo, Suspense } from 'react';
 import type { PracticeMode } from '@/schemas/practice';
 import { useParticipants, useStartPractice } from '@/hooks/usePractice';
 import { conversationIdStorage } from '@/utils/conversationIdStorage';
 
 /**
- * 연습 설정 페이지
- * - 연습 모드 선택: 새로운 대화 / 기존 대화 이어가기
- * - 대화 상대 선택(복수): 서버에서 participants 조회
- * - "대화 시작하기": 세션 생성 → /practice/chat/[sessionId]
+ * 연습 설정 페이지 내부 컴포넌트
  */
-export default function PracticeSettingPage() {
+function PracticeSettingContent() {
   const router = useRouter();
   const sp = useSearchParams();
 
@@ -67,7 +64,7 @@ export default function PracticeSettingPage() {
         </p>
         <p className="text-sm text-gray-600">
           먼저 대화를 업로드하고 분석을 완료한 뒤, 분석 결과 페이지에서{' '}
-          <strong>“연습하러 가기”</strong> 버튼을 눌러 주세요.
+          <strong>"연습하러 가기"</strong> 버튼을 눌러 주세요.
         </p>
       </main>
     );
@@ -158,5 +155,26 @@ export default function PracticeSettingPage() {
         {start.isPending ? '세션 생성 중…' : '대화 시작하기'}
       </button>
     </main>
+  );
+}
+
+/**
+ * 연습 설정 페이지
+ * - 연습 모드 선택: 새로운 대화 / 기존 대화 이어가기
+ * - 대화 상대 선택(복수): 서버에서 participants 조회
+ * - "대화 시작하기": 세션 생성 → /practice/chat/[sessionId]
+ */
+export default function PracticeSettingPage() {
+  return (
+    <Suspense fallback={
+      <main className="mx-auto max-w-2xl p-6">
+        <div className="animate-pulse space-y-4">
+          <div className="h-6 bg-gray-200 rounded w-32"></div>
+          <div className="h-4 bg-gray-200 rounded w-48"></div>
+        </div>
+      </main>
+    }>
+      <PracticeSettingContent />
+    </Suspense>
   );
 }
