@@ -60,9 +60,16 @@ class VectorDBManager:
         Args:
             connection_string: PostgreSQL 연결 문자열 (선택사항, 기본값은 설정에서 가져옴)
         """
-        # 설정에서 연결 정보 가져오기
+        # 설정에서 연결 정보 가져오기 (config.py에서 이미 Secret Manager 처리됨)
         if connection_string is None:
             connection_string = settings.database_url
+            
+        print(f"사용할 URL: {connection_string[:50]}...")
+        
+        # SQLAlchemy 형식으로 변환 (postgresql+psycopg2:// 제거)
+        if connection_string.startswith("postgresql+psycopg2://"):
+            connection_string = connection_string.replace("postgresql+psycopg2://", "postgresql://")
+            print("URL 변환: postgresql+psycopg2:// -> postgresql://")
             
         # pgvector 확장을 고려하여 엔진 생성
         self.engine = create_engine(connection_string)

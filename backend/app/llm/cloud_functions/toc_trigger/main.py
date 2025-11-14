@@ -34,12 +34,37 @@ def toc_pdf_processor(cloud_event):
             print(f"TOC RAG는 PDF만 지원: {file_name}")
             return
         
-        # 리팩토링 후: 파일 처리는 더 이상 필요하지 않음
-        # TOC 기반 RAG는 검색 전용으로 변경됨
-        print(f"TOC RAG 리팩토링 완료: 파일 처리는 더 이상 수행하지 않습니다 - {file_name}")
-        print("파일 처리 로직이 제거되었습니다. 검색 전용 RAG로 변경되었습니다.")
+        # 실제 TOC 기반 파일 처리 수행
+        from rag_toc_based import TOCBasedRAG
+        from rag_interface import RAGConfig
         
-        return "TOC RAG 리팩토링 완료: 파일 처리 로직 제거됨"
+        print(f"TOC 파일 처리 시작: {file_name}")
+        
+        # GCS 경로 구성
+        gcs_path = f"gs://{bucket}/{file_name}"
+        
+        # TOC 기반 RAG 설정
+        config = RAGConfig(
+            storage_type="gcp",
+            chunker_type="toc_based",
+            embedding_model="openai",
+            vector_db_type="postgresql",
+            extra_config={
+                "bucket_name": bucket,
+                "embedding_model": "text-embedding-3-small",
+                "table_name": "ideal_answer"
+            }
+        )
+        
+        # TOC RAG 시스템으로 처리
+        toc_rag = TOCBasedRAG(config)
+        results = toc_rag.load_and_process_file(gcs_path)
+        
+        print(f"TOC 파일 처리 완료: {len(results)}개 결과")
+        for i, result in enumerate(results[:3]):  # 처음 3개만 로그
+            print(f"결과 {i+1}: {result}")
+        
+        return f"TOC 파일 처리 완료: {len(results)}개 청크 생성"
         
     except Exception as e:
         print(f"TOC RAG 처리 실패: {str(e)}")
