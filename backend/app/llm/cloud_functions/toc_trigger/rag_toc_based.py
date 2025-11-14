@@ -6,7 +6,7 @@ import json
 import tempfile
 import logging
 from typing import List, Dict, Any, Tuple, Optional
-from uuid import UUID, uuid4
+from uuid import UUID, uuid4, uuid5, NAMESPACE_DNS
 from pathlib import Path
 from openai import OpenAI
 
@@ -111,15 +111,22 @@ class TOCBasedRAG(AdvancedRAGInterface):
         results = []
         
         try:
+            # 원본 파일명 추출
+            original_filename = Path(source_path).name if source_path.startswith("gs://") else Path(source_path).stem
+            
             # GCP에서 파일 다운로드 (필요한 경우)
             if source_path.startswith("gs://") or not Path(source_path).exists():
                 local_path = self.gcp_manager.download_single_file(source_path)
             else:
                 local_path = source_path
             
-            # 1. TOC 추출
+            # 1. TOC 추출 (원본 파일명 전달)
             try:
                 toc_data = self.toc_extractor.extract_toc_from_pdf(local_path)
+                # 원본 파일명을 TOC 데이터에 추가
+                for entry in toc_data:
+                    entry["book_name"] = Path(original_filename).stem
+                    
                 print(f"TOC 추출 결과: {len(toc_data)}개 항목")
                 if toc_data:
                     print(f"첫 번째 TOC 항목: {toc_data[0]}")
@@ -175,8 +182,13 @@ class TOCBasedRAG(AdvancedRAGInterface):
         """청크를 데이터베이스에 저장 (SQLAlchemy 방식)"""
         session = self.SessionLocal()
         try:
+            # book_id 생성 (파일명 기반으로 일관된 UUID)
+            book_title = chunk.get("book_title", "Unknown")
+            book_id = uuid5(NAMESPACE_DNS, book_title)
+            
             # IdealAnswer 객체 생성
             ideal_answer = IdealAnswer(
+                book_id=book_id,
                 book_title=chunk.get("book_title"),
                 l1_title=chunk.get("l1_title"),
                 l2_title=chunk.get("l2_title"), 

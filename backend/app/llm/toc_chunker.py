@@ -136,15 +136,21 @@ class TOCChunker:
     
     def _build_hierarchy(self, entry: Dict, parent_index: Dict[str, Dict]) -> Dict[str, str]:
         """계층 구조 정보 생성"""
-        hierarchy = {"l3_title": entry["title"]}  # 현재 레벨을 L3로 가정
+        hierarchy = {}
+        
+        # 현재 항목의 레벨에 따라 적절한 위치에 배치
+        current_level = entry["level"]
+        level_map = {1: "l1_title", 2: "l2_title", 3: "l3_title"}
+        
+        # 현재 항목 배치
+        if current_level in level_map:
+            hierarchy[level_map[current_level]] = entry["title"]
         
         # 부모들을 거슬러 올라가며 계층 구조 구축
         current = entry
-        level_map = {3: "l3_title", 2: "l2_title", 1: "l1_title"}
-        
         while current["toc_id"] in parent_index:
             parent = parent_index[current["toc_id"]]
-            parent_level = min(parent["level"], 2)  # L1, L2로 제한
+            parent_level = parent["level"]
             
             if parent_level in level_map:
                 hierarchy[level_map[parent_level]] = parent["title"]

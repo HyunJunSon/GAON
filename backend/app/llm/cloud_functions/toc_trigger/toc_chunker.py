@@ -6,7 +6,6 @@ import json
 import uuid
 import re
 import unicodedata
-import logging
 from pathlib import Path
 from typing import List, Dict, Tuple, Any
 import fitz
@@ -15,44 +14,74 @@ import fitz
 class TOCChunker:
     """TOC 기반 청킹 처리기"""
     
+    # 📌 블랙리스트 강화: 프롤로그/머리말/처음으로/추천사도 제외
+    BLACK_TITLES = {
+        "차례", "목차", "판권", "표지",
+        "프롤로그", "머리말", "추천사",
+        "저자 소개", "여는 말",
+        "책의 시작", "처음으로",
+    }
+    
+    # 📌 정확 일치 블랙리스트 (오탐 방지용)
+    NORMALIZE_MAP = {
+        "저자소개": "저자 소개",
+        "여는말": "여는 말",
+    }
+    
     def __init__(self, min_chars: int = 600, max_chars: int = 800):
         self.min_chars = min_chars
         self.max_chars = max_chars
     
+    def _is_blacklisted(self, title: str) -> bool:
+        """제목이 블랙리스트에 포함되는지 확인"""
+        if not title:
+            return True
+            
+        # 정규화
+        normalized_title = self.NORMALIZE_MAP.get(title.strip(), title.strip())
+        
+        # 정확 일치 확인
+        if normalized_title in self.BLACK_TITLES:
+            return True
+            
+        # 부분 일치 확인 (프롤로그, 머리말 등)
+        for black_item in self.BLACK_TITLES:
+            if black_item in normalized_title:
+                return True
+                
+        return False
+    
     def chunk_pdf_by_toc(self, pdf_path: str, toc_data: List[Dict]) -> List[Dict[str, Any]]:
-        """TOC 기반으로 PDF 청킹"""
-        logging.info(f"청킹 시작: {len(toc_data)}개 TOC 항목")
+        """TOC 기반으로 PDF 청킹 (블랙리스트 필터링 포함)"""
         doc = fitz.open(pdf_path)
         
+        # 📌 블랙리스트 필터링 적용
+        filtered_toc = [entry for entry in toc_data if not self._is_blacklisted(entry.get("title", ""))]
+        
+        print(f"📋 TOC 필터링: {len(toc_data)} → {len(filtered_toc)} (블랙리스트 {len(toc_data) - len(filtered_toc)}개 제외)")
+        
         # TOC 데이터를 계층 구조로 정리
-        parent_index, children_index = self._build_parent_index(toc_data)
+        parent_index, children_index = self._build_parent_index(filtered_toc)
         
         # 리프 노드(최하위 목차)만 추출
-        leaf_entries = [entry for entry in toc_data if entry["toc_id"] not in children_index]
-        logging.info(f"리프 노드: {len(leaf_entries)}개")
+        leaf_entries = [entry for entry in filtered_toc if entry["toc_id"] not in children_index]
         
         chunks = []
-        for i, entry in enumerate(leaf_entries):
-            logging.info(f"처리 중 {i+1}/{len(leaf_entries)}: {entry['title']}")
+        for entry in leaf_entries:
             # 해당 섹션의 텍스트 추출
-            section_text = self._extract_section_text(doc, entry, toc_data)
+            section_text = self._extract_section_text(doc, entry, filtered_toc)
             
             if not section_text.strip():
-                logging.warning(f"빈 텍스트: {entry['title']}")
                 continue
-            
-            logging.info(f"텍스트 길이: {len(section_text)} 문자")
             
             # 계층 구조 정보 생성
             hierarchy = self._build_hierarchy(entry, parent_index)
             
             # 청킹 수행
             section_chunks = self._chunk_text(section_text, entry, hierarchy)
-            logging.info(f"생성된 청크: {len(section_chunks)}개")
             chunks.extend(section_chunks)
         
         doc.close()
-        logging.info(f"총 청크 수: {len(chunks)}")
         return chunks
     
     def _build_parent_index(self, toc_data: List[Dict]) -> Tuple[Dict[str, Dict], Dict[str, List[Dict]]]:
@@ -107,15 +136,21 @@ class TOCChunker:
     
     def _build_hierarchy(self, entry: Dict, parent_index: Dict[str, Dict]) -> Dict[str, str]:
         """계층 구조 정보 생성"""
-        hierarchy = {"l3_title": entry["title"]}  # 현재 레벨을 L3로 가정
+        hierarchy = {}
+        
+        # 현재 항목의 레벨에 따라 적절한 위치에 배치
+        current_level = entry["level"]
+        level_map = {1: "l1_title", 2: "l2_title", 3: "l3_title"}
+        
+        # 현재 항목 배치
+        if current_level in level_map:
+            hierarchy[level_map[current_level]] = entry["title"]
         
         # 부모들을 거슬러 올라가며 계층 구조 구축
         current = entry
-        level_map = {3: "l3_title", 2: "l2_title", 1: "l1_title"}
-        
         while current["toc_id"] in parent_index:
             parent = parent_index[current["toc_id"]]
-            parent_level = min(parent["level"], 2)  # L1, L2로 제한
+            parent_level = parent["level"]
             
             if parent_level in level_map:
                 hierarchy[level_map[parent_level]] = parent["title"]
@@ -163,14 +198,19 @@ class TOCChunker:
     
     def _create_chunk(self, text: str, entry: Dict, hierarchy: Dict[str, str], chunk_idx: int) -> Dict[str, Any]:
         """청크 데이터 생성"""
-        # embed_text 생성 (계층 구조 + 본문)
-        path_parts = []
+        # 📌 embed_text 생성: 대제목+중제목+소제목+본문 형식
+        title_parts = []
         for level in ["l1_title", "l2_title", "l3_title"]:
             if level in hierarchy and hierarchy[level]:
-                path_parts.append(hierarchy[level])
+                title_parts.append(hierarchy[level])
         
-        canonical_path = " > ".join(path_parts)
-        embed_text = f"[{canonical_path}] {text}" if canonical_path else text
+        canonical_path = " > ".join(title_parts)
+        
+        # 📌 요구사항에 맞는 embed_text 형식: 대제목+중제목+소제목+본문
+        embed_text = " + ".join(title_parts + [text]) if title_parts else text
+        
+        # 📌 book_title을 파일명에서 추출
+        book_title = Path(entry.get('book_name', 'Unknown')).stem
         
         return {
             "chunk_id": str(uuid.uuid4()),
@@ -181,7 +221,8 @@ class TOCChunker:
             "page_end": entry["page"],  # 단순화
             "full_text": text,
             "embed_text": embed_text.strip(),
-            "citation": f"{entry['book_name']}, p.{entry['page']}",
+            "citation": f"{book_title}, {canonical_path}, p.{entry['page']}",  # 📌 개선된 citation
+            "book_title": book_title,  # 📌 파일명 기반 책 제목
             **hierarchy
         }
     
