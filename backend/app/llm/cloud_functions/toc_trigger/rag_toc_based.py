@@ -186,6 +186,17 @@ class TOCBasedRAG(AdvancedRAGInterface):
             book_title = chunk.get("book_title", "Unknown")
             book_id = uuid5(NAMESPACE_DNS, book_title)
             
+            # 중복 체크: 같은 book_id + canonical_path + chunk_ix 조합 확인
+            existing = session.query(IdealAnswer).filter(
+                IdealAnswer.book_id == book_id,
+                IdealAnswer.canonical_path == chunk.get("canonical_path"),
+                IdealAnswer.chunk_ix == chunk.get("chunk_ix")
+            ).first()
+            
+            if existing:
+                print(f"중복 데이터 스킵: {chunk.get('canonical_path')} (chunk {chunk.get('chunk_ix')})")
+                return str(existing.snippet_id)
+            
             # IdealAnswer 객체 생성
             ideal_answer = IdealAnswer(
                 book_id=book_id,
