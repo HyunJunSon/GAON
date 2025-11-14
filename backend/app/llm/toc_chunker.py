@@ -14,12 +14,13 @@ import fitz
 class TOCChunker:
     """TOC 기반 청킹 처리기"""
     
-    # 📌 블랙리스트 강화: 프롤로그/머리말/처음으로/추천사도 제외
+    # 📌 블랙리스트 강화: 프롤로그/머리말/처음으로/추천사/에필로그도 제외
     BLACK_TITLES = {
         "차례", "목차", "판권", "표지",
         "프롤로그", "머리말", "추천사",
         "저자 소개", "여는 말",
         "책의 시작", "처음으로",
+        "에필로그",
     }
     
     # 📌 정확 일치 블랙리스트 (오탐 방지용)
@@ -65,6 +66,18 @@ class TOCChunker:
         
         # 리프 노드(최하위 목차)만 추출
         leaf_entries = [entry for entry in filtered_toc if entry["toc_id"] not in children_index]
+        
+        # 📌 각 섹션의 끝 페이지 계산
+        for i, entry in enumerate(leaf_entries):
+            start_page = entry["page"]
+            # 다음 섹션의 시작 페이지를 찾아서 끝 페이지 결정
+            if i + 1 < len(leaf_entries):
+                end_page = leaf_entries[i + 1]["page"] - 1
+            else:
+                end_page = len(doc) - 1  # 마지막 섹션은 문서 끝까지
+            
+            entry["page_start"] = start_page
+            entry["page_end"] = max(start_page, end_page)  # 최소한 시작 페이지와 같거나 큰 값
         
         chunks = []
         for entry in leaf_entries:
@@ -206,8 +219,8 @@ class TOCChunker:
         
         canonical_path = " > ".join(title_parts)
         
-        # 📌 요구사항에 맞는 embed_text 형식: 대제목+중제목+소제목+본문
-        embed_text = " + ".join(title_parts + [text]) if title_parts else text
+        # 📌 embed_text 형식: [canonical_path] full_text
+        embed_text = f"[{canonical_path}] {text}" if canonical_path else text
         
         # 📌 book_title을 파일명에서 추출
         book_title = Path(entry.get('book_name', 'Unknown')).stem
@@ -217,11 +230,11 @@ class TOCChunker:
             "section_id": entry["toc_id"],
             "canonical_path": canonical_path,
             "chunk_ix": chunk_idx,
-            "page_start": entry["page"],
-            "page_end": entry["page"],  # 단순화
+            "page_start": entry.get("page_start", entry["page"]),
+            "page_end": entry.get("page_end", entry["page"]),
             "full_text": text,
             "embed_text": embed_text.strip(),
-            "citation": f"{book_title}, {canonical_path}, p.{entry['page']}",  # 📌 개선된 citation
+            "citation": f"{book_title}, {canonical_path}, p.{entry.get('page_start', entry['page'])}-{entry.get('page_end', entry['page'])}",
             "book_title": book_title,  # 📌 파일명 기반 책 제목
             **hierarchy
         }
