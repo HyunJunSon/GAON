@@ -6,8 +6,12 @@ from app.core.config import settings
 from langchain_openai import ChatOpenAI
 import pandas as pd
 from sqlalchemy.orm import Session
+import logging
 
 from app.llm.agent.crud import update_analysis_result, get_analysis_by_conv_id
+from app.llm.cloud_functions.rag_trigger.rag.vector_db.vector_db_manager import VectorDBManager, EmbeddingService
+
+logger = logging.getLogger(__name__)
 
 
 # =====================================
@@ -279,3 +283,155 @@ class AnalysisSaver:
             import traceback
             traceback.print_exc()
             return {"status": "error", "error": str(e)}
+
+
+# =====================================
+# ✅ RAG 기반 피드백 생성기
+# =====================================
+@dataclass
+class RAGFeedbackGenerator:
+    """RAG를 활용한 피드백 생성"""
+    verbose: bool = False
+
+    def generate_feedback(self, analysis_result: Dict[str, Any]) -> Dict[str, Any]:
+        """분석 결과를 바탕으로 RAG 검색 후 피드백 생성"""
+        try:
+            if self.verbose:
+                print(f"   🤖 [RAGFeedbackGenerator] 피드백 생성 시작")
+            
+            # RAG 시스템 초기화
+            vector_db_manager = VectorDBManager()
+            embedding_service = EmbeddingService(vector_db_manager)
+            
+            # 분석 결과에서 핵심 키워드 추출
+            summary = analysis_result.get("summary", "")
+            statistics = analysis_result.get("statistics", {})
+            
+            # 검색 쿼리 생성 (대화의 핵심 문제점과 개선 필요 영역)
+            search_query = f"""
+            가족 대화 분석:
+            {summary}
+            
+            주요 이슈:
+            - 감정 표현: {statistics.get('emotion_distribution', {})}
+            - 대화 패턴: 총 {statistics.get('total_utterances', 0)}회 발화
+            - 소통 스타일 개선 필요
+            """
+            
+            # RAG에서 관련 책 조언 검색
+            book_advice = []
+            try:
+                # 쿼리 임베딩 생성
+                query_embedding = embedding_service.create_embedding(search_query)
+                
+                # 관련 조언 검색 (60% 이상 유사도만)
+                similar_results = vector_db_manager.find_similar(
+                    query_embedding=query_embedding,
+                    top_k=3,
+                    threshold=0.6  # 60% 이상 유사도
+                )
+                
+                book_advice = [
+                    {
+                        "advice": content,
+                        "similarity": similarity,
+                        "source_id": str(advice_id)
+                    }
+                    for content, similarity, advice_id in similar_results
+                    if similarity >= 0.6  # 60% 이상만 포함
+                ]
+                
+                if self.verbose:
+                    print(f"      → RAG 검색 완료: {len(book_advice)}개 관련 조언 발견")
+                
+            except Exception as e:
+                logger.warning(f"RAG 검색 실패, 기본 피드백으로 진행: {str(e)}")
+            
+            # LLM을 사용한 피드백 생성
+            llm = ChatOpenAI(
+                model="gpt-4o-mini",
+                temperature=0.3,
+                api_key=settings.openai_api_key
+            )
+            
+            # 시스템 프롬프트 (책 조언 포함)
+            system_prompt = """
+당신은 가족 대화 분석 전문가입니다. 
+분석 결과를 바탕으로 구체적이고 실용적인 개선 피드백을 제공해주세요.
+
+**피드백 작성 원칙:**
+1. 긍정적인 부분을 먼저 언급
+2. 개선이 필요한 부분을 구체적으로 지적
+3. 실천 가능한 개선 방안 제시
+4. 가족 관계 개선에 도움이 되는 조언
+
+**출력 형식:**
+## 잘하고 있는 점
+- [구체적인 긍정적 피드백]
+
+## 개선이 필요한 부분  
+- [구체적인 개선점]
+
+## 실천 방안
+- [구체적인 실천 방법]
+"""
+
+            # 관련 책 조언이 있으면 프롬프트에 추가
+            if book_advice:
+                advice_text = "\n".join([
+                    f"📚 조언 {i+1} (관련도: {advice['similarity']:.1%}): {advice['advice']}"
+                    for i, advice in enumerate(book_advice)
+                ])
+                system_prompt += f"""
+
+## 참고할 전문가 조언
+다음은 이 대화 상황과 관련된 전문서적의 조언들입니다 (60% 이상 관련도):
+
+{advice_text}
+
+위 전문가 조언들을 참고하여 더 구체적이고 근거 있는 피드백을 제공해주세요.
+조언을 직접 인용하거나 참고했다면 "전문가 조언에 따르면..." 등으로 언급해주세요.
+"""
+
+            # 사용자 메시지 구성
+            user_message = f"""
+다음 대화 분석 결과를 바탕으로 피드백을 작성해주세요:
+
+**분석 요약:**
+{summary}
+
+**주요 통계:**
+{statistics}
+
+**분석 점수:** {analysis_result.get('score', 0)}/100
+**신뢰도:** {analysis_result.get('confidence_score', 0)}/100
+"""
+
+            # LLM 호출
+            from langchain_core.messages import HumanMessage, SystemMessage
+            messages = [
+                SystemMessage(content=system_prompt),
+                HumanMessage(content=user_message)
+            ]
+            
+            response = llm.invoke(messages)
+            feedback = response.content
+            
+            if self.verbose:
+                print(f"      → 피드백 생성 완료 (길이: {len(feedback)}자, 조언: {len(book_advice)}개)")
+            
+            return {
+                "status": "success",
+                "feedback": feedback,
+                "book_advice": book_advice,
+                "rag_used": len(book_advice) > 0,
+                "book_advice_count": len(book_advice)
+            }
+            
+        except Exception as e:
+            logger.error(f"RAG 피드백 생성 실패: {str(e)}")
+            return {
+                "status": "error",
+                "error": str(e),
+                "feedback": None
+            }

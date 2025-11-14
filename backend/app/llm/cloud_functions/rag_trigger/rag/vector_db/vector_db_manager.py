@@ -7,13 +7,13 @@ from typing import List, Dict, Any, Optional, Tuple
 from uuid import UUID, uuid4
 from datetime import datetime
 
-from sqlalchemy import create_engine, Column, String, Text, DateTime, ForeignKey
+from sqlalchemy import create_engine, Column, String, Text, DateTime, ForeignKey, Integer
 from sqlalchemy.dialects.postgresql import UUID as PostgreSQLUUID
 from sqlalchemy.orm import sessionmaker, declarative_base, Session
 from pgvector.sqlalchemy import Vector
 
 # 기존 데이터베이스 설정 가져오기
-from core.config import settings
+from app.core.config import settings
 
 # 로깅 및 예외 처리 모듈 가져오기
 from ..logger import rag_logger
@@ -27,24 +27,27 @@ Base = declarative_base()
 
 class IdealAnswer(Base):
     """
-    이상적인 답변을 저장하는 테이블 모델
+    이상적인 답변을 저장하는 테이블 모델 (실제 DB 스키마에 맞춤)
     """
     __tablename__ = 'ideal_answer'
     
-    # 모범답안ID
-    idea_id = Column(PostgreSQLUUID(as_uuid=True), primary_key=True, default=uuid4)
-    
-    # 원문
-    source = Column(Text, nullable=False)
-    
-    # 임베딩 (pgvector)
-    embedding = Column(Vector(settings.embedding_dimension))  # 설정에서 임베딩 차원 가져오기
-    
-    # 생성일
-    created_at = Column(DateTime, default=datetime.utcnow)
-    
-    # 분석결과ID (외래키 가능)
-    analysisID = Column('analysisid', PostgreSQLUUID(as_uuid=True), nullable=True)
+    # 실제 DB 스키마에 맞게 수정
+    snippet_id = Column(PostgreSQLUUID(as_uuid=True), primary_key=True)
+    book_id = Column(PostgreSQLUUID(as_uuid=True), nullable=True)
+    book_title = Column(Text, nullable=True)
+    l1_title = Column(Text, nullable=True)
+    l2_title = Column(Text, nullable=True)
+    l3_title = Column(Text, nullable=True)
+    canonical_path = Column(Text, nullable=True)
+    section_id = Column(Text, nullable=True)
+    chunk_ix = Column(Integer, nullable=True)
+    page_start = Column(Integer, nullable=True)
+    page_end = Column(Integer, nullable=True)
+    citation = Column(Text, nullable=True)
+    full_text = Column(Text, nullable=True)
+    embed_text = Column(Text, nullable=True)
+    embedding = Column(Vector(1536), nullable=True)
+    rag_type = Column(String(20), nullable=True, default='legacy')
 
 
 class VectorDBManager:
@@ -171,14 +174,14 @@ class VectorDBManager:
     def find_similar(self, 
                      query_embedding: List[float], 
                      top_k: int = 5,
-                     threshold: float = 0.5) -> List[Tuple[str, float, UUID]]:
+                     threshold: float = 0.6) -> List[Tuple[str, float, UUID]]:  # 60% 유사도로 높임
         """
         유사한 임베딩을 검색합니다.
         
         Args:
             query_embedding: 쿼리 임베딩
             top_k: 반환할 결과 수
-            threshold: 유사도 임계값
+            threshold: 유사도 임계값 (낮춰서 더 많은 결과 포함)
             
         Returns:
             (원본 텍스트, 유사도 점수, ID)의 튜플 리스트
@@ -186,14 +189,14 @@ class VectorDBManager:
         session = self.get_session()
         
         try:
-            # 벡터 유사도 검색: 코사인 유사도 사용
+            # 실제 DB 스키마에 맞게 수정: full_text, snippet_id 사용
             from sqlalchemy import text
             
             # 벡터 간의 코사인 거리 계산 (1 - 코사인 유사도)
             # pgvector에서는 <=> 연산자가 코사인 거리를 계산함
             query = session.query(
-                IdealAnswer.source,
-                IdealAnswer.idea_id
+                IdealAnswer.full_text,  # source -> full_text
+                IdealAnswer.snippet_id  # idea_id -> snippet_id
             ).order_by(
                 IdealAnswer.embedding.cosine_distance(query_embedding)
             ).filter(
@@ -204,13 +207,13 @@ class VectorDBManager:
             
             # 유사도 점수 계산 (0~1 사이, 높을수록 유사)
             similar_results = []
-            for source, idea_id in results:
+            for full_text, snippet_id in results:
                 # 다시 유사도 점수를 계산
                 similarity_score_query = session.query(
                     1 - IdealAnswer.embedding.cosine_distance(query_embedding).label('similarity')
-                ).filter(IdealAnswer.idea_id == idea_id).scalar()
+                ).filter(IdealAnswer.snippet_id == snippet_id).scalar()
                 
-                similar_results.append((source, similarity_score_query, idea_id))
+                similar_results.append((full_text, similarity_score_query, snippet_id))
             
             logger.info(f"유사도 검색 완료: {len(similar_results)}개 결과 반환")
             return similar_results
