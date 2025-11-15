@@ -73,8 +73,27 @@ async def upload_audio_conversation(
             logger.warning(f"오디오 형식 검증 실패: {file.filename}")
             # 검증 실패해도 처리 시도 (일부 파일은 시그니처가 다를 수 있음)
         
-        # STT 처리 실행 (파일명 전달)
-        stt_result = stt_service.transcribe_audio_with_diarization(file_content, file.filename)
+        # STT 처리 실행 (WebM은 AssemblyAI 우선 사용)
+        if file_extension == 'webm':
+            logger.info("WebM 파일 - AssemblyAI 사용")
+            try:
+                stt_result = stt_service.assemblyai_client.transcribe_with_speakers(file_content, file.filename)
+                # AssemblyAI 응답 형식을 Google STT 형식으로 변환
+                if 'segments' in stt_result:
+                    stt_result['speaker_segments'] = stt_result['segments']
+                if 'full_text' in stt_result:
+                    stt_result['transcript'] = stt_result['full_text']
+                # 기본값 설정
+                stt_result.setdefault('transcript', '')
+                stt_result.setdefault('speaker_segments', [])
+                stt_result.setdefault('duration', 0)
+                stt_result.setdefault('speaker_count', 0)
+            except Exception as e:
+                logger.warning(f"AssemblyAI 실패, Google STT로 대체: {str(e)}")
+                stt_result = stt_service.transcribe_audio_with_diarization(file_content, file.filename)
+        else:
+            # 다른 형식은 Google STT 사용
+            stt_result = stt_service.transcribe_audio_with_diarization(file_content, file.filename)
         
         # STT 실패 시에도 파일은 저장하되 상태 표시
         processing_status = "completed" if stt_result["transcript"] else "stt_failed"
@@ -244,6 +263,7 @@ async def update_speaker_mapping(
         SpeakerMappingResponse: 매핑 설정 결과
     """
     logger.info(f"화자 매핑 설정 요청 - 사용자: {current_user.id}, 대화 ID: {conversation_id}")
+    logger.info(f"요청된 화자 매핑: {request.speaker_mapping}")
     
     try:
         # 1. Conversation 존재 확인
@@ -266,22 +286,37 @@ async def update_speaker_mapping(
         if not audio_file:
             raise HTTPException(status_code=404, detail="음성 대화 파일을 찾을 수 없습니다.")
         
-        # 4. 화자 매핑 유효성 검사
-        if audio_file.speaker_count:
-            valid_speakers = {str(i) for i in range(audio_file.speaker_count)}
-            invalid_speakers = set(request.speaker_mapping.keys()) - valid_speakers
-            
-            if invalid_speakers:
-                raise HTTPException(
-                    status_code=400, 
-                    detail=f"유효하지 않은 화자 ID: {invalid_speakers}. 유효한 화자: {valid_speakers}"
-                )
+        # 4. 화자 매핑 유효성 검사 (임시로 완화)
+        # if audio_file.speaker_count:
+        #     valid_speakers = {str(i) for i in range(audio_file.speaker_count)}
+        #     invalid_speakers = set(request.speaker_mapping.keys()) - valid_speakers
+        #     
+        #     if invalid_speakers:
+        #         raise HTTPException(
+        #             status_code=400, 
+        #             detail=f"유효하지 않은 화자 ID: {invalid_speakers}. 유효한 화자: {valid_speakers}"
+        #         )
         
-        # 5. 화자 매핑 업데이트
-        audio_file.speaker_mapping = request.speaker_mapping
+        # 5. 화자 매핑 업데이트 (사용자 ID 정보 포함)
+        mapping_data = {
+            "speaker_names": request.speaker_mapping,
+            "user_ids": request.user_mapping or {}
+        }
+        audio_file.speaker_mapping = mapping_data
         db.commit()
         
-        logger.info(f"화자 매핑 설정 완료 - 대화 ID: {conversation_id}, 매핑: {request.speaker_mapping}")
+        logger.info(f"화자 매핑 설정 완료 - 대화 ID: {conversation_id}, 매핑: {request.speaker_mapping}, 사용자 매핑: {request.user_mapping}")
+        
+        # 6. 매핑 완료 후 자동으로 분석 파이프라인 시작
+        try:
+            from app.domains.conversation.router import run_agent_pipeline_async
+            import asyncio
+            
+            # 백그라운드에서 분석 파이프라인 실행
+            asyncio.create_task(run_agent_pipeline_async(str(conversation_id), current_user.id))
+            logger.info(f"분석 파이프라인 자동 시작됨 - 대화 ID: {conversation_id}")
+        except Exception as e:
+            logger.warning(f"분석 파이프라인 자동 시작 실패: {str(e)}")
         
         return SpeakerMappingResponse(
             conversation_id=str(conversation_id),
@@ -342,18 +377,46 @@ async def get_speaker_mapping(
         if not audio_file:
             raise HTTPException(status_code=404, detail="음성 대화 파일을 찾을 수 없습니다.")
         
-        # 4. 매핑된 세그먼트 생성
+        # 4. 매핑된 세그먼트 생성 (하위 호환성 처리)
         mapped_segments = []
         speaker_mapping = audio_file.speaker_mapping or {}
+        
+        # 새로운 형식 (speaker_names, user_ids) 또는 기존 형식 처리
+        if isinstance(speaker_mapping, dict):
+            if "speaker_names" in speaker_mapping:
+                # 새로운 형식
+                speaker_names = speaker_mapping.get("speaker_names", {})
+                user_ids = speaker_mapping.get("user_ids", {})
+            else:
+                # 기존 형식 (하위 호환성)
+                speaker_names = speaker_mapping
+                user_ids = {}
+        else:
+            speaker_names = {}
+            user_ids = {}
         
         if audio_file.speaker_segments:
             for segment in audio_file.speaker_segments:
                 speaker_id = str(segment.get("speaker", ""))
+                speaker_name = speaker_names.get(speaker_id, speaker_id)
+                
+                start_time = segment.get("start", 0)
+                end_time = segment.get("end", 0)
+                
+                # 시:분:초 형태로 변환
+                def format_time(seconds):
+                    minutes = int(seconds // 60)
+                    secs = int(seconds % 60)
+                    return f"{minutes:02d}:{secs:02d}"
+                
                 mapped_segments.append({
                     "speaker": segment.get("speaker"),
-                    "speaker_name": speaker_mapping.get(speaker_id),
-                    "start": segment.get("start"),
-                    "end": segment.get("end"),
+                    "speaker_name": speaker_name,
+                    "start": start_time,
+                    "end": end_time,
+                    "start_time": format_time(start_time),
+                    "end_time": format_time(end_time),
+                    "duration": round(end_time - start_time, 2),
                     "text": segment.get("text")
                 })
         

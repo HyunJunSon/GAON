@@ -106,11 +106,18 @@ export type SpeakerMappingResponse = {
 };
 
 /** 화자 매핑 설정 */
-export async function updateSpeakerMapping(conversationId: string, speakerMapping: SpeakerMapping) {
+export async function updateSpeakerMapping(
+  conversationId: string, 
+  speakerMapping: SpeakerMapping, 
+  userMapping?: Record<string, number>
+) {
   return apiFetch<{ message: string }>(`/api/conversation/audio/${conversationId}/speaker-mapping`, {
     method: 'PUT',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ speaker_mapping: speakerMapping }),
+    body: JSON.stringify({ 
+      speaker_mapping: speakerMapping,
+      user_mapping: userMapping 
+    }),
   });
 }
 
