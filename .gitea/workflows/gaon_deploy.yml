@@ -51,6 +51,8 @@ jobs:
     steps:
     - name: Checkout repository
       uses: actions/checkout@v3
+      with:
+        path: gaon-source
 
     - name: Authenticate to Google Cloud
       run: |
@@ -64,7 +66,7 @@ jobs:
       run: |
         export PATH=$PATH:/home/ubuntu/google-cloud-sdk/bin
         IMAGE_TAG=${{ env.REGISTRY }}/${{ env.PROJECT_ID }}/${{ env.REPOSITORY }}/${{ env.BACKEND_IMAGE }}
-        docker build -t ${IMAGE_TAG}:${{ github.sha }} -t ${IMAGE_TAG}:latest -t gaon:back-server ./backend
+        docker build -t ${IMAGE_TAG}:${{ github.sha }} -t ${IMAGE_TAG}:latest -t gaon:back-server ./gaon-source/backend
         docker push ${IMAGE_TAG}:${{ github.sha }}
         docker push ${IMAGE_TAG}:latest
 
@@ -76,6 +78,8 @@ jobs:
     steps:
     - name: Checkout repository
       uses: actions/checkout@v3
+      with:
+        path: gaon-source
 
     - name: Authenticate to Google Cloud
       run: |
@@ -89,7 +93,7 @@ jobs:
       run: |
         export PATH=$PATH:/home/ubuntu/google-cloud-sdk/bin
         IMAGE_TAG=${{ env.REGISTRY }}/${{ env.PROJECT_ID }}/${{ env.REPOSITORY }}/${{ env.FRONTEND_IMAGE }}
-        docker build -t ${IMAGE_TAG}:${{ github.sha }} -t ${IMAGE_TAG}:latest -t gaon:front-server ./frontend
+        docker build -t ${IMAGE_TAG}:${{ github.sha }} -t ${IMAGE_TAG}:latest -t gaon:front-server ./gaon-source/frontend
         docker push ${IMAGE_TAG}:${{ github.sha }}
         docker push ${IMAGE_TAG}:latest
 
