@@ -6,6 +6,7 @@ from uuid import UUID
 class SpeakerMappingRequest(BaseModel):
     """화자 매핑 요청 스키마"""
     speaker_mapping: Dict[str, str]  # {"0": "아빠", "1": "딸"}
+    user_mapping: Optional[Dict[str, int]] = None  # {"0": 123, "1": 456} - 스피커별 사용자 ID
 
 
 class SpeakerMappingResponse(BaseModel):

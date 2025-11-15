@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { getSpeakerMapping, updateSpeakerMapping } from '@/apis/analysis';
+import { useAuth } from '@/hooks/useAuth';
 
 type SpeakerMappingModalProps = {
   conversationId: string;
@@ -28,8 +29,10 @@ export default function SpeakerMappingModal({
 }: SpeakerMappingModalProps) {
   const [speakers, setSpeakers] = useState<SpeakerSegment[]>([]);
   const [mapping, setMapping] = useState<Record<string, string>>({});
+  const [userMapping, setUserMapping] = useState<Record<string, number>>({});
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const { user } = useAuth(); // 현재 사용자 정보 가져오기
 
   // 화자 정보 로드
   useEffect(() => {
@@ -68,10 +71,24 @@ export default function SpeakerMappingModal({
     }));
   };
 
+  // "나" 버튼 클릭 시 현재 사용자 이름으로 설정
+  const handleSetAsMe = (speakerId: string) => {
+    if (user?.name && user?.id) {
+      setMapping(prev => ({
+        ...prev,
+        [speakerId]: user.name
+      }));
+      setUserMapping(prev => ({
+        ...prev,
+        [speakerId]: user.id
+      }));
+    }
+  };
+
   const handleSubmit = async () => {
     try {
       setIsLoading(true);
-      await updateSpeakerMapping(conversationId, mapping);
+      await updateSpeakerMapping(conversationId, mapping, userMapping);
       onComplete(mapping);
       onClose();
     } catch (err) {
@@ -166,13 +183,24 @@ export default function SpeakerMappingModal({
                         <label className="block text-xs font-medium text-gray-700 mb-1">
                           화자 이름
                         </label>
-                        <input
-                          type="text"
-                          placeholder="예: 엄마, 아빠, 아이 등"
-                          value={mapping[speaker.speaker.toString()] || ''}
-                          onChange={(e) => handleNameChange(speaker.speaker.toString(), e.target.value)}
-                          className="w-full rounded border border-gray-300 px-3 py-2 text-sm focus:border-black focus:outline-none focus:ring-1 focus:ring-black"
-                        />
+                        <div className="flex space-x-2">
+                          <input
+                            type="text"
+                            placeholder="예: 엄마, 아빠, 아이 등"
+                            value={mapping[speaker.speaker.toString()] || ''}
+                            onChange={(e) => handleNameChange(speaker.speaker.toString(), e.target.value)}
+                            className="flex-1 rounded border border-gray-300 px-3 py-2 text-sm focus:border-black focus:outline-none focus:ring-1 focus:ring-black"
+                          />
+                          {user?.name && (
+                            <button
+                              type="button"
+                              onClick={() => handleSetAsMe(speaker.speaker.toString())}
+                              className="px-3 py-2 text-sm font-medium text-gray-700 bg-gray-100 border border-gray-300 rounded hover:bg-gray-200 focus:outline-none focus:ring-1 focus:ring-black transition-colors"
+                            >
+                              나
+                            </button>
+                          )}
+                        </div>
                       </div>
                     </div>
                   ))}
