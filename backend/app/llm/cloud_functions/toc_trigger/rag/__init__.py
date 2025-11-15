@@ -5,13 +5,13 @@ from typing import List, Dict, Any, Optional, Tuple
 from uuid import UUID
 from pathlib import Path
 
-from rag.loaders.document_loader import DocumentLoader, Document
-from rag.extractors.document_extractors import ExtractorFactory
-from rag.storage.storage_adapter import StorageAdapterFactory
-from rag.chunkers.chunking_strategies import ChunkerFactory
-from rag.vector_db.vector_db_manager import VectorDBManager, EmbeddingService
-from rag.logger import rag_logger
-from rag.exception import DocumentLoadException, ExtractionException, \
+from .loaders.document_loader import DocumentLoader, Document
+from .extractors.document_extractors import ExtractorFactory
+from .storage.storage_adapter import StorageAdapterFactory
+from .chunkers.chunking_strategies import ChunkerFactory
+from .vector_db.vector_db_manager import VectorDBManager, EmbeddingService
+from .logger import rag_logger
+from .exception import DocumentLoadException, ExtractionException, \
     ChunkingException, StorageException, VectorDBException, EmbeddingException
 
 logger = rag_logger
@@ -41,7 +41,7 @@ class RAGSystem:
                 storage_type=storage_type,
                 **storage_kwargs
             )
-            self.document_loader = DocumentLoader(storage_adapter=self.storage_adapter)
+            self.document_loader = DocumentLoader()
             self.extractor_factory = ExtractorFactory()
             self.chunker_factory = ChunkerFactory()
             self.vector_db_manager = VectorDBManager()
@@ -99,9 +99,9 @@ class RAGSystem:
                     
                     # 벡터 데이터베이스에 저장
                     record_id = self.vector_db_manager.store_embedding(
-                        embed_text=chunk.content,
+                        source=chunk.content,
                         embedding=embedding,
-                        full_text=chunk.content
+                        analysis_id=None  # 필요 시 analysis_id 전달
                     )
                     
                     results.append({
@@ -248,15 +248,13 @@ class RAGSystem:
     
     def add_document(self, 
                     text: str, 
-                    book_id: Optional[UUID] = None,
-                    metadata: Optional[Dict[str, Any]] = None) -> UUID:
+                    analysis_id: Optional[UUID] = None) -> UUID:
         """
         단일 문서 텍스트를 임베딩하여 저장합니다.
         
         Args:
             text: 저장할 텍스트
-            book_id: 책 ID (선택사항)
-            metadata: 추가 메타데이터 (선택사항)
+            analysis_id: 분석 결과 ID (선택사항)
             
         Returns:
             저장된 레코드의 ID
@@ -267,8 +265,7 @@ class RAGSystem:
             # 1. 임베딩 생성 및 저장
             record_id = self.embedding_service.store_text_with_embedding(
                 text=text,
-                book_id=book_id,
-                metadata=metadata
+                analysis_id=analysis_id
             )
             
             logger.info(f"단일 문서 추가 완료: {record_id}")
@@ -279,15 +276,13 @@ class RAGSystem:
     
     def batch_add_documents(self, 
                            texts: List[str], 
-                           book_ids: Optional[List[UUID]] = None,
-                           metadata_list: Optional[List[Dict[str, Any]]] = None) -> List[UUID]:
+                           analysis_ids: Optional[List[UUID]] = None) -> List[UUID]:
         """
         여러 문서 텍스트를 일괄 임베딩하여 저장합니다.
         
         Args:
             texts: 저장할 텍스트 목록
-            book_ids: 책 ID 목록 (선택사항)
-            metadata_list: 메타데이터 목록 (선택사항)
+            analysis_ids: 분석 결과 ID 목록 (선택사항)
             
         Returns:
             저장된 레코드의 ID 목록
@@ -298,8 +293,7 @@ class RAGSystem:
             # 1. 임베딩 일괄 생성 및 저장
             record_ids = self.embedding_service.store_texts_with_embeddings(
                 texts=texts,
-                book_ids=book_ids,
-                metadata_list=metadata_list
+                analysis_ids=analysis_ids
             )
             
             logger.info(f"문서 일괄 추가 완료: {len(record_ids)}개 저장됨")

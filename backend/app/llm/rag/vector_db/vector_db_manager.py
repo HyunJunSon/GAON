@@ -69,6 +69,9 @@ class IdealAnswer(Base):
     
     # 임베딩 (pgvector)
     embedding = Column(Vector(1536), nullable=True)  # OpenAI text-embedding-3-small 기준
+    
+    # RAG 타입 구분
+    rag_type = Column(String(20), nullable=True, default='legacy')
 
 
 class VectorDBManager:
@@ -122,7 +125,8 @@ class VectorDBManager:
                        chunk_ix: int = None,
                        page_start: int = None,
                        page_end: int = None,
-                       citation: str = None) -> UUID:
+                       citation: str = None,
+                       rag_type: str = 'legacy') -> UUID:
         """
         임베딩을 데이터베이스에 저장합니다.
         
@@ -163,7 +167,8 @@ class VectorDBManager:
                 chunk_ix=chunk_ix,
                 page_start=page_start,
                 page_end=page_end,
-                citation=citation
+                citation=citation,
+                rag_type=rag_type  # rag_type 파라미터 사용
             )
             
             # 데이터베이스에 추가 및 커밋
@@ -185,7 +190,8 @@ class VectorDBManager:
                               full_texts: Optional[List[str]] = None,
                               book_ids: Optional[List[UUID]] = None,
                               book_titles: Optional[List[str]] = None,
-                              metadata_list: Optional[List[Dict[str, Any]]] = None) -> List[UUID]:
+                              metadata_list: Optional[List[Dict[str, Any]]] = None,
+                              rag_type: str = 'legacy') -> List[UUID]:
         """
         여러 임베딩을 일괄 저장합니다.
         
@@ -228,7 +234,8 @@ class VectorDBManager:
                     chunk_ix=metadata.get('chunk_ix'),
                     page_start=metadata.get('page_start'),
                     page_end=metadata.get('page_end'),
-                    citation=metadata.get('citation')
+                    citation=metadata.get('citation'),
+                    rag_type=rag_type  # rag_type 파라미터 사용
                 )
                 
                 session.add(ideal_answer)
