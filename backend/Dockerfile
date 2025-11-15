@@ -24,11 +24,13 @@ RUN python -m venv /opt/venv
 ENV PATH="/opt/venv/bin:$PATH"
 
 # 의존성 파일 복사 (Docker 캐시 활용)
-COPY pyproject.toml requirement.txt ./
+COPY pyproject.toml ./
+# requirement.txt가 있으면 복사, 없으면 무시
+COPY requirement.tx[t] ./
 
-# Python 의존성 설치
+# Python 의존성 설치 (requirement.txt 우선, 실패시 pyproject.toml 사용)
 RUN pip install --no-cache-dir --upgrade pip && \
-    pip install --no-cache-dir -r requirement.txt
+    (pip install --no-cache-dir -r requirement.txt 2>/dev/null || pip install --no-cache-dir .)
 
 # Stage 2: 최종 이미지
 FROM python:3.11-slim
