@@ -13,6 +13,7 @@ from sqlalchemy.orm import sessionmaker, declarative_base, Session
 from pgvector.sqlalchemy import Vector
 
 # 기존 데이터베이스 설정 가져오기
+from app.core.config import settings
 from config import settings
 
 # 로깅 및 예외 처리 모듈 가져오기
@@ -27,10 +28,27 @@ Base = declarative_base()
 
 class IdealAnswer(Base):
     """
-    이상적인 답변을 저장하는 테이블 모델
+    이상적인 답변을 저장하는 테이블 모델 (실제 DB 스키마에 맞춤)
     """
     __tablename__ = 'ideal_answer'
     
+    # 실제 DB 스키마에 맞게 수정
+    snippet_id = Column(PostgreSQLUUID(as_uuid=True), primary_key=True)
+    book_id = Column(PostgreSQLUUID(as_uuid=True), nullable=True)
+    book_title = Column(Text, nullable=True)
+    l1_title = Column(Text, nullable=True)
+    l2_title = Column(Text, nullable=True)
+    l3_title = Column(Text, nullable=True)
+    canonical_path = Column(Text, nullable=True)
+    section_id = Column(Text, nullable=True)
+    chunk_ix = Column(Integer, nullable=True)
+    page_start = Column(Integer, nullable=True)
+    page_end = Column(Integer, nullable=True)
+    citation = Column(Text, nullable=True)
+    full_text = Column(Text, nullable=True)
+    embed_text = Column(Text, nullable=True)
+    embedding = Column(Vector(1536), nullable=True)
+
     # 스니펫 고유 ID
     snippet_id = Column(PostgreSQLUUID(as_uuid=True), primary_key=True, default=uuid4)
     
@@ -262,7 +280,7 @@ class VectorDBManager:
         Args:
             query_embedding: 쿼리 임베딩
             top_k: 반환할 결과 수
-            threshold: 유사도 임계값
+            threshold: 유사도 임계값 (낮춰서 더 많은 결과 포함)
             
         Returns:
             (임베딩용 텍스트, 전체 텍스트, 유사도 점수, ID)의 튜플 리스트
@@ -270,7 +288,7 @@ class VectorDBManager:
         session = self.get_session()
         
         try:
-            # 벡터 유사도 검색: 코사인 유사도 사용
+            # 실제 DB 스키마에 맞게 수정: full_text, snippet_id 사용
             from sqlalchemy import text
             
             # 벡터 간의 코사인 거리 계산 (1 - 코사인 유사도)
@@ -296,7 +314,6 @@ class VectorDBManager:
                 ).filter(IdealAnswer.snippet_id == snippet_id).scalar()
                 
                 similar_results.append((embed_text, full_text, similarity_score_query, snippet_id))
-            
             logger.info(f"유사도 검색 완료: {len(similar_results)}개 결과 반환")
             return similar_results
         except Exception as e:

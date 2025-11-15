@@ -29,7 +29,7 @@ except ImportError as e:
 from rag_interface import AdvancedRAGInterface, RAGConfig
 from toc_utils import TOCExtractor
 from toc_chunker import TOCChunker
-from gcp_utils import GCPStorageManager
+from app.utils.gcp_utils import GCPStorageManager
 from config import settings
 
 # 베이스 클래스

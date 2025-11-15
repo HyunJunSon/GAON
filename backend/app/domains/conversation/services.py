@@ -1,7 +1,7 @@
 from sqlalchemy.orm import Session
 from sqlalchemy import func
 from fastapi import UploadFile, HTTPException
-from typing import List, Dict, Any
+from typing import List, Dict, Any, Optional
 from datetime import datetime
 import logging
 
@@ -204,4 +204,18 @@ class ConversationFileService:
             "dialog": [{"speaker": "User", "content": "분석된 대화 내용"}],
             "status": "completed",
             "updated_at": conversation.create_date
+        }
+
+    def get_conversation_by_id(self, conv_id: str) -> Optional[Dict[str, Any]]:
+        """대화 ID로 대화 조회"""
+        conversation = self.db.query(Conversation).filter(Conversation.conv_id == conv_id).first()
+        if not conversation:
+            return None
+        
+        return {
+            "conv_id": str(conversation.conv_id),
+            "title": conversation.title,
+            "content": conversation.content,
+            "family_id": conversation.family_id,
+            "create_date": conversation.create_date
         }

@@ -8,7 +8,7 @@ from unittest.mock import MagicMock, patch
 
 from app.llm.rag import RAGSystem
 from app.llm.rag.logger import rag_logger as logger
-from app.llm.rag_manager import get_rag_manager, RAGType, RAGConfig
+from app.llm.rag.implementations.rag_manager import get_rag_manager, RAGType, RAGConfig
 
 
 def create_test_pdf(filename: str) -> str:

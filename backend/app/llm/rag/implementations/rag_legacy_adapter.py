@@ -5,7 +5,7 @@ from typing import List, Dict, Any, Tuple
 from uuid import UUID
 
 from .rag_interface import RAGInterface, RAGConfig
-from .rag import RAGSystem
+from app.llm.rag import RAGSystem
 
 
 class LegacyRAGAdapter(RAGInterface):

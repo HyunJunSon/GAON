@@ -5,7 +5,7 @@
 from typing import Dict, Any, List
 from pathlib import Path
 
-from rag_manager import get_rag_manager, RAGType, RAGConfig
+from app.llm.rag.implementations.rag_manager import get_rag_manager, RAGType, RAGConfig
 from rag_interface import RAGInterface
 
 
