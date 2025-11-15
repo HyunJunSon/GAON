@@ -306,7 +306,7 @@ export default function AudioRecorder({
           {isRecording 
             ? (isPaused ? '녹음이 일시정지되었습니다.' : '녹음 중입니다...')
             : audioBlob 
-            ? (uploadedFile ? `파일이 업로드되었습니다: ${uploadedFile.name}` : '녹음이 완료되었습니다. 파형을 확인하고 전송하거나 다시 녹음하세요.')
+            ? (uploadedFile ? `음성이 업로드되었습니다: ${uploadedFile.name}` : '녹음이 완료되었습니다. 파형을 확인하고 전송하거나 다시 녹음하세요.')
             : placeholder
           }
         </p>
@@ -328,7 +328,7 @@ export default function AudioRecorder({
                 onClick={handleFileSelect}
                 className="px-6 py-2 bg-gray-600 text-white rounded hover:bg-gray-700 transition-colors"
               >
-                파일 업로드
+                음성 업로드
               </button>
             </>
           )}
@@ -384,7 +384,7 @@ export default function AudioRecorder({
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
           <div className="bg-white rounded p-6 max-w-sm w-full mx-4">
             <h3 className="text-lg font-semibold mb-4">
-              {uploadedFile ? '파일 업로드 완료' : '음성 녹음 완료'}
+              {uploadedFile ? '음성 업로드 완료' : '음성 녹음 완료'}
             </h3>
             <p className="text-gray-600 mb-6">
               {uploadedFile ? '업로드된 파일을' : '녹음된 음성을'} 전송하시겠습니까?<br/>
