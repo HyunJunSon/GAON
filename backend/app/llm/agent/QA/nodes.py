@@ -9,7 +9,7 @@ from sqlalchemy.orm import Session
 import logging
 
 from app.llm.agent.crud import update_analysis_result, get_analysis_by_conv_id
-from app.llm.cloud_functions.rag_trigger.rag.vector_db.vector_db_manager import VectorDBManager, EmbeddingService
+from app.llm.rag.vector_db.vector_db_manager import VectorDBManager, EmbeddingService
 
 logger = logging.getLogger(__name__)
 

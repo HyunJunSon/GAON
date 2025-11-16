@@ -19,6 +19,7 @@ router = APIRouter(prefix="/api", tags=["conversations"])
 
 @router.post("/conversations/analyze", response_model=FileUploadResponse)
 async def upload_conversation_file(
+    background_tasks: BackgroundTasks,
     file: UploadFile = File(...),
     family_id: Optional[int] = Form(None),
     current_user: User = Depends(get_current_user),
@@ -39,10 +40,17 @@ async def upload_conversation_file(
             current_user.id, family_id, file
         )
         
-        logger.info(f"파일 업로드 성공: conversation_id={conversation.conv_id}, file_id={db_file.id}")
+        # 🚀 자동 분석 시작 추가
+        background_tasks.add_task(
+            run_agent_pipeline_async, 
+            str(conversation.conv_id), 
+            current_user.id
+        )
+        
+        logger.info(f"파일 업로드 성공 및 분석 시작: conversation_id={conversation.conv_id}, file_id={db_file.id}")
         
         return FileUploadResponse(
-            message="파일이 성공적으로 업로드되고 처리되었습니다.",
+            message="파일이 성공적으로 업로드되고 분석이 시작되었습니다.",
             conversation_id=str(conversation.conv_id),
             file_id=db_file.id,
             status=db_file.processing_status,
