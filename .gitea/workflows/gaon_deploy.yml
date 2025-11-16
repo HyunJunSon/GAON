@@ -183,6 +183,17 @@ jobs:
             chmod 600 /home/ubuntu/gaon/gcp_service_account_key.json
           fi
           
+          # 백엔드 이미지에서 최신 설정 파일들 복사
+          echo "📋 Updating configuration files from backend image..."
+          TEMP_CONTAINER=$(docker create ${BACKEND_IMAGE})
+          docker cp $TEMP_CONTAINER:/app/config/nginx.conf /home/ubuntu/gaon/ || echo "nginx.conf copy failed"
+          docker cp $TEMP_CONTAINER:/app/config/docker-compose.prod.yml /home/ubuntu/gaon/ || echo "docker-compose.prod.yml copy failed"
+          docker cp $TEMP_CONTAINER:/app/config/docker-compose-db.yml /home/ubuntu/gaon/ || echo "docker-compose-db.yml copy failed"
+          docker cp $TEMP_CONTAINER:/app/config/deploy.sh /home/ubuntu/gaon/ || echo "deploy.sh copy failed"
+          docker rm $TEMP_CONTAINER
+          chmod +x /home/ubuntu/gaon/deploy.sh
+          echo "✅ Configuration files updated"
+          
           # 새로 시작
           docker-compose -f docker-compose.prod.yml up -d || rollback
           echo "⏳ Waiting for services to start..."
