@@ -13,19 +13,16 @@ echo "📦 Pulling latest images..."
 docker pull $BACKEND_IMAGE
 docker pull $FRONTEND_IMAGE
 
-echo "🧹 Cleaning up existing containers..."
-# 모든 gaon 관련 컨테이너 강제 제거
-docker rm -f gaon-backend gaon-frontend gaon-nginx gaon-postgres 2>/dev/null || true
-docker rm -f $(docker ps -aq --filter "name=gaon") 2>/dev/null || true
+echo "🧹 Cleaning up existing containers (DB 제외)..."
+# DB 제외하고 다른 컨테이너만 제거
+docker rm -f gaon-backend gaon-frontend gaon-nginx 2>/dev/null || true
 
-# Docker Compose로 정리
-docker-compose -f docker-compose.prod.yml down --remove-orphans 2>/dev/null || true
-
-# 시스템 정리
-docker system prune -f
+# Docker Compose로 정리 (DB 제외)
+docker-compose -f docker-compose.prod.yml stop gaon_backend gaon_frontend nginx 2>/dev/null || true
+docker-compose -f docker-compose.prod.yml rm -f gaon_backend gaon_frontend nginx 2>/dev/null || true
 
 echo "⏳ Waiting for cleanup to complete..."
-sleep 5
+sleep 3
 
 echo "🔄 Starting new containers..."
 docker-compose -f docker-compose.prod.yml up -d --remove-orphans
@@ -36,7 +33,7 @@ sleep 10
 echo "🔄 Applying database migrations..."
 docker exec -w /app gaon-backend alembic upgrade head || {
     echo "🚨 Error detected! Rolling back..."
-    docker-compose -f docker-compose.prod.yml down
+    docker-compose -f docker-compose.prod.yml stop gaon_backend gaon_frontend nginx
     exit 1
 }
 
