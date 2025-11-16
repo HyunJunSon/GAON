@@ -14,11 +14,10 @@ docker pull $BACKEND_IMAGE
 docker pull $FRONTEND_IMAGE
 
 echo "🧹 Cleaning up existing containers..."
-# 모든 gaon 관련 컨테이너 강제 제거
-docker rm -f gaon-backend gaon-frontend gaon-nginx gaon-postgres 2>/dev/null || true
-docker rm -f $(docker ps -aq --filter "name=gaon") 2>/dev/null || true
+# PostgreSQL 컨테이너는 보존하고 나머지만 제거
+docker rm -f gaon-backend gaon-frontend gaon-nginx 2>/dev/null || true
 
-# Docker Compose로 정리
+# Docker Compose로 정리 (PostgreSQL 제외)
 docker-compose -f docker-compose.prod.yml down --remove-orphans 2>/dev/null || true
 
 # 시스템 정리
