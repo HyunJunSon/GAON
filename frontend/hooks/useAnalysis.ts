@@ -56,5 +56,14 @@ export function useAnalysis(conversationId: string): UseQueryResult<AnalysisRes,
       // 진행 중이거나 실패한 경우는 짧은 캐싱
       return 30 * 1000; // 30초
     },
+    gcTime: (query) => {
+      const status = query?.state?.data?.status;
+      // 분석 완료된 데이터는 메모리에서 제거하지 않음
+      if (status === 'ready' || status === 'completed') {
+        return Infinity;
+      }
+      // 진행 중인 데이터는 5분 후 제거
+      return 5 * 60 * 1000;
+    },
   })
 }
