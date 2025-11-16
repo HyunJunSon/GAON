@@ -322,6 +322,7 @@ async def update_speaker_mapping(
             conversation_id=str(conversation_id),
             file_id=audio_file.id,
             speaker_mapping=request.speaker_mapping,
+            user_mapping=request.user_mapping,
             message="화자 매핑이 성공적으로 설정되었습니다."
         )
         
@@ -423,7 +424,8 @@ async def get_speaker_mapping(
         return {
             "conversation_id": str(conversation_id),
             "file_id": audio_file.id,
-            "speaker_mapping": speaker_mapping,
+            "speaker_mapping": speaker_names,
+            "user_mapping": user_ids,
             "speaker_count": audio_file.speaker_count,
             "mapped_segments": mapped_segments
         }

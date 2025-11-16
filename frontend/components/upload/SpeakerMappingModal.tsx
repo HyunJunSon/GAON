@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { getSpeakerMapping, updateSpeakerMapping } from '@/apis/analysis';
-import { useAuth } from '@/hooks/useAuth';
+import { useMe } from '@/hooks/useAuth';
 
 type SpeakerMappingModalProps = {
   conversationId: string;
@@ -32,7 +32,7 @@ export default function SpeakerMappingModal({
   const [userMapping, setUserMapping] = useState<Record<string, number>>({});
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const { user } = useAuth(); // 현재 사용자 정보 가져오기
+  const { data: user } = useMe(); // 현재 사용자 정보 가져오기
 
   // 화자 정보 로드
   useEffect(() => {
@@ -191,7 +191,7 @@ export default function SpeakerMappingModal({
                             onChange={(e) => handleNameChange(speaker.speaker.toString(), e.target.value)}
                             className="flex-1 rounded border border-gray-300 px-3 py-2 text-sm focus:border-black focus:outline-none focus:ring-1 focus:ring-black"
                           />
-                          {user?.name && (
+                          {user?.name && !Object.values(userMapping).includes(user.id) && (
                             <button
                               type="button"
                               onClick={() => handleSetAsMe(speaker.speaker.toString())}

@@ -2,6 +2,7 @@ import { apiFetch } from './client';
 
 // 백엔드 스펙에 맞춘 타입 정의
 export type User = {
+  id: number;
   email: string;
   name: string;
 };

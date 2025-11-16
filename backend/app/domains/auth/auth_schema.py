@@ -19,6 +19,7 @@ class UserLogin(BaseModel):
 
 class User(BaseModel):
     """사용자 정보 조회 시 반환될 모델"""
+    id: int          # 사용자 ID
     email: EmailStr  # 사용자 이메일
     name: str        # 사용자 이름
 
