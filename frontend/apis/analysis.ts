@@ -12,7 +12,7 @@ export type StartAnalysisResSnake = {
 
 export type StartAnalysisAny = StartAnalysisRes | StartAnalysisResSnake;
 
-export type AnalysisStatus = 'queued' | 'processing' | 'ready' | 'failed';
+export type AnalysisStatus = 'queued' | 'processing' | 'ready' | 'completed' | 'failed';
 
 export type AnalysisRes = {
   conversationId: string;

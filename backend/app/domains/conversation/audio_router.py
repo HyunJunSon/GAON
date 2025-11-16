@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, UploadFile, File, HTTPException, Form
+from fastapi import APIRouter, Depends, UploadFile, File, HTTPException, Form, BackgroundTasks
 from sqlalchemy.orm import Session
 from typing import Optional
 import logging
@@ -19,8 +19,64 @@ router = APIRouter(prefix="/api/conversation", tags=["audio-conversation"])
 logger = logging.getLogger(__name__)
 
 
+def convert_speaker_to_number(speaker_id):
+    """SPEAKER_0A → 1001, SPEAKER_0B → 1002 형태로 변환 (실제 사용자 ID와 충돌 방지)"""
+    if isinstance(speaker_id, str) and speaker_id.startswith('SPEAKER_'):
+        # SPEAKER_0A → 1001, SPEAKER_0B → 1002 (1000번대 사용)
+        suffix = speaker_id.split('_')[-1]  # 0A, 0B, 1A, 1B
+        if len(suffix) >= 2:
+            try:
+                num = int(suffix[:-1])  # 0, 1, 2...
+                letter = suffix[-1]     # A, B, C...
+                # A=1, B=2, C=3... + 1000 (게스트 범위)
+                letter_num = ord(letter) - ord('A') + 1
+                return 1000 + num * 10 + letter_num
+            except:
+                pass
+    return speaker_id
+
+
+def format_transcript_for_agent(stt_result: dict, user_mapping: dict = None) -> str:
+    """STT 결과를 Agent가 기대하는 형식으로 변환 (user_mapping 지원)"""
+    speaker_segments = stt_result.get("speaker_segments", [])
+    
+    if not speaker_segments:
+        # 화자 분리가 안된 경우 기본 형식
+        transcript = stt_result.get("transcript", "")
+        return f"참석자 1 00:00\n{transcript}"
+    
+    # 화자별 세그먼트를 Agent 형식으로 변환
+    formatted_lines = []
+    
+    for segment in speaker_segments:
+        speaker = segment.get("speaker", 1)
+        start_time = segment.get("start", 0)
+        text = segment.get("text", "")
+        
+        # user_mapping이 있으면 speaker 번호를 user_id로 치환
+        if user_mapping and str(speaker) in user_mapping:
+            mapped_user_id = user_mapping[str(speaker)]
+            if mapped_user_id is not None:
+                speaker = mapped_user_id
+        else:
+            # user_mapping에 없으면 숫자 ID로 변환 (게스트 처리)
+            speaker = convert_speaker_to_number(speaker)
+        
+        # 시간을 MM:SS 형식으로 변환
+        minutes = int(start_time // 60)
+        seconds = int(start_time % 60)
+        timestamp = f"{minutes:02d}:{seconds:02d}"
+        
+        formatted_lines.append(f"참석자 {speaker} {timestamp}")
+        formatted_lines.append(text)
+        formatted_lines.append("")  # 빈 줄 추가
+    
+    return "\n".join(formatted_lines)
+
+
 @router.post("/audio", response_model=FileUploadResponse)
 async def upload_audio_conversation(
+    background_tasks: BackgroundTasks,
     file: UploadFile = File(...),
     family_id: Optional[int] = Form(1),
     current_user: User = Depends(get_current_user),
@@ -99,10 +155,13 @@ async def upload_audio_conversation(
         processing_status = "completed" if stt_result["transcript"] else "stt_failed"
         transcript_text = stt_result["transcript"] or "음성 인식 처리 실패"
         
+        # STT 결과를 Agent 기대 형식으로 변환
+        formatted_content = format_transcript_for_agent(stt_result)
+        
         # 4. 새 conversation 생성
         conversation = Conversation(
             title=f"음성 대화 - {file.filename}",
-            content=transcript_text[:1000],  # 처음 1000자만 저장
+            content=formatted_content[:1000],  # Agent 형식으로 저장
             id=current_user.id,  # 사용자 ID 저장
             family_id=family_id,
             create_date=datetime.now()
@@ -303,17 +362,28 @@ async def update_speaker_mapping(
             "user_ids": request.user_mapping or {}
         }
         audio_file.speaker_mapping = mapping_data
+        
+        # 6. user_mapping이 있으면 conversation content도 업데이트
+        if request.user_mapping:
+            # STT 결과에서 user_mapping 적용한 새로운 content 생성
+            stt_result = {
+                "speaker_segments": audio_file.speaker_segments or [],
+                "transcript": audio_file.transcript or ""
+            }
+            updated_content = format_transcript_for_agent(stt_result, request.user_mapping)
+            conversation.content = updated_content
+            logger.info(f"Conversation content 업데이트됨 - user_mapping 적용")
+        
         db.commit()
         
         logger.info(f"화자 매핑 설정 완료 - 대화 ID: {conversation_id}, 매핑: {request.speaker_mapping}, 사용자 매핑: {request.user_mapping}")
         
-        # 6. 매핑 완료 후 자동으로 분석 파이프라인 시작
+        # 7. 매핑 완료 후 자동으로 분석 파이프라인 시작
         try:
             from app.domains.conversation.router import run_agent_pipeline_async
-            import asyncio
             
             # 백그라운드에서 분석 파이프라인 실행
-            asyncio.create_task(run_agent_pipeline_async(str(conversation_id), current_user.id))
+            background_tasks.add_task(run_agent_pipeline_async, str(conversation_id), current_user.id)
             logger.info(f"분석 파이프라인 자동 시작됨 - 대화 ID: {conversation_id}")
         except Exception as e:
             logger.warning(f"분석 파이프라인 자동 시작 실패: {str(e)}")

@@ -117,8 +117,11 @@ def conversation_to_dataframe(conversation: Dict[str, Any]) -> pd.DataFrame:
        (참석자 번호를 정수형으로 파싱)
     """
     content = conversation["content"]
+    
+    if not content:
+        return pd.DataFrame(columns=["speaker", "text", "timestamp"])
+    
     lines = content.strip().split("\n")
-
     data = []
     current_speaker = None
     current_text = ""
@@ -145,7 +148,7 @@ def conversation_to_dataframe(conversation: Dict[str, Any]) -> pd.DataFrame:
                 try:
                     current_speaker = int(parts[1])  # 🔧 문자열 → int 변환
                 except ValueError:
-                    current_speaker = None
+                    current_speaker = 1  # 기본값
                 current_timestamp = parts[2] if len(parts) == 3 else "00:00"
                 current_text = ""
         else:

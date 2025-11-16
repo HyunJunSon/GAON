@@ -19,6 +19,7 @@ router = APIRouter(prefix="/api", tags=["conversations"])
 
 @router.post("/conversations/analyze", response_model=FileUploadResponse)
 async def upload_conversation_file(
+    background_tasks: BackgroundTasks,
     file: UploadFile = File(...),
     family_id: Optional[int] = Form(None),
     current_user: User = Depends(get_current_user),
@@ -39,10 +40,17 @@ async def upload_conversation_file(
             current_user.id, family_id, file
         )
         
-        logger.info(f"파일 업로드 성공: conversation_id={conversation.conv_id}, file_id={db_file.id}")
+        # 🚀 자동 분석 시작 추가
+        background_tasks.add_task(
+            run_agent_pipeline_async, 
+            str(conversation.conv_id), 
+            current_user.id
+        )
+        
+        logger.info(f"파일 업로드 성공 및 분석 시작: conversation_id={conversation.conv_id}, file_id={db_file.id}")
         
         return FileUploadResponse(
-            message="파일이 성공적으로 업로드되고 처리되었습니다.",
+            message="파일이 성공적으로 업로드되고 분석이 시작되었습니다.",
             conversation_id=str(conversation.conv_id),
             file_id=db_file.id,
             status=db_file.processing_status,
@@ -172,16 +180,34 @@ async def run_agent_pipeline_async(conversation_id: str, user_id: int):
         
         logger.info(f"Agent 파이프라인 완료: conv_id={conversation_id}, status={result.get('status')}")
         
-        # 성공/실패에 따른 추가 처리 (알림 등)
+        # WebSocket으로 프론트엔드에 완료 알림
+        from .websocket import notify_analysis_complete, notify_analysis_error
+        
         if result.get("status") == "completed":
             logger.info(f"분석 성공: score={result.get('score')}, confidence={result.get('confidence')}")
+            
+            # 성공 알림
+            await notify_analysis_complete(conversation_id, {
+                "analysisId": result.get("analysis_id"),
+                "score": result.get("score"),
+                "confidence": result.get("confidence"),
+                "status": "completed"
+            })
         else:
             logger.error(f"분석 실패: {result.get('error')}")
+            
+            # 실패 알림
+            await notify_analysis_error(conversation_id, result.get('error', '분석 실패'))
         
         return result
         
     except Exception as e:
         logger.error(f"Agent 파이프라인 실행 실패: conv_id={conversation_id}, error={str(e)}")
+        
+        # 예외 발생 시에도 WebSocket 알림
+        from .websocket import notify_analysis_error
+        await notify_analysis_error(conversation_id, str(e))
+        
         return {"status": "failed", "error": str(e)}
 
 

@@ -60,6 +60,13 @@ class RawInspector:
         issues: List[str] = []
         if pd is not None and isinstance(raw, pd.DataFrame):
             df = raw.copy()
+            
+            # speaker 컬럼 존재 여부 확인
+            if "speaker" not in df.columns:
+                # speaker 컬럼이 없으면 기본값으로 생성
+                df["speaker"] = "User"  # 또는 적절한 기본값
+                issues.append("missing_speaker_column")
+            
             unique_speakers = set(df["speaker"].astype(str))
 
             # ✅ 화자 2명 이상인지 확인

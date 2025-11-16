@@ -15,8 +15,8 @@ from pprint import pprint
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 sys.path.append(BASE_DIR)
 
-# 테스트 DB 환경 활성화 (운영 시 false)
-os.environ["USE_TEST_DB"] = "true"
+# 테스트 DB 환경 비활성화 (운영 DB 사용)
+os.environ["USE_TEST_DB"] = "false"
 # ----------------------------------------
 
 # ----------------------------------------

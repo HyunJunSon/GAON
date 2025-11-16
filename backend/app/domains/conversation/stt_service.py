@@ -44,6 +44,11 @@ class STTService:
             # 파일 형식에 따른 인코딩 및 샘플 레이트 설정
             encoding, sample_rate = self._get_audio_config(filename)
             
+            # WebM 파일인 경우 WAV로 변환
+            if filename.lower().endswith('.webm'):
+                logger.info("WebM 파일 감지, WAV로 변환 중...")
+                audio_content = self._convert_webm_to_wav(audio_content)
+            
             # 파일 크기 기준으로 LongRunning API 사용 결정 (10MB 이상)
             file_size_mb = len(audio_content) / (1024 * 1024)
             
@@ -71,11 +76,55 @@ class STTService:
         config_map = {
             'mp3': (RecognitionConfig.AudioEncoding.MP3, 44100),
             'wav': (RecognitionConfig.AudioEncoding.LINEAR16, 16000),
-            'webm': (RecognitionConfig.AudioEncoding.WEBM_OPUS, 48000),
-            'm4a': (RecognitionConfig.AudioEncoding.MP3, 44100),  # M4A를 MP3로 처리
+            'webm': (RecognitionConfig.AudioEncoding.LINEAR16, 16000),  # WebM을 WAV로 변환 후 처리
+            'm4a': (RecognitionConfig.AudioEncoding.MP3, 44100),
         }
         
         return config_map.get(ext, (RecognitionConfig.AudioEncoding.ENCODING_UNSPECIFIED, 16000))
+    
+    def _convert_webm_to_wav(self, audio_content: bytes) -> bytes:
+        """WebM 오디오를 WAV로 변환"""
+        try:
+            import subprocess
+            import tempfile
+            import os
+            
+            # 임시 파일 생성
+            with tempfile.NamedTemporaryFile(suffix='.webm', delete=False) as temp_webm:
+                temp_webm.write(audio_content)
+                temp_webm_path = temp_webm.name
+            
+            temp_wav_path = temp_webm_path.replace('.webm', '.wav')
+            
+            # ffmpeg로 WebM을 WAV로 변환
+            cmd = [
+                'ffmpeg', '-i', temp_webm_path,
+                '-ar', '16000',  # 16kHz 샘플링 레이트
+                '-ac', '1',      # 모노 채널
+                '-f', 'wav',     # WAV 형식
+                temp_wav_path, '-y'  # 덮어쓰기
+            ]
+            
+            result = subprocess.run(cmd, capture_output=True, text=True)
+            
+            if result.returncode != 0:
+                logger.error(f"ffmpeg 변환 실패: {result.stderr}")
+                raise Exception(f"오디오 변환 실패: {result.stderr}")
+            
+            # 변환된 WAV 파일 읽기
+            with open(temp_wav_path, 'rb') as wav_file:
+                wav_content = wav_file.read()
+            
+            # 임시 파일 정리
+            os.unlink(temp_webm_path)
+            os.unlink(temp_wav_path)
+            
+            logger.info("WebM을 WAV로 변환 완료")
+            return wav_content
+            
+        except Exception as e:
+            logger.error(f"WebM 변환 실패: {str(e)}")
+            raise
     
     def _transcribe_short_audio(self, audio_content: bytes, encoding, sample_rate: int, 
                                language_code: str, max_speakers: int) -> Dict[str, Any]:

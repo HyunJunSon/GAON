@@ -62,7 +62,7 @@ export default function ResultsDialogPage() {
 
   if (isLoading) return <div>로딩…</div>;
   if (isError || !data) return <div>{(error as Error)?.message ?? '불러오기 실패'}</div>;
-  if (data.status !== 'ready') return <div>현재 상태: {data.status}</div>;
+  if (data.status !== 'ready' && data.status !== 'completed') return <div>현재 상태: {data.status}</div>;
 
   return (
     <main className="mx-auto max-w-3xl p-6 space-y-6">

@@ -1,5 +1,6 @@
 from typing import Optional, List
 from pydantic_settings import BaseSettings
+import os
 
 
 class Settings(BaseSettings):
@@ -45,9 +46,18 @@ class Settings(BaseSettings):
     assemblyai_api_key: str = ""
 
     class Config:
-        env_file = ".env"
+        # 절대 경로로 .env 파일 지정
+        env_file = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), ".env")
         extra = "ignore"  # 알려지지 않은 변수들은 무시
 
 
 # 전역 설정 인스턴스
 settings = Settings()
+
+# LangChain 환경변수 설정 (LangChain이 자동으로 읽을 수 있도록)
+if settings.langchain_tracing_v2.lower() == "true":
+    os.environ["LANGCHAIN_TRACING_V2"] = "true"
+    os.environ["LANGCHAIN_ENDPOINT"] = settings.langchain_endpoint
+    os.environ["LANGCHAIN_PROJECT"] = settings.langchain_project
+    if settings.langchain_api_key:
+        os.environ["LANGCHAIN_API_KEY"] = settings.langchain_api_key
