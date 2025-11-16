@@ -60,6 +60,15 @@ COPY --from=builder /opt/venv /opt/venv
 # 프로젝트 소스 코드 복사
 COPY . /app/
 
+# 설정 파일들을 /app/config 디렉토리에 복사
+COPY ../nginx.conf /app/config/
+COPY ../docker-compose.prod.yml /app/config/
+COPY ../docker-compose-db.yml /app/config/
+COPY ../deploy.sh /app/config/
+
+# config 디렉토리 생성 및 권한 설정
+RUN mkdir -p /app/config && chmod +x /app/config/deploy.sh
+
 # 앱 디렉토리 소유권 변경
 RUN chown -R gaon-admin:gaon-admin /app
 
