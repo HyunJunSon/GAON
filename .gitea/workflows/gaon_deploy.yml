@@ -2,7 +2,7 @@ name: Deploy GAON Application
 
 on:
   push:
-    branches: [ "main", "develop", "hotfix/fix-code" ]
+    branches: [ "main", "develop", "hotfix/fix-code", "fix/#135_분석데이터_frontend_화면에_안_보이는문제_해결" ]
 
 env:
   REGISTRY: asia-northeast3-docker.pkg.dev
@@ -99,7 +99,7 @@ jobs:
 
   deploy:
     needs: [check-changes, build-backend, build-frontend]
-    if: always() && (needs.build-backend.result == 'success' || needs.build-backend.result == 'skipped') && (needs.build-frontend.result == 'success' || needs.build-frontend.result == 'skipped') && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/develop' || github.ref == 'refs/heads/hotfix/fix-code')
+    if: always() && (needs.build-backend.result == 'success' || needs.build-backend.result == 'skipped') && (needs.build-frontend.result == 'success' || needs.build-frontend.result == 'skipped') && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/develop' || github.ref == 'refs/heads/hotfix/fix-code' || github.ref == 'refs/heads/fix/#135_분석데이터_frontend_화면에_안_보이는문제_해결')
     runs-on: self-hosted
     
     steps:
