@@ -2,7 +2,7 @@ name: Deploy GAON Application
 
 on:
   push:
-    branches: [ "main", "develop" ]
+    branches: [ "main", "develop", "hotfix/fix-code" ]
 
 env:
   REGISTRY: asia-northeast3-docker.pkg.dev
