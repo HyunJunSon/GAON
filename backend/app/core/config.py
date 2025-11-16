@@ -1,5 +1,6 @@
 from typing import Optional, List
 from pydantic_settings import BaseSettings
+import os
 
 
 class Settings(BaseSettings):
@@ -45,7 +46,8 @@ class Settings(BaseSettings):
     assemblyai_api_key: str = ""
 
     class Config:
-        env_file = ".env"
+        # 절대 경로로 .env 파일 지정
+        env_file = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), ".env")
         extra = "ignore"  # 알려지지 않은 변수들은 무시
 
 
