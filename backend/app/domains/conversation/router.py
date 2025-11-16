@@ -180,16 +180,34 @@ async def run_agent_pipeline_async(conversation_id: str, user_id: int):
         
         logger.info(f"Agent 파이프라인 완료: conv_id={conversation_id}, status={result.get('status')}")
         
-        # 성공/실패에 따른 추가 처리 (알림 등)
+        # WebSocket으로 프론트엔드에 완료 알림
+        from .websocket import notify_analysis_complete, notify_analysis_error
+        
         if result.get("status") == "completed":
             logger.info(f"분석 성공: score={result.get('score')}, confidence={result.get('confidence')}")
+            
+            # 성공 알림
+            await notify_analysis_complete(conversation_id, {
+                "analysisId": result.get("analysis_id"),
+                "score": result.get("score"),
+                "confidence": result.get("confidence"),
+                "status": "completed"
+            })
         else:
             logger.error(f"분석 실패: {result.get('error')}")
+            
+            # 실패 알림
+            await notify_analysis_error(conversation_id, result.get('error', '분석 실패'))
         
         return result
         
     except Exception as e:
         logger.error(f"Agent 파이프라인 실행 실패: conv_id={conversation_id}, error={str(e)}")
+        
+        # 예외 발생 시에도 WebSocket 알림
+        from .websocket import notify_analysis_error
+        await notify_analysis_error(conversation_id, str(e))
+        
         return {"status": "failed", "error": str(e)}
 
 
