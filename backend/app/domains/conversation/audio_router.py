@@ -19,6 +19,23 @@ router = APIRouter(prefix="/api/conversation", tags=["audio-conversation"])
 logger = logging.getLogger(__name__)
 
 
+def convert_speaker_to_number(speaker_id):
+    """SPEAKER_0A → 1, SPEAKER_0B → 2 형태로 변환"""
+    if isinstance(speaker_id, str) and speaker_id.startswith('SPEAKER_'):
+        # SPEAKER_0A → 1, SPEAKER_0B → 2, SPEAKER_1A → 3, SPEAKER_1B → 4
+        suffix = speaker_id.split('_')[-1]  # 0A, 0B, 1A, 1B
+        if len(suffix) >= 2:
+            try:
+                num = int(suffix[:-1])  # 0, 1, 2...
+                letter = suffix[-1]     # A, B, C...
+                # A=1, B=2, C=3...
+                letter_num = ord(letter) - ord('A') + 1
+                return num * 10 + letter_num
+            except:
+                pass
+    return speaker_id
+
+
 def format_transcript_for_agent(stt_result: dict, user_mapping: dict = None) -> str:
     """STT 결과를 Agent가 기대하는 형식으로 변환 (user_mapping 지원)"""
     speaker_segments = stt_result.get("speaker_segments", [])
@@ -41,6 +58,9 @@ def format_transcript_for_agent(stt_result: dict, user_mapping: dict = None) -> 
             mapped_user_id = user_mapping[str(speaker)]
             if mapped_user_id is not None:
                 speaker = mapped_user_id
+        else:
+            # user_mapping에 없으면 숫자 ID로 변환 (게스트 처리)
+            speaker = convert_speaker_to_number(speaker)
         
         # 시간을 MM:SS 형식으로 변환
         minutes = int(start_time // 60)

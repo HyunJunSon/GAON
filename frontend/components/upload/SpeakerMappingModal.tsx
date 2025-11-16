@@ -71,10 +71,25 @@ export default function SpeakerMappingModal({
   const loadFamilyMembers = async () => {
     try {
       const familyData = await getFamily();
-      setFamilyMembers(familyData.members || []);
+      let members = familyData.members || [];
+      
+      // 현재 사용자를 가족 구성원 목록 맨 앞에 추가
+      if (user) {
+        members = [
+          { id: user.id.toString(), name: `${user.name} (나)`, email: user.email },
+          ...members.filter(member => member.id !== user.id.toString())
+        ];
+      }
+      
+      setFamilyMembers(members);
     } catch (err) {
       console.error('가족 구성원 로드 실패:', err);
-      // 가족 정보 로드 실패해도 화자 매핑은 계속 진행
+      // 가족 정보 로드 실패해도 현재 사용자는 추가
+      if (user) {
+        setFamilyMembers([
+          { id: user.id.toString(), name: `${user.name} (나)`, email: user.email }
+        ]);
+      }
     }
   };
 
@@ -117,26 +132,24 @@ export default function SpeakerMappingModal({
     }
   };
 
-  // "나" 버튼 클릭 시 현재 사용자로 설정
-  const handleSetAsMe = (speakerId: string) => {
-    if (user?.name && user?.id) {
-      setMapping(prev => ({
-        ...prev,
-        [speakerId]: user.name
-      }));
-      setUserMapping(prev => ({
-        ...prev,
-        [speakerId]: user.id
-      }));
-      setSpeakerTypes(prev => ({
-        ...prev,
-        [speakerId]: 'family'
-      }));
-    }
-  };
-
   const handleSubmit = async () => {
     try {
+      // 최소 1명은 가족 구성원이어야 함 검증
+      const familyMemberCount = Object.keys(userMapping).length;
+      if (familyMemberCount === 0) {
+        setError('최소 1명은 가족 구성원으로 선택해야 합니다.');
+        return;
+      }
+
+      // 모든 화자가 설정되었는지 확인
+      const unsetSpeakers = speakers.filter(speaker => 
+        !mapping[speaker.speaker.toString()]
+      );
+      if (unsetSpeakers.length > 0) {
+        setError('모든 화자를 설정해주세요.');
+        return;
+      }
+
       setIsLoading(true);
       await updateSpeakerMapping(conversationId, mapping, userMapping);
       onComplete(mapping);
@@ -160,6 +173,9 @@ export default function SpeakerMappingModal({
           <h2 className="text-xl font-semibold mb-2">화자 설정</h2>
           <p className="text-sm text-gray-600">
             음성에서 인식된 화자들에게 이름을 지정해주세요.
+          </p>
+          <p className="text-xs text-orange-600 mt-1">
+            ⚠️ 분석을 위해 최소 1명은 가족 구성원으로 선택해야 합니다.
           </p>
         </div>
         
@@ -241,8 +257,8 @@ export default function SpeakerMappingModal({
                             onClick={() => handleSpeakerTypeChange(speaker.speaker.toString(), 'family')}
                             className={`flex-1 px-3 py-2 text-xs font-medium rounded border transition-colors ${
                               speakerTypes[speaker.speaker.toString()] === 'family'
-                                ? 'bg-gray-100 border-gray-400 text-gray-800' 
-                                : 'bg-white border-gray-300 text-gray-600 hover:bg-gray-50'
+                                ? 'bg-black text-white border-black' 
+                                : 'bg-white border-gray-300 text-gray-700 hover:bg-gray-50'
                             }`}
                           >
                             👨‍👩‍👧‍👦 가족 구성원
@@ -252,8 +268,8 @@ export default function SpeakerMappingModal({
                             onClick={() => handleSpeakerTypeChange(speaker.speaker.toString(), 'guest')}
                             className={`flex-1 px-3 py-2 text-xs font-medium rounded border transition-colors ${
                               speakerTypes[speaker.speaker.toString()] === 'guest'
-                                ? 'bg-gray-100 border-gray-400 text-gray-800' 
-                                : 'bg-white border-gray-300 text-gray-600 hover:bg-gray-50'
+                                ? 'bg-black text-white border-black' 
+                                : 'bg-white border-gray-300 text-gray-700 hover:bg-gray-50'
                             }`}
                           >
                             👥 게스트/친구
@@ -262,30 +278,19 @@ export default function SpeakerMappingModal({
 
                         {/* 가족 구성원 선택 */}
                         {speakerTypes[speaker.speaker.toString()] === 'family' && (
-                          <div className="space-y-2">
-                            <div className="flex space-x-2">
-                              <select
-                                value={userMapping[speaker.speaker.toString()] || ''}
-                                onChange={(e) => handleFamilyMemberSelect(speaker.speaker.toString(), e.target.value)}
-                                className="flex-1 rounded border border-gray-300 px-3 py-2 text-sm focus:border-black focus:outline-none focus:ring-1 focus:ring-black"
-                              >
-                                <option value="">가족 구성원 선택</option>
-                                {familyMembers.map(member => (
-                                  <option key={member.id} value={member.id}>
-                                    {member.name}
-                                  </option>
-                                ))}
-                              </select>
-                              {user?.name && !Object.values(userMapping).includes(user.id) && (
-                                <button
-                                  type="button"
-                                  onClick={() => handleSetAsMe(speaker.speaker.toString())}
-                                  className="px-3 py-2 text-sm font-medium text-gray-700 bg-gray-100 border border-gray-300 rounded hover:bg-gray-200 focus:outline-none focus:ring-1 focus:ring-black transition-colors"
-                                >
-                                  나
-                                </button>
-                              )}
-                            </div>
+                          <div>
+                            <select
+                              value={userMapping[speaker.speaker.toString()] || ''}
+                              onChange={(e) => handleFamilyMemberSelect(speaker.speaker.toString(), e.target.value)}
+                              className="w-full rounded border border-gray-300 px-3 py-2 text-sm focus:border-black focus:outline-none focus:ring-1 focus:ring-black"
+                            >
+                              <option value="">가족 구성원 선택</option>
+                              {familyMembers.map(member => (
+                                <option key={member.id} value={member.id}>
+                                  {member.name}
+                                </option>
+                              ))}
+                            </select>
                           </div>
                         )}
 
@@ -327,7 +332,11 @@ export default function SpeakerMappingModal({
                   </button>
                   <button
                     onClick={handleSubmit}
-                    disabled={Object.keys(mapping).length === 0 || isLoading}
+                    disabled={
+                      Object.keys(mapping).length === 0 || 
+                      Object.keys(userMapping).length === 0 || 
+                      isLoading
+                    }
                     className="flex-1 rounded bg-black px-4 py-2 text-sm font-medium text-white hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed transition-opacity"
                   >
                     {isLoading ? '저장 중...' : '확인'}
