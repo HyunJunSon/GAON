@@ -25,6 +25,8 @@ os.environ["USE_TEST_DB"] = "false"
 from app.llm.agent.Cleaner.run_cleaner import run_cleaner
 from app.llm.agent.Analysis.run_analysis import run_analysis
 from app.llm.agent.QA.run_qa import run_qa
+from app.llm.agent.Feedback.run_feedback import run_feedback
+
 
 # ----------------------------------------
 # 메인 실행 로직
@@ -108,6 +110,24 @@ def main():
     print(f"\n✅ QA 완료: confidence={qa_result.get('confidence', 0):.2f}")
 
     # =========================================
+    # 4️⃣ Feedback 실행
+    # =========================================
+    print("\n[4️⃣ FEEDBACK] 조언 생성 단계 시작")
+
+    feedback_result = run_feedback(
+        conv_id=conv_id,
+        id=id,
+        conversation_df=cleaned_df,
+    )
+
+    print("\n📊 [Feedback 결과]")
+    print("-" * 60)
+    pprint(feedback_result)
+
+    print(f"\n✅ Feedback 완료: analysis_id={feedback_result.get('analysis_id')}")
+
+
+    # =========================================
     # ✅ 최종 완료
     # =========================================
     print("\n" + "=" * 60)
@@ -122,16 +142,18 @@ def main():
     print(f"   말하기 점수: {analysis_result.get('analysis_result', {}).get('score', 0):.2f}")
     print(f"   신뢰도 점수: {qa_result.get('confidence', 0):.2f}")
     print(f"   QA 상태: {qa_result.get('status', 'unknown')}")
-    
+    print(f"   피드백 요약: { (feedback_result.get('feedback') or '')[:80] }...")
+
     return {
         "conv_id": conv_id,
         "id": id,
         "analysis_id": analysis_result.get("analysis_id"),
         "score": analysis_result.get("analysis_result", {}).get("score", 0),
         "confidence": qa_result.get("confidence", 0),
-        "status": "completed"
+        "status": "completed",
+        "feedback": feedback_result.get("feedback"),
     }
-
 
 if __name__ == "__main__":
     main()
+    

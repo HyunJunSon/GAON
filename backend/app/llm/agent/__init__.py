@@ -4,6 +4,7 @@ Agent package: LangGraph 기반 모듈 (Cleaner, Analysis, QA)
 """
 from .Cleaner import *
 from .Analysis import *
+from .Feedback import *
 
 # QA 모듈은 의존성 문제로 선택적 import
 try:
