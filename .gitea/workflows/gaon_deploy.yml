@@ -160,20 +160,44 @@ jobs:
           # 롤링 업데이트 (무중단 배포)
           echo "🚀 Starting rolling update..."
           
-          # 기존 컨테이너 강제 정리 (컨테이너 이름 충돌 방지)
-          echo "🧹 Cleaning up existing containers..."
-          docker rm -f gaon-backend gaon-frontend gaon-nginx gaon-postgres 2>/dev/null || true
-          docker rm -f $(docker ps -aq --filter "name=gaon") 2>/dev/null || true
+          # 기존 컨테이너 강제 정리 (PostgreSQL 제외)
+          echo "🧹 Cleaning up existing containers (preserving PostgreSQL)..."
+          docker rm -f gaon-backend gaon-frontend gaon-nginx 2>/dev/null || true
           docker-compose -f docker-compose.prod.yml down --remove-orphans || true
           docker system prune -f || true
           
           echo "⏳ Waiting for cleanup to complete..."
           sleep 5
           
+          # PostgreSQL이 실행 중이 아니면 시작
+          if ! docker ps | grep -q gaon-postgres; then
+            echo "🗄️ Starting PostgreSQL database..."
+            docker-compose -f docker-compose-db.yml up -d
+            sleep 10
+          fi
+          
+          # GCP 서비스 계정 키 파일 확인 및 생성
+          if [ ! -f "/home/ubuntu/gaon/gcp_service_account_key.json" ]; then
+            echo "🔑 Creating GCP service account key file..."
+            echo '${{ secrets.GCP_SA_KEY }}' > /home/ubuntu/gaon/gcp_service_account_key.json
+            chmod 600 /home/ubuntu/gaon/gcp_service_account_key.json
+          fi
+          
           # 새로 시작
           docker-compose -f docker-compose.prod.yml up -d || rollback
           echo "⏳ Waiting for services to start..."
           sleep 20
+          
+          # DB 연결 확인
+          echo "🗄️ Checking database connection..."
+          for i in {1..30}; do
+            if docker exec gaon-postgres pg_isready -U gaon_admin -d gaon; then
+              echo "✅ Database is ready!"
+              break
+            fi
+            echo "⏳ Waiting for database... ($i/30)"
+            sleep 2
+          done
           
           # DB 마이그레이션 적용 (마이그레이션 변경사항이 있을 때)
           if [ "${{ needs.check-changes.outputs.migration_changed }}" == "true" ]; then
