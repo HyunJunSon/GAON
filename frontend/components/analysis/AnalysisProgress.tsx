@@ -32,7 +32,7 @@ export default function AnalysisProgress({
   const [progressData, setProgressData] = useState<ProgressData | null>(null);
   const { addNotification } = useNotificationStore();
 
-  const { isConnected, error } = useWebSocket({
+  const { isConnected } = useWebSocket({
     url: `ws://localhost:8000/ws/analysis/${conversationId}`,
     onMessage: (message) => {
       switch (message.type) {
