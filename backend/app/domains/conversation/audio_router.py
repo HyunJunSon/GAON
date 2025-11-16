@@ -20,17 +20,17 @@ logger = logging.getLogger(__name__)
 
 
 def convert_speaker_to_number(speaker_id):
-    """SPEAKER_0A → 1, SPEAKER_0B → 2 형태로 변환"""
+    """SPEAKER_0A → 1001, SPEAKER_0B → 1002 형태로 변환 (실제 사용자 ID와 충돌 방지)"""
     if isinstance(speaker_id, str) and speaker_id.startswith('SPEAKER_'):
-        # SPEAKER_0A → 1, SPEAKER_0B → 2, SPEAKER_1A → 3, SPEAKER_1B → 4
+        # SPEAKER_0A → 1001, SPEAKER_0B → 1002 (1000번대 사용)
         suffix = speaker_id.split('_')[-1]  # 0A, 0B, 1A, 1B
         if len(suffix) >= 2:
             try:
                 num = int(suffix[:-1])  # 0, 1, 2...
                 letter = suffix[-1]     # A, B, C...
-                # A=1, B=2, C=3...
+                # A=1, B=2, C=3... + 1000 (게스트 범위)
                 letter_num = ord(letter) - ord('A') + 1
-                return num * 10 + letter_num
+                return 1000 + num * 10 + letter_num
             except:
                 pass
     return speaker_id

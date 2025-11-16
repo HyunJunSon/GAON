@@ -285,11 +285,21 @@ export default function SpeakerMappingModal({
                               className="w-full rounded border border-gray-300 px-3 py-2 text-sm focus:border-black focus:outline-none focus:ring-1 focus:ring-black"
                             >
                               <option value="">가족 구성원 선택</option>
-                              {familyMembers.map(member => (
-                                <option key={member.id} value={member.id}>
-                                  {member.name}
-                                </option>
-                              ))}
+                              {familyMembers.map(member => {
+                                // 이미 다른 화자가 선택한 가족 구성원은 비활성화
+                                const isAlreadySelected = Object.values(userMapping).includes(parseInt(member.id)) && 
+                                                         userMapping[speaker.speaker.toString()] !== parseInt(member.id);
+                                
+                                return (
+                                  <option 
+                                    key={member.id} 
+                                    value={member.id}
+                                    disabled={isAlreadySelected}
+                                  >
+                                    {member.name} {isAlreadySelected ? '(이미 선택됨)' : ''}
+                                  </option>
+                                );
+                              })}
                             </select>
                           </div>
                         )}
