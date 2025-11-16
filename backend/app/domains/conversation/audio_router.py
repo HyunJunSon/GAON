@@ -379,7 +379,16 @@ async def update_speaker_mapping(
         
         logger.info(f"화자 매핑 설정 완료 - 대화 ID: {conversation_id}, 매핑: {request.speaker_mapping}, 사용자 매핑: {request.user_mapping}")
         
-        # 7. 매핑 완료 후 자동으로 분석 파이프라인 시작
+        # 응답 객체 생성
+        response = SpeakerMappingResponse(
+            conversation_id=str(conversation_id),
+            file_id=audio_file.id,
+            speaker_mapping=request.speaker_mapping,
+            user_mapping=request.user_mapping,
+            message="화자 매핑이 성공적으로 설정되었습니다."
+        )
+        
+        # 7. 매핑 완료 후 자동으로 분석 파이프라인 시작 (백그라운드)
         try:
             from app.domains.conversation.router import run_agent_pipeline_async
             
@@ -389,13 +398,7 @@ async def update_speaker_mapping(
         except Exception as e:
             logger.warning(f"분석 파이프라인 자동 시작 실패: {str(e)}")
         
-        return SpeakerMappingResponse(
-            conversation_id=str(conversation_id),
-            file_id=audio_file.id,
-            speaker_mapping=request.speaker_mapping,
-            user_mapping=request.user_mapping,
-            message="화자 매핑이 성공적으로 설정되었습니다."
-        )
+        return response
         
     except HTTPException:
         db.rollback()
