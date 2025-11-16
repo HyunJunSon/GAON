@@ -194,15 +194,34 @@ class ConversationFileService:
         if not conversation:
             raise HTTPException(status_code=404, detail="대화를 찾을 수 없습니다.")
         
-        # 파일들의 분석 결과 통합
-        files = self.db.query(ConversationFile).filter(ConversationFile.conv_id == conv_id).all()
+        # analysis_result 테이블에서 직접 조회
+        try:
+            result = self.db.execute(
+                "SELECT summary, statistics, style_analysis, score, confidence_score, feedback, updated_at "
+                "FROM analysis_result WHERE conv_id = %s", 
+                (conv_id,)
+            ).fetchone()
+            
+            if result:
+                # 실제 분석 결과 반환
+                return {
+                    "summary": result[0],
+                    "statistics": result[1],
+                    "style_analysis": result[2],
+                    "score": result[3],
+                    "confidence_score": result[4],
+                    "feedback": result[5],
+                    "status": "completed",
+                    "updated_at": result[6],
+                    "dialog": [{"speaker": "User", "content": "분석된 대화 내용"}]
+                }
+        except Exception as e:
+            logger.error(f"분석 결과 조회 중 오류: {str(e)}")
         
-        # 임시 분석 결과 (실제로는 LLM 분석 결과를 반환)
+        # 분석 결과가 없으면 처리 중 상태 반환
         return {
-            "summary": conversation.content[:500] + "..." if len(conversation.content) > 500 else conversation.content,
-            "emotion": {"positive": 0.7, "negative": 0.2, "neutral": 0.1},
-            "dialog": [{"speaker": "User", "content": "분석된 대화 내용"}],
-            "status": "completed",
+            "status": "processing",
+            "message": "분석이 진행 중입니다.",
             "updated_at": conversation.create_date
         }
 
