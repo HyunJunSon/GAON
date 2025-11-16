@@ -151,7 +151,23 @@ speaker는 반드시 int 형태로 반환해야해.
             if self.verbose:
                 print(f"🧠 [RelationResolver_LLM] 응답: {content[:200]}")
             
-            # ✅ 간단한 fallback
+            # JSON 파싱 시도
+            try:
+                import json
+                # JSON 부분만 추출
+                json_start = content.find('[')
+                json_end = content.rfind(']') + 1
+                if json_start != -1 and json_end != 0:
+                    json_str = content[json_start:json_end]
+                    relations = json.loads(json_str)
+                    if self.verbose:
+                        print(f"✅ [RelationResolver_LLM] 파싱 성공: {relations}")
+                    return relations
+            except Exception as parse_error:
+                if self.verbose:
+                    print(f"⚠️ JSON 파싱 실패: {parse_error}")
+            
+            # fallback
             return [
                 {"speaker": 1, "relation": "참석자1"},
                 {"speaker": 2, "relation": "참석자2"}
