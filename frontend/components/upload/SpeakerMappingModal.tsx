@@ -134,6 +134,22 @@ export default function SpeakerMappingModal({
 
   const handleSubmit = async () => {
     try {
+      // 최소 1명은 가족 구성원이어야 함 검증
+      const familyMemberCount = Object.keys(userMapping).length;
+      if (familyMemberCount === 0) {
+        setError('최소 1명은 가족 구성원으로 선택해야 합니다.');
+        return;
+      }
+
+      // 모든 화자가 설정되었는지 확인
+      const unsetSpeakers = speakers.filter(speaker => 
+        !mapping[speaker.speaker.toString()]
+      );
+      if (unsetSpeakers.length > 0) {
+        setError('모든 화자를 설정해주세요.');
+        return;
+      }
+
       setIsLoading(true);
       await updateSpeakerMapping(conversationId, mapping, userMapping);
       onComplete(mapping);
@@ -157,6 +173,9 @@ export default function SpeakerMappingModal({
           <h2 className="text-xl font-semibold mb-2">화자 설정</h2>
           <p className="text-sm text-gray-600">
             음성에서 인식된 화자들에게 이름을 지정해주세요.
+          </p>
+          <p className="text-xs text-orange-600 mt-1">
+            ⚠️ 분석을 위해 최소 1명은 가족 구성원으로 선택해야 합니다.
           </p>
         </div>
         
@@ -313,7 +332,11 @@ export default function SpeakerMappingModal({
                   </button>
                   <button
                     onClick={handleSubmit}
-                    disabled={Object.keys(mapping).length === 0 || isLoading}
+                    disabled={
+                      Object.keys(mapping).length === 0 || 
+                      Object.keys(userMapping).length === 0 || 
+                      isLoading
+                    }
                     className="flex-1 rounded bg-black px-4 py-2 text-sm font-medium text-white hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed transition-opacity"
                   >
                     {isLoading ? '저장 중...' : '확인'}
