@@ -14,6 +14,7 @@ class SpeakerMappingResponse(BaseModel):
     conversation_id: str
     file_id: int
     speaker_mapping: Dict[str, Optional[str]]
+    user_mapping: Optional[Dict[str, int]] = None
     message: str
 
 

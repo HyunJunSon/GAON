@@ -191,7 +191,7 @@ export default function SpeakerMappingModal({
                             onChange={(e) => handleNameChange(speaker.speaker.toString(), e.target.value)}
                             className="flex-1 rounded border border-gray-300 px-3 py-2 text-sm focus:border-black focus:outline-none focus:ring-1 focus:ring-black"
                           />
-                          {user?.name && (
+                          {user?.name && !Object.values(userMapping).includes(user.id) && (
                             <button
                               type="button"
                               onClick={() => handleSetAsMe(speaker.speaker.toString())}

@@ -101,6 +101,7 @@ export type SpeakerMappingResponse = {
   conversation_id: string;
   file_id: number;
   speaker_mapping: SpeakerMapping;
+  user_mapping?: Record<string, number>;
   speaker_count: number;
   mapped_segments: SpeakerSegment[];
 };
