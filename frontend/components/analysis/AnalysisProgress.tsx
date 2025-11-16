@@ -94,7 +94,7 @@ export default function AnalysisProgress({
           <div className="w-8 h-8 border-2 border-gray-300 border-t-black rounded-full animate-spin mx-auto mb-4"></div>
           <p className="text-sm text-gray-600">분석 준비 중...</p>
           {!isConnected && (
-            <p className="text-xs text-red-500 mt-2">연결 중... {error}</p>
+            <p className="text-xs text-red-500 mt-2">연결 중...</p>
           )}
         </div>
       </div>

@@ -2,7 +2,7 @@ name: Deploy GAON Application
 
 on:
   push:
-    branches: [ "main", "develop" ]
+    branches: [ "main", "develop", "hotfix/fix-code" ]
 
 env:
   REGISTRY: asia-northeast3-docker.pkg.dev
@@ -99,7 +99,7 @@ jobs:
 
   deploy:
     needs: [check-changes, build-backend, build-frontend]
-    if: always() && (needs.build-backend.result == 'success' || needs.build-backend.result == 'skipped') && (needs.build-frontend.result == 'success' || needs.build-frontend.result == 'skipped') && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/develop')
+    if: always() && (needs.build-backend.result == 'success' || needs.build-backend.result == 'skipped') && (needs.build-frontend.result == 'success' || needs.build-frontend.result == 'skipped') && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/develop' || github.ref == 'refs/heads/hotfix/fix-code')
     runs-on: self-hosted
     
     steps:

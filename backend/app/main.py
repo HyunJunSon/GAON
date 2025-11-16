@@ -33,7 +33,7 @@ app.add_middleware(
 
 @app.get("/health")
 def health_check():
-    return {"message": "안녕하세요. 가족의온도를 책임지는 가온 입니다.", "version": "1.0.1"}
+    return {"message": "안녕하세요. 가족의온도를 책임지는 가온 입니다.", "version": "1.0.2"}
 
 
 app.include_router(auth_router)
