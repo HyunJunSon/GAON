@@ -45,7 +45,7 @@ export function useAnalysis(conversationId: string): UseQueryResult<AnalysisRes,
     refetchInterval: (query) => {
       if (!query) return 2000;
       const status = query.state.data?.status;
-      return status === 'ready' || status === 'failed' ? false : 2000;
+      return status === 'ready' || status === 'completed' || status === 'failed' ? false : 2000;
     },
     staleTime: 0,
   })
