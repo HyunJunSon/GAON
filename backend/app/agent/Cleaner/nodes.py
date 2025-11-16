@@ -91,35 +91,74 @@ class RawInspector:
 # =========================================
 @dataclass
 class ConversationCleaner:
-    """LLM을 사용해 문장 정제 및 노이즈 제거"""
+    """LLM을 사용해 문장 정제 및 노이즈 제거 (배치 처리 최적화)"""
     verbose: bool = False
+    batch_size: int = 10  # 한 번에 처리할 문장 수
 
     def clean(self, df: Any, state=None) -> Any:
         if pd is not None and isinstance(df, pd.DataFrame):
             out = df.copy()
             llm = ChatOpenAI(model="gpt-4o-mini", api_key=settings.openai_api_key)
 
+            texts = out["text"].tolist()
             cleaned = []
-            for text in out["text"]:
-                prompt = f"다음 문장에서 철자 오류나 이상한 기호를 자연스럽게 수정해줘:\n{text}"
+            
+            # 배치 단위로 처리
+            for i in range(0, len(texts), self.batch_size):
+                batch = texts[i:i + self.batch_size]
+                
+                # 배치 프롬프트 생성
+                batch_prompt = "다음 문장들에서 철자 오류나 이상한 기호를 자연스럽게 수정해줘. 각 문장을 번호와 함께 수정해서 반환해줘:\n\n"
+                for j, text in enumerate(batch, 1):
+                    batch_prompt += f"{j}. {text}\n"
+                
                 if self.verbose:
-                    print(f"🪶 [Cleaner LLM 입력] {text}")
+                    print(f"🪶 [Cleaner LLM 배치 {i//self.batch_size + 1}] {len(batch)}개 문장 처리 중...")
+                
                 try:
-                    response = llm.invoke(prompt)
+                    response = llm.invoke(batch_prompt)
                     cleaned_text = (
                         response.content
                         if hasattr(response, "content")
                         else str(response)
                     )
-                    cleaned.append(cleaned_text)
+                    
+                    # 응답에서 개별 문장 추출
+                    batch_cleaned = self._parse_batch_response(cleaned_text, batch)
+                    cleaned.extend(batch_cleaned)
+                    
                     if self.verbose:
-                        print(f"✅ [Cleaner LLM 결과] {cleaned_text}")
+                        print(f"✅ [Cleaner LLM 배치 완료] {len(batch_cleaned)}개 문장 정제됨")
+                        
                 except Exception as e:
-                    cleaned.append(text)
-                    print(f"⚠️ LLM 호출 실패: {e}")
+                    # 실패 시 원본 사용
+                    cleaned.extend(batch)
+                    print(f"⚠️ 배치 LLM 호출 실패: {e}")
+            
             out["text"] = cleaned
             return out
         return df
+    
+    def _parse_batch_response(self, response: str, original_batch: List[str]) -> List[str]:
+        """배치 응답에서 개별 문장 추출"""
+        lines = response.strip().split('\n')
+        cleaned_batch = []
+        
+        for i, original in enumerate(original_batch, 1):
+            # 번호로 시작하는 라인 찾기
+            found = False
+            for line in lines:
+                if line.strip().startswith(f"{i}."):
+                    cleaned_text = line.strip()[2:].strip()  # "1. " 제거
+                    cleaned_batch.append(cleaned_text)
+                    found = True
+                    break
+            
+            if not found:
+                # 파싱 실패 시 원본 사용
+                cleaned_batch.append(original)
+        
+        return cleaned_batch
 
 
 # =========================================
