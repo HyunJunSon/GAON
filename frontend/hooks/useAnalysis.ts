@@ -47,6 +47,14 @@ export function useAnalysis(conversationId: string): UseQueryResult<AnalysisRes,
       const status = query.state.data?.status;
       return status === 'ready' || status === 'completed' || status === 'failed' ? false : 2000;
     },
-    staleTime: 0,
+    staleTime: (query) => {
+      const status = query?.state?.data?.status;
+      // 분석 완료된 데이터는 무제한 캐싱
+      if (status === 'ready' || status === 'completed') {
+        return Infinity;
+      }
+      // 진행 중이거나 실패한 경우는 짧은 캐싱
+      return 30 * 1000; // 30초
+    },
   })
 }
