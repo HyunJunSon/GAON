@@ -1,5 +1,5 @@
 // schemas/practice.ts
-export type PracticeMode = 'new' | 'replay';
+export type PracticeMode = 'chat' | 'voice';
 
 export type PracticeParticipant = {
   id: string;
@@ -10,11 +10,12 @@ export type PracticeParticipant = {
 export type StartPracticeReq = {
   conversationId: string;
   mode: PracticeMode;
-  participantIds: string[];
 };
 
 export type StartPracticeRes = {
   sessionId: string;
+  mode: PracticeMode;
+  conversationId: string;
 };
 
 export type FinishPracticeReq = {

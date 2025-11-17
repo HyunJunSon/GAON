@@ -7,6 +7,10 @@ import type {
   PracticeResult
 } from '@/schemas/practice';
 
+export async function startPracticeSession(payload: StartPracticeReq): Promise<StartPracticeRes> {
+  return apiFetch<StartPracticeRes>('/api/practice/session', { method: 'POST', json: payload });
+}
+
 export async function fetchParticipants(): Promise<{ participants: PracticeParticipant[] }> {
   return apiFetch('/api/practice/participants', { method: 'GET' });
 }
