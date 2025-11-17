@@ -219,6 +219,27 @@ class ContentValidator:
     def validate(self, df: pd.DataFrame) -> pd.DataFrame:
         # 현재는 그대로 pass
         return df
+    
+    def _parse_batch_response(self, response: str, original_batch: List[str]) -> List[str]:
+        """배치 응답에서 개별 문장 추출"""
+        lines = response.strip().split('\n')
+        cleaned_batch = []
+        
+        for i, original in enumerate(original_batch, 1):
+            # 번호로 시작하는 라인 찾기
+            found = False
+            for line in lines:
+                if line.strip().startswith(f"{i}."):
+                    cleaned_text = line.strip()[2:].strip()  # "1. " 제거
+                    cleaned_batch.append(cleaned_text)
+                    found = True
+                    break
+            
+            if not found:
+                # 파싱 실패 시 원본 사용
+                cleaned_batch.append(original)
+        
+        return cleaned_batch
 
 
 # ===============================================================

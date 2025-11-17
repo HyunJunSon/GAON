@@ -30,6 +30,7 @@ export default function AudioRecorder({
   const [audioBlob, setAudioBlob] = useState<Blob | null>(null);
   const [showConfirmDialog, setShowConfirmDialog] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
+  const [uploadedFile, setUploadedFile] = useState<File | null>(null);
   
   // 참조 (기존 패턴 따름)
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
@@ -37,6 +38,7 @@ export default function AudioRecorder({
   const timerRef = useRef<NodeJS.Timeout | null>(null);
   const animationRef = useRef<number | null>(null);
   const waveformRef = useRef<HTMLDivElement | null>(null);
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
 
   // 타이머 업데이트
   useEffect(() => {
@@ -149,6 +151,7 @@ export default function AudioRecorder({
   const resetRecording = useCallback(() => {
     stopRecording();
     setAudioBlob(null);
+    setUploadedFile(null);
     setRecordingTime(0);
     
     // 실시간 파형 애니메이션 중지
@@ -165,6 +168,48 @@ export default function AudioRecorder({
       }
     }
   }, [stopRecording]);
+
+  // 파일 업로드 핸들러 (GAON 스타일 + STT 최적화)
+  const handleFileUpload = useCallback((event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    // 지원하는 오디오 형식 검증 (백엔드 STT 서비스 기준)
+    const supportedFormats = ['audio/mp3', 'audio/mpeg', 'audio/wav', 'audio/webm', 'audio/mp4', 'audio/x-m4a'];
+    const fileExtension = file.name.toLowerCase().split('.').pop();
+    const supportedExtensions = ['mp3', 'wav', 'webm', 'm4a'];
+
+    if (!supportedFormats.includes(file.type) && !supportedExtensions.includes(fileExtension || '')) {
+      onError?.('지원하는 오디오 형식: MP3, WAV, WebM, M4A');
+      return;
+    }
+
+    // 파일 크기 제한 (50MB - Google STT 제한)
+    if (file.size > 50 * 1024 * 1024) {
+      onError?.('파일 크기는 50MB 이하여야 합니다.');
+      return;
+    }
+
+    setUploadedFile(file);
+    setAudioBlob(file);
+    
+    // 오디오 파일의 재생 시간 계산
+    const audio = new Audio();
+    audio.onloadedmetadata = () => {
+      setRecordingTime(Math.floor(audio.duration));
+    };
+    audio.onerror = () => {
+      onError?.('오디오 파일을 읽을 수 없습니다.');
+    };
+    audio.src = URL.createObjectURL(file);
+    
+    console.log('📁 파일 업로드 완료:', file.name, file.size, 'bytes');
+  }, [onError]);
+
+  // 파일 선택 버튼 클릭
+  const handleFileSelect = useCallback(() => {
+    fileInputRef.current?.click();
+  }, []);
 
   // 녹음 완료 확인 다이얼로그 표시
   const handleComplete = useCallback(() => {
@@ -261,7 +306,7 @@ export default function AudioRecorder({
           {isRecording 
             ? (isPaused ? '녹음이 일시정지되었습니다.' : '녹음 중입니다...')
             : audioBlob 
-            ? '녹음이 완료되었습니다. 파형을 확인하고 전송하거나 다시 녹음하세요.'
+            ? (uploadedFile ? `음성이 업로드되었습니다: ${uploadedFile.name}` : '녹음이 완료되었습니다. 파형을 확인하고 전송하거나 다시 녹음하세요.')
             : placeholder
           }
         </p>
@@ -269,15 +314,23 @@ export default function AudioRecorder({
         {/* 버튼 그룹 */}
         <div className="flex justify-center space-x-3">
           {!isRecording && !audioBlob && (
-            <button
-              onClick={() => {
-                console.log('🔴 녹음 시작 버튼 클릭됨!');
-                startRecording();
-              }}
-              className="px-6 py-2 bg-black text-white rounded hover:bg-gray-800 transition-colors disabled:opacity-50"
-            >
-              녹음 시작
-            </button>
+            <>
+              <button
+                onClick={() => {
+                  console.log('🔴 녹음 시작 버튼 클릭됨!');
+                  startRecording();
+                }}
+                className="px-6 py-2 bg-black text-white rounded hover:bg-gray-800 transition-colors disabled:opacity-50"
+              >
+                녹음 시작
+              </button>
+              <button
+                onClick={handleFileSelect}
+                className="px-6 py-2 bg-gray-600 text-white rounded hover:bg-gray-700 transition-colors"
+              >
+                음성 업로드
+              </button>
+            </>
           )}
 
           {isRecording && (
@@ -330,11 +383,13 @@ export default function AudioRecorder({
       {showConfirmDialog && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
           <div className="bg-white rounded p-6 max-w-sm w-full mx-4">
-            <h3 className="text-lg font-semibold mb-4">음성 녹음 완료</h3>
+            <h3 className="text-lg font-semibold mb-4">
+              {uploadedFile ? '음성 업로드 완료' : '음성 녹음 완료'}
+            </h3>
             <p className="text-gray-600 mb-6">
-              녹음된 음성을 전송하시겠습니까?<br/>
+              {uploadedFile ? '업로드된 파일을' : '녹음된 음성을'} 전송하시겠습니까?<br/>
               <span className="text-sm text-gray-500">
-                녹음 시간: {formatTime(recordingTime)}
+                {uploadedFile ? `파일명: ${uploadedFile.name}` : `녹음 시간: ${formatTime(recordingTime)}`}
               </span>
             </p>
             <div className="flex space-x-3">
@@ -356,6 +411,15 @@ export default function AudioRecorder({
           </div>
         </div>
       )}
+
+      {/* 숨겨진 파일 입력 */}
+      <input
+        ref={fileInputRef}
+        type="file"
+        accept=".mp3,.wav,.webm,.m4a,audio/mp3,audio/mpeg,audio/wav,audio/webm,audio/mp4,audio/x-m4a"
+        onChange={handleFileUpload}
+        className="hidden"
+      />
     </div>
   );
 }

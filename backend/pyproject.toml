@@ -15,6 +15,7 @@ dependencies = [
     "argon2-cffi==25.1.0",
     "python-jose[cryptography]==3.5.0", # JWT 토큰 처리
     "bcrypt==5.0.0", # 비밀번호 해싱
+    "ecdsa==0.18.0", # 호환성 문제 해결을 위한 버전 고정
     # --- Database ---
     "sqlalchemy==2.0.43",
     "alembic==1.13.2",
@@ -38,41 +39,41 @@ dependencies = [
     "requests==2.32.5",
     "tqdm==4.67.1",
     "pypdf==6.1.1",
+    # --- Data Processing ---
+    "pandas>=2.0.0",
     # --- Document Processing ---
     "ebooklib==0.18",
     "python-docx==1.1.2",
+    "pymupdf==1.24.10",  # PDF 처리 및 TOC 추출용
     # --- AI / LLM Core ---
-    "openai==1.106.1",
-    "anthropic==0.69.0",
-    "google-api-python-client==2.184.0",
-    "google-cloud-speech==2.34.0", # Google Cloud Speech-to-Text API
-    "huggingface-hub==0.35.3",
-    "transformers==4.42.4",
-    "tokenizers==0.19.1",
+    "openai>=1.0.0,==1.106.1",
+    "anthropic>=0.60.0,==0.69.0",
+    "google-api-python-client>=2.0.0,==2.184.0",
+    "google-cloud-speech>=2.0.0,==2.34.0",
+    "huggingface-hub>=0.20.0,==0.35.3",
+    "tokenizers>=0.15.0,==0.19.1",
     "filelock==3.13.1",
     "fsspec==2024.6.1",
-    "torch==2.5.1",
-    "torchvision==0.20.1",
-    "torchaudio==2.5.1",
     "accelerate==1.10.1",
     "safetensors==0.6.2",
-    "sentence-transformers==5.1.1",
-    "scikit-learn==1.7.2",
-    "scipy==1.14.1",
-    "numpy==1.26.4",
     "networkx==3.3",
     # --- LangChain & Related ---
-    "langchain==0.3.27",
-    "langchain-core==0.3.79",
-    "langchain-community==0.3.31",
-    "langchain-openai==0.3.32",
-    "langchain-anthropic==0.3.22",
-    "langchain-google-genai==2.1.12",
+    "langchain>=0.1.0,==0.3.27",
+    "langchain-core>=0.1.0,==0.3.79",
+    "langchain-community>=0.0.10,==0.3.31",
+    "langchain-openai>=0.0.5,==0.3.32",
+    "langchain-anthropic>=0.1.0,==0.3.22",
+    "langchain-google-genai>=1.0.0,==2.1.12",
     "langchain-huggingface==0.3.1",
     "langchain-experimental==0.3.4",
     "langchain-postgres==0.0.15",
     "langchain-text-splitters==0.3.11",
     "langsmith==0.4.26",
+    # --- LangGraph ---
+    "langgraph==0.2.45",
+    "langgraph-sdk==0.1.35",
+    # --- WebSocket & Real-time ---
+    "websockets>=13.0",
     # --- Google Cloud ---
     "google-cloud-storage==3.4.1",
     # --- Typing ---
@@ -82,12 +83,14 @@ dependencies = [
     "types-passlib>=1.7.7.20250602",
     "pip>=25.3",
     "docx>=0.2.4",
+    # === Data ===
+    "pandas",
+    "konlpy",
 ]
-[tool.uv]
-venv = "gaon-venv"
-
-[tool.setuptools]
-packages = ["app"]
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["app*"]
+exclude = ["alembic*"]
 
 [build-system]
 requires = ["setuptools", "wheel"]
@@ -101,4 +104,3 @@ dev = [
     "httpx",
     "reportlab==4.2.5",
 ]
-

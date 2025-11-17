@@ -12,7 +12,7 @@ export type StartAnalysisResSnake = {
 
 export type StartAnalysisAny = StartAnalysisRes | StartAnalysisResSnake;
 
-export type AnalysisStatus = 'queued' | 'processing' | 'ready' | 'failed';
+export type AnalysisStatus = 'queued' | 'processing' | 'ready' | 'completed' | 'failed';
 
 export type AnalysisRes = {
   conversationId: string;
@@ -83,5 +83,48 @@ export async function uploadAudio(audioBlob: Blob) {
   return apiFetch<StartAnalysisRes>('/api/conversation/audio', {
     method: 'POST',
     body: formData,
+  });
+}
+
+/** 화자 매핑 관련 타입 */
+export type SpeakerMapping = Record<string, string>;
+
+export type SpeakerSegment = {
+  speaker: number;
+  speaker_name?: string;
+  start: number;
+  end: number;
+  text: string;
+};
+
+export type SpeakerMappingResponse = {
+  conversation_id: string;
+  file_id: number;
+  speaker_mapping: SpeakerMapping;
+  user_mapping?: Record<string, number>;
+  speaker_count: number;
+  mapped_segments: SpeakerSegment[];
+};
+
+/** 화자 매핑 설정 */
+export async function updateSpeakerMapping(
+  conversationId: string, 
+  speakerMapping: SpeakerMapping, 
+  userMapping?: Record<string, number>
+) {
+  return apiFetch<{ message: string }>(`/api/conversation/audio/${conversationId}/speaker-mapping`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ 
+      speaker_mapping: speakerMapping,
+      user_mapping: userMapping 
+    }),
+  });
+}
+
+/** 화자 매핑 조회 */
+export async function getSpeakerMapping(conversationId: string) {
+  return apiFetch<SpeakerMappingResponse>(`/api/conversation/audio/${conversationId}/speaker-mapping`, {
+    method: 'GET',
   });
 }

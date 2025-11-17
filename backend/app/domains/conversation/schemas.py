@@ -29,11 +29,16 @@ class FileUploadResponse(BaseModel):
 
 
 class ConversationAnalysisResponse(BaseModel):
-    summary: str
-    emotion: Dict[str, Any]
-    dialog: List[Dict[str, Any]]
+    summary: Optional[str] = None
+    emotion: Optional[Dict[str, Any]] = None
+    dialog: Optional[List[Dict[str, Any]]] = None
     status: str
-    updated_at: datetime
+    updated_at: Optional[datetime] = None
+    score: Optional[float] = None
+    confidence_score: Optional[float] = None
+    feedback: Optional[str] = None
+    statistics: Optional[Dict[str, Any]] = None
+    style_analysis: Optional[Dict[str, Any]] = None
 
 
 # 파일 업로드 설정을 settings에서 가져오는 헬퍼 함수들

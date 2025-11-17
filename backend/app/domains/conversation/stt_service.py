@@ -3,6 +3,7 @@ from typing import List, Dict, Any, Optional
 from google.cloud import speech
 from google.cloud.speech import RecognitionAudio, RecognitionConfig, SpeakerDiarizationConfig
 import io
+from .assemblyai_client import AssemblyAIClient
 
 logger = logging.getLogger(__name__)
 
@@ -14,7 +15,8 @@ class STTService:
         """STT 서비스 초기화"""
         try:
             self.client = speech.SpeechClient()
-            logger.info("Google Cloud Speech-to-Text 클라이언트 초기화 완료")
+            self.assemblyai_client = AssemblyAIClient()
+            logger.info("STT 서비스 클라이언트들 초기화 완료")
         except Exception as e:
             logger.error(f"STT 클라이언트 초기화 실패: {str(e)}")
             raise
@@ -22,7 +24,7 @@ class STTService:
     def transcribe_audio_with_diarization(
         self, 
         audio_content: bytes, 
-        sample_rate: int = 16000,  # 더 일반적인 샘플 레이트
+        filename: str,
         language_code: str = "ko-KR",
         max_speakers: int = 2
     ) -> Dict[str, Any]:
@@ -31,7 +33,7 @@ class STTService:
         
         Args:
             audio_content: 오디오 파일의 바이트 데이터
-            sample_rate: 샘플링 레이트 (기본값: 16000Hz)
+            filename: 파일명 (확장자로 형식 판단)
             language_code: 언어 코드 (기본값: "ko-KR")
             max_speakers: 최대 화자 수 (기본값: 2)
             
@@ -39,57 +41,180 @@ class STTService:
             Dict containing transcript, speaker_segments, duration, speaker_count
         """
         try:
-            # 오디오 설정
-            audio = RecognitionAudio(content=audio_content)
+            # 파일 형식에 따른 인코딩 및 샘플 레이트 설정
+            encoding, sample_rate = self._get_audio_config(filename)
             
-            # 화자 구분 설정
-            diarization_config = SpeakerDiarizationConfig(
-                enable_speaker_diarization=True,
-                max_speaker_count=max_speakers,
-            )
+            # WebM 파일인 경우 WAV로 변환
+            if filename.lower().endswith('.webm'):
+                logger.info("WebM 파일 감지, WAV로 변환 중...")
+                audio_content = self._convert_webm_to_wav(audio_content)
             
-            # 인식 설정 - 자동 인코딩 감지 시도
-            config = RecognitionConfig(
-                encoding=RecognitionConfig.AudioEncoding.ENCODING_UNSPECIFIED,  # 자동 감지
-                sample_rate_hertz=sample_rate,
-                language_code=language_code,
-                diarization_config=diarization_config,
-                enable_automatic_punctuation=True,
-                model="latest_long"  # 긴 오디오에 최적화된 모델
-            )
+            # 파일 크기 기준으로 LongRunning API 사용 결정 (10MB 이상)
+            file_size_mb = len(audio_content) / (1024 * 1024)
             
-            logger.info(f"STT 처리 시작 - 언어: {language_code}, 최대 화자: {max_speakers}")
+            logger.info(f"STT 처리 시작 - 파일: {filename}, 크기: {file_size_mb:.1f}MB")
             
-            try:
-                # 음성 인식 실행
-                response = self.client.recognize(config=config, audio=audio)
-            except Exception as e:
-                # 자동 감지 실패 시 WEBM_OPUS로 재시도
-                logger.warning(f"자동 인코딩 감지 실패, WEBM_OPUS로 재시도: {str(e)}")
-                config.encoding = RecognitionConfig.AudioEncoding.WEBM_OPUS
-                response = self.client.recognize(config=config, audio=audio)
-            
-            if not response.results:
-                logger.warning("STT 결과가 없습니다")
-                return {
-                    "transcript": "",
-                    "speaker_segments": [],
-                    "duration": 0,
-                    "speaker_count": 0
-                }
-            
-            # 결과 파싱
-            return self._parse_recognition_response(response)
+            # 1MB 이상이면 LongRunning API 사용
+            if file_size_mb > 1:
+                return self._transcribe_long_audio(audio_content, encoding, sample_rate, language_code, max_speakers)
+            else:
+                return self._transcribe_short_audio(audio_content, encoding, sample_rate, language_code, max_speakers)
             
         except Exception as e:
             logger.error(f"STT 처리 실패: {str(e)}")
-            # 빈 결과 반환 (서버 오류 방지)
             return {
                 "transcript": "",
                 "speaker_segments": [],
                 "duration": 0,
                 "speaker_count": 0
             }
+    
+    def _get_audio_config(self, filename: str) -> tuple:
+        """파일 확장자에 따른 오디오 설정 반환"""
+        ext = filename.lower().split('.')[-1]
+        
+        config_map = {
+            'mp3': (RecognitionConfig.AudioEncoding.MP3, 44100),
+            'wav': (RecognitionConfig.AudioEncoding.LINEAR16, 16000),
+            'webm': (RecognitionConfig.AudioEncoding.LINEAR16, 16000),  # WebM을 WAV로 변환 후 처리
+            'm4a': (RecognitionConfig.AudioEncoding.MP3, 44100),
+        }
+        
+        return config_map.get(ext, (RecognitionConfig.AudioEncoding.ENCODING_UNSPECIFIED, 16000))
+    
+    def _convert_webm_to_wav(self, audio_content: bytes) -> bytes:
+        """WebM 오디오를 WAV로 변환"""
+        try:
+            import subprocess
+            import tempfile
+            import os
+            
+            # 임시 파일 생성
+            with tempfile.NamedTemporaryFile(suffix='.webm', delete=False) as temp_webm:
+                temp_webm.write(audio_content)
+                temp_webm_path = temp_webm.name
+            
+            temp_wav_path = temp_webm_path.replace('.webm', '.wav')
+            
+            # ffmpeg로 WebM을 WAV로 변환
+            cmd = [
+                'ffmpeg', '-i', temp_webm_path,
+                '-ar', '16000',  # 16kHz 샘플링 레이트
+                '-ac', '1',      # 모노 채널
+                '-f', 'wav',     # WAV 형식
+                temp_wav_path, '-y'  # 덮어쓰기
+            ]
+            
+            result = subprocess.run(cmd, capture_output=True, text=True)
+            
+            if result.returncode != 0:
+                logger.error(f"ffmpeg 변환 실패: {result.stderr}")
+                raise Exception(f"오디오 변환 실패: {result.stderr}")
+            
+            # 변환된 WAV 파일 읽기
+            with open(temp_wav_path, 'rb') as wav_file:
+                wav_content = wav_file.read()
+            
+            # 임시 파일 정리
+            os.unlink(temp_webm_path)
+            os.unlink(temp_wav_path)
+            
+            logger.info("WebM을 WAV로 변환 완료")
+            return wav_content
+            
+        except Exception as e:
+            logger.error(f"WebM 변환 실패: {str(e)}")
+            raise
+    
+    def _transcribe_short_audio(self, audio_content: bytes, encoding, sample_rate: int, 
+                               language_code: str, max_speakers: int) -> Dict[str, Any]:
+        """짧은 오디오 (1분 미만) 처리"""
+        audio = RecognitionAudio(content=audio_content)
+        
+        diarization_config = SpeakerDiarizationConfig(
+            enable_speaker_diarization=True,
+            min_speaker_count=1,  # 최소 1명으로 변경 - 더 유연한 화자 감지
+            max_speaker_count=max_speakers,
+        )
+        
+        config = RecognitionConfig(
+            encoding=encoding,
+            sample_rate_hertz=sample_rate,
+            language_code=language_code,
+            diarization_config=diarization_config,
+            enable_automatic_punctuation=True,
+            use_enhanced=False,  # enhanced 모드 비활성화
+            model="latest_short",  # 기본 모델 사용
+            enable_word_time_offsets=True,  # 단어별 시간 정보 활성화
+        )
+        
+        response = self.client.recognize(config=config, audio=audio)
+        return self._parse_recognition_response(response)
+    
+    def _transcribe_long_audio(self, audio_content: bytes, encoding, sample_rate: int,
+                              language_code: str, max_speakers: int) -> Dict[str, Any]:
+        """긴 오디오 (1분 이상) 처리 - GCS 업로드 후 LongRunning API 사용"""
+        from google.cloud import storage
+        import uuid
+        import time
+        
+        try:
+            # 임시 GCS 경로에 업로드
+            bucket_name = "gaon-cloud-data"
+            temp_filename = f"temp-audio/{uuid.uuid4()}.audio"
+            
+            storage_client = storage.Client()
+            bucket = storage_client.bucket(bucket_name)
+            blob = bucket.blob(temp_filename)
+            blob.upload_from_string(audio_content)
+            
+            gcs_uri = f"gs://{bucket_name}/{temp_filename}"
+            logger.info(f"긴 오디오 파일을 GCS에 업로드: {gcs_uri}")
+            
+            # LongRunning API 설정
+            audio = RecognitionAudio(uri=gcs_uri)
+            
+            diarization_config = SpeakerDiarizationConfig(
+                enable_speaker_diarization=True,
+                min_speaker_count=1,  # 최소 1명으로 변경 - 더 유연한 화자 감지
+                max_speaker_count=max_speakers,
+            )
+            
+            config = RecognitionConfig(
+                encoding=encoding,
+                sample_rate_hertz=sample_rate,
+                language_code=language_code,
+                diarization_config=diarization_config,
+                enable_automatic_punctuation=True,
+                use_enhanced=False,  # enhanced 모드 비활성화
+                model="latest_long",  # 기본 모델 사용
+                enable_word_time_offsets=True,  # 단어별 시간 정보 활성화
+            )
+            
+            # LongRunning 요청 시작
+            operation = self.client.long_running_recognize(config=config, audio=audio)
+            logger.info("LongRunning STT 작업 시작, 완료 대기 중...")
+            
+            # 결과 대기 (최대 10분)
+            response = operation.result(timeout=600)
+            
+            # 임시 파일 삭제
+            try:
+                blob.delete()
+                logger.info("임시 GCS 파일 삭제 완료")
+            except:
+                pass
+            
+            return self._parse_recognition_response(response)
+            
+        except Exception as e:
+            logger.error(f"LongRunning STT 처리 실패: {str(e)}")
+            # 임시 파일 정리 시도
+            try:
+                blob.delete()
+            except:
+                pass
+            raise
     
     def _parse_recognition_response(self, response) -> Dict[str, Any]:
         """
@@ -172,6 +297,12 @@ class STTService:
                 "speaker_count": speaker_count
             }
             
+            # 화자 분리가 제대로 안 된 경우 후처리 적용
+            if speaker_count <= 1 and len(speaker_segments) > 1:
+                logger.info("화자 분리 후처리 적용 중...")
+                result = self._apply_post_processing_diarization(result)
+                speaker_count = result['speaker_count']
+            
             logger.info(f"STT 처리 완료 - 화자 수: {speaker_count}, 총 시간: {duration}초")
             return result
             
@@ -179,30 +310,189 @@ class STTService:
             logger.error(f"STT 응답 파싱 실패: {str(e)}")
             raise Exception(f"음성 인식 결과 처리 중 오류가 발생했습니다: {str(e)}")
     
-    def validate_audio_format(self, audio_content: bytes) -> bool:
+    def _apply_post_processing_diarization(self, result: Dict[str, Any]) -> Dict[str, Any]:
+        """
+        텍스트 패턴 기반 화자 분리 후처리
+        Google STT가 화자 분리를 제대로 하지 못한 경우 적용
+        """
+        segments = result['speaker_segments']
+        if not segments:
+            return result
+        
+        # 질문-답변 패턴 키워드
+        question_patterns = ['어때', '뭐', '어떤', '왜', '언제', '어디', '누구', '어떻게', '있어', '해']
+        answer_patterns = ['네', '아니요', '그래요', '맞아요', '좋아요', '싫어요', '같아요', '요', '어요']
+        
+        improved_segments = []
+        current_speaker = 0
+        
+        for i, segment in enumerate(segments):
+            text = segment['text'].strip()
+            
+            # 질문 패턴 감지
+            is_question = any(pattern in text for pattern in question_patterns)
+            # 답변 패턴 감지  
+            is_answer = any(pattern in text for pattern in answer_patterns)
+            
+            # 이전 세그먼트와 비교해서 화자 결정
+            if i > 0:
+                prev_text = segments[i-1]['text'].strip()
+                prev_is_question = any(pattern in prev_text for pattern in question_patterns)
+                
+                # 이전이 질문이고 현재가 답변이면 화자 변경
+                if prev_is_question and is_answer:
+                    current_speaker = 1 - current_speaker
+                # 현재가 질문이면 화자 변경 (질문자 교대)
+                elif is_question and not prev_is_question:
+                    current_speaker = 1 - current_speaker
+            
+            # 세그먼트 복사 후 화자 할당
+            new_segment = segment.copy()
+            new_segment['speaker'] = current_speaker
+            improved_segments.append(new_segment)
+        
+        # 결과 업데이트
+        result['speaker_segments'] = improved_segments
+        speakers = set(seg['speaker'] for seg in improved_segments)
+        result['speaker_count'] = len(speakers)
+        
+        logger.info(f"후처리 완료 - 개선된 화자 수: {result['speaker_count']}")
+        return result
+    
+    def validate_audio_format(self, audio_content: bytes, filename: str) -> bool:
         """
         오디오 파일 형식이 유효한지 검증
         
         Args:
             audio_content: 오디오 파일의 바이트 데이터
+            filename: 파일명
             
         Returns:
             bool: 유효한 형식이면 True
         """
         try:
-            # WebM 파일 시그니처 확인 (간단한 검증)
             if len(audio_content) < 4:
                 return False
             
-            # WebM 파일은 EBML 헤더로 시작 (0x1A, 0x45, 0xDF, 0xA3)
-            webm_signature = b'\x1a\x45\xdf\xa3'
-            if audio_content[:4] == webm_signature:
-                return True
+            ext = filename.lower().split('.')[-1]
             
-            # 추가적인 오디오 형식 검증 로직을 여기에 추가할 수 있음
-            logger.warning("지원하지 않는 오디오 형식입니다")
+            # 파일 시그니처 검증
+            signatures = {
+                'mp3': [b'ID3', b'\xff\xfb', b'\xff\xf3', b'\xff\xf2'],  # MP3 시그니처들
+                'wav': [b'RIFF'],  # WAV 시그니처
+                'webm': [b'\x1a\x45\xdf\xa3'],  # WebM 시그니처
+                'm4a': [b'ftyp'],  # M4A 시그니처 (4바이트 오프셋)
+            }
+            
+            if ext in signatures:
+                for sig in signatures[ext]:
+                    if ext == 'm4a':
+                        # M4A는 4바이트 오프셋에서 확인
+                        if len(audio_content) >= 8 and audio_content[4:8] == sig:
+                            return True
+                    else:
+                        if audio_content.startswith(sig):
+                            return True
+                        # MP3의 경우 중간에 시그니처가 있을 수 있음
+                        if ext == 'mp3' and sig in audio_content[:1024]:
+                            return True
+            
+            logger.warning(f"지원하지 않는 오디오 형식: {filename}")
             return False
             
         except Exception as e:
             logger.error(f"오디오 형식 검증 실패: {str(e)}")
             return False
+    
+    def compare_speaker_diarization_methods(
+        self, 
+        audio_content: bytes, 
+        filename: str
+    ) -> Dict[str, Any]:
+        """
+        여러 화자분리 방법 비교 테스트
+        """
+        results = {}
+        
+        try:
+            logger.info(f"화자분리 방법 비교 테스트 시작: {filename}")
+            
+            # 1. Google Cloud Speech-to-Text
+            try:
+                results["google_stt"] = self.transcribe_with_diarization(audio_content, filename)
+                logger.info("✅ Google STT 완료")
+            except Exception as e:
+                results["google_stt"] = {"error": str(e)}
+                logger.error(f"❌ Google STT 실패: {e}")
+            
+            # 2. OpenAI Whisper
+            try:
+                results["whisper"] = self.whisper_client.transcribe_with_speakers(audio_content, filename)
+                logger.info("✅ Whisper 완료")
+            except Exception as e:
+                results["whisper"] = {"error": str(e)}
+                logger.error(f"❌ Whisper 실패: {e}")
+            
+            # 3. AssemblyAI
+            try:
+                results["assemblyai"] = self.assemblyai_client.transcribe_with_speakers(audio_content, filename)
+                logger.info("✅ AssemblyAI 완료")
+            except Exception as e:
+                results["assemblyai"] = {"error": str(e)}
+                logger.error(f"❌ AssemblyAI 실패: {e}")
+            
+            # 결과 요약
+            summary = self._create_comparison_summary(results)
+            
+            return {
+                "results": results,
+                "summary": summary,
+                "filename": filename
+            }
+            
+        except Exception as e:
+            logger.error(f"화자분리 비교 테스트 실패: {e}")
+            raise Exception(f"비교 테스트 실패: {e}")
+    
+    def _create_comparison_summary(self, results: Dict) -> Dict[str, Any]:
+        """비교 결과 요약 생성"""
+        summary = {
+            "methods_tested": len(results),
+            "successful_methods": [],
+            "failed_methods": [],
+            "speaker_counts": {},
+            "segment_counts": {},
+            "processing_methods": {}
+        }
+        
+        for method, result in results.items():
+            if "error" in result:
+                summary["failed_methods"].append(method)
+            else:
+                summary["successful_methods"].append(method)
+                summary["speaker_counts"][method] = result.get("speaker_count", 0)
+                summary["segment_counts"][method] = len(result.get("segments", []))
+                summary["processing_methods"][method] = result.get("processing_method", method)
+        
+        return summary
+    def transcribe_with_speaker_diarization(
+        self, 
+        audio_content: bytes, 
+        filename: str
+    ) -> Dict[str, Any]:
+        """
+        AssemblyAI를 사용한 화자분리 음성 인식 (기본 메서드)
+        """
+        try:
+            logger.info(f"화자분리 음성 인식 시작: {filename}")
+            
+            # AssemblyAI로 화자분리 수행
+            result = self.assemblyai_client.transcribe_with_speakers(audio_content, filename)
+            
+            logger.info(f"화자분리 완료: {result['speaker_count']}명, {len(result['segments'])}개 세그먼트")
+            return result
+            
+        except Exception as e:
+            logger.error(f"화자분리 실패, Google STT로 fallback: {e}")
+            # AssemblyAI 실패 시 Google STT로 fallback
+            return self.transcribe_with_diarization(audio_content, filename)

@@ -1,7 +1,7 @@
 from sqlalchemy.orm import Session
 from sqlalchemy import func
 from fastapi import UploadFile, HTTPException
-from typing import List, Dict, Any
+from typing import List, Dict, Any, Optional
 from datetime import datetime
 import logging
 
@@ -190,18 +190,77 @@ class ConversationFileService:
 
     def get_conversation_analysis(self, conv_id: str) -> Dict[str, Any]:
         """대화 분석 결과 조회"""
+        from app.llm.agent.crud import get_analysis_by_conv_id
+        
         conversation = self.db.query(Conversation).filter(Conversation.conv_id == conv_id).first()
         if not conversation:
             raise HTTPException(status_code=404, detail="대화를 찾을 수 없습니다.")
         
-        # 파일들의 분석 결과 통합
-        files = self.db.query(ConversationFile).filter(ConversationFile.conv_id == conv_id).all()
+        # 기존 CRUD 함수 사용
+        try:
+            result = get_analysis_by_conv_id(self.db, conv_id)
+            
+            if result:
+                # 대화 내용 가져오기
+                dialog_content = []
+                if conversation.content:
+                    # 간단한 대화 파싱 (실제로는 더 정교한 파싱 필요)
+                    lines = conversation.content.split('\n')
+                    for line in lines:
+                        if line.strip():
+                            dialog_content.append({
+                                "speaker": "User", 
+                                "content": line.strip()
+                            })
+                
+                # 감정 분석 데이터 (style_analysis에서 추출)
+                emotion_data = {}
+                if result.get("style_analysis"):
+                    emotion_data = {
+                        "overall_emotion": "긍정적",
+                        "emotion_score": result.get("confidence_score", 0.0),
+                        "details": result["style_analysis"]
+                    }
+                
+                return {
+                    "summary": result["summary"],
+                    "emotion": emotion_data,
+                    "dialog": dialog_content,
+                    "statistics": result["statistics"],
+                    "style_analysis": result["style_analysis"],
+                    "score": result["score"],
+                    "confidence_score": result["confidence_score"],
+                    "feedback": result["feedback"],
+                    "status": "completed",
+                    "updated_at": result["create_date"]
+                }
+        except Exception as e:
+            logger.error(f"분석 결과 조회 중 오류: {str(e)}")
         
-        # 임시 분석 결과 (실제로는 LLM 분석 결과를 반환)
+        # 분석 결과가 없으면 처리 중 상태 반환
         return {
-            "summary": conversation.content[:500] + "..." if len(conversation.content) > 500 else conversation.content,
-            "emotion": {"positive": 0.7, "negative": 0.2, "neutral": 0.1},
-            "dialog": [{"speaker": "User", "content": "분석된 대화 내용"}],
-            "status": "completed",
+            "summary": None,
+            "emotion": None,
+            "dialog": None,
+            "statistics": None,
+            "style_analysis": None,
+            "score": None,
+            "confidence_score": None,
+            "feedback": None,
+            "status": "processing",
             "updated_at": conversation.create_date
+        }
+
+    def get_conversation_by_id(self, conv_id: str) -> Optional[Dict[str, Any]]:
+        """대화 ID로 대화 조회"""
+        conversation = self.db.query(Conversation).filter(Conversation.conv_id == conv_id).first()
+        if not conversation:
+            return None
+        
+        return {
+            "conv_id": str(conversation.conv_id),
+            "title": conversation.title,
+            "content": conversation.content,
+            "family_id": conversation.family_id,
+            "create_date": conversation.create_date
         }

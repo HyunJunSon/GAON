@@ -11,7 +11,7 @@ export default function ResultsSummaryPage() {
 
   if (isLoading) return <div>로딩…</div>;
   if (isError || !data) return <div>{(error as Error)?.message ?? '불러오기 실패'}</div>;
-  if (data.status !== 'ready') return <div>현재 상태: {data.status}</div>;
+  if (data.status !== 'ready' && data.status !== 'completed') return <div>현재 상태: {data.status}</div>;
 
   const { summary, style_analysis, score, confidence_score, feedback } = data
     // style_analysis는 화자ID를 키로 갖는 Record 형태이므로, 표시할 대상 화자의 항목만 선택
