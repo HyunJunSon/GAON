@@ -1,6 +1,6 @@
 import { useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
-import { useGlobalNotification } from './useGlobalNotification';
+import { useNotificationStore } from '@/lib/notificationStore';
 
 interface GlobalWebSocketManager {
   connections: Map<string, WebSocket>;
@@ -14,7 +14,8 @@ const globalWsManager: GlobalWebSocketManager = {
   addConnection: function(conversationId: string) {
     if (this.connections.has(conversationId)) return;
 
-    const wsUrl = `ws://localhost:8000/ws/analysis/${conversationId}`;
+    const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
+    const wsUrl = apiUrl.replace('http', 'ws') + `/ws/analysis/${conversationId}`;
     const ws = new WebSocket(wsUrl);
     
     ws.onopen = () => {
@@ -55,7 +56,7 @@ const globalWsManager: GlobalWebSocketManager = {
 
 export function useGlobalWebSocket() {
   const router = useRouter();
-  const { showNotification } = useGlobalNotification();
+  const { addNotification } = useNotificationStore();
   const hasListenerRef = useRef(false);
 
   useEffect(() => {
@@ -65,13 +66,13 @@ export function useGlobalWebSocket() {
     const handleAnalysisComplete = (event: CustomEvent) => {
       const { conversationId, data } = event.detail;
       
-      showNotification({
+      // NotificationCenter에 알림 추가
+      addNotification({
+        type: 'success',
         title: '🎉 분석 완료!',
-        body: `대화 분석이 완료되었습니다. (점수: ${data.score})`,
-        onClick: () => {
-          // 분석 결과 페이지로 이동
-          router.push(`/conversations/${conversationId}`);
-        }
+        message: `대화 분석이 완료되었습니다. (점수: ${data.score})`,
+        conversationId,
+        link: `/analysis/${conversationId}/summary`
       });
     };
 
@@ -81,7 +82,7 @@ export function useGlobalWebSocket() {
       window.removeEventListener('gaon-analysis-complete', handleAnalysisComplete as EventListener);
       hasListenerRef.current = false;
     };
-  }, [router, showNotification]);
+  }, [router, addNotification]);
 
   return {
     addConnection: globalWsManager.addConnection.bind(globalWsManager),
