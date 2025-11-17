@@ -11,6 +11,10 @@ export async function startPracticeSession(payload: StartPracticeReq): Promise<S
   return apiFetch<StartPracticeRes>('/api/practice/session', { method: 'POST', json: payload });
 }
 
+export async function fetchPracticeResult(sessionId: string,): Promise<PracticeResult> {
+  return apiFetch<PracticeResult>(`/api/practice/result/${sessionId}`, {method: 'GET'});
+}
+
 export async function fetchParticipants(): Promise<{ participants: PracticeParticipant[] }> {
   return apiFetch('/api/practice/participants', { method: 'GET' });
 }
@@ -23,6 +27,6 @@ export async function finishPractice(sessionId: string, body: FinishPracticeReq)
   return apiFetch(`/api/practice/session/${sessionId}/finish`, { method: 'POST', json: body });
 }
 
-export async function fetchPracticeResult(sessionId: string): Promise<PracticeResult> {
-  return apiFetch(`/api/practice/result/${sessionId}`, { method: 'GET' });
-}
+// export async function fetchPracticeResult(sessionId: string): Promise<PracticeResult> {
+//   return apiFetch(`/api/practice/result/${sessionId}`, { method: 'GET' });
+// }

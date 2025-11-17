@@ -1,7 +1,7 @@
 // hooks/practice/usePractice.ts
 'use client';
 
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useQuery, useMutation, useQueryClient, UseQueryResult } from '@tanstack/react-query';
 import { qk } from '@/constants/queryKeys';
 import {
   fetchParticipants, startPractice, finishPractice, fetchPracticeResult,
@@ -21,11 +21,11 @@ export function useParticipants() {
   });
 }
 
-export function useStartPractice() {
-  return useMutation<StartPracticeRes, Error, StartPracticeReq>({
-    mutationFn: startPractice,
-  });
-}
+// export function useStartPractice() {
+//   return useMutation<StartPracticeRes, Error, StartPracticeReq>({
+//     mutationFn: startPractice,
+//   });
+// }
 
 export function useFinishPractice(sessionId: string) {
   const qc = useQueryClient();
@@ -37,13 +37,13 @@ export function useFinishPractice(sessionId: string) {
   });
 }
 
-export function usePracticeResult(sessionId: string) {
-  return useQuery<PracticeResult>({
-    queryKey: qk.practice.result(sessionId),
-    queryFn: () => fetchPracticeResult(sessionId),
-    enabled: !!sessionId,
-  });
-}
+// export function usePracticeResult(sessionId: string) {
+//   return useQuery<PracticeResult>({
+//     queryKey: qk.practice.result(sessionId),
+//     queryFn: () => fetchPracticeResult(sessionId),
+//     enabled: !!sessionId,
+//   });
+// }
 
 /**
  * 연습 세션 생성 훅
@@ -52,5 +52,17 @@ export function usePracticeResult(sessionId: string) {
 export function useStartPracticeSession() {
   return useMutation<StartPracticeRes, Error, StartPracticeReq>({
     mutationFn: (payload) => startPracticeSession(payload),
+  });
+}
+
+/**
+ * 연습 결과 조회 훅
+ * - /practice/result/[sessionId] 페이지에서 사용
+ */
+export function usePracticeResult(sessionId: string): UseQueryResult<PracticeResult, Error> {
+  return useQuery<PracticeResult, Error>({
+    queryKey: ['practice', 'result', sessionId],
+    queryFn: () => fetchPracticeResult(sessionId),
+    enabled: !!sessionId,
   });
 }

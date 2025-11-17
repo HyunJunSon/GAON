@@ -30,9 +30,17 @@ export type FinishPracticeRes = {
 
 export type PracticeResult = {
   sessionId: string;
+  conversationId: string;
+  mode: 'chat' | 'voice';
   score: number;
   strengths: string[];
   improvements: string[];
+  checkpoints: {
+    id: string;
+    title: string;
+    achieved: boolean;
+    description: string;
+  }[];
   summary: string;
   createdAt: string;
 };
