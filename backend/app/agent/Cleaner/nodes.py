@@ -1,66 +1,68 @@
-# app/agent/Cleaner/nodes.py
+# app/agent/Cleaner/nodes.py 
 
 from __future__ import annotations
 from dataclasses import dataclass
-from typing import Any, Dict, List, Tuple
+from typing import Any, Dict, List, Tuple, Optional
 import pandas as pd
+import numpy as np
+import requests
+import librosa
 
 from sqlalchemy.orm import Session
 
-# CRUD import
+# CRUD
 from app.agent.crud import (
     get_conversation_by_id,
-    get_conversation_file_by_conv_id     # ← 신규 추가된 함수 사용
+    get_conversation_file_by_conv_id,
 )
 
 
-
-# =========================================
-# ✅ RawFetcher 
-# =========================================
+# ===============================================================
+# 1) RawFetcher
+# ===============================================================
 @dataclass
 class RawFetcher:
     """
-    역할:
-    - conversation → conversation_file로 접근
-    - raw_content 가져와 DataFrame 생성
-    - 파일 타입(text/audio) 분기 없음 (raw_content는 항상 텍스트)
+    DB에서 conversation_file.raw_content 및 file_type/audio_url/speaker_segments 를 읽어
+    → DataFrame(df)와 메타 정보 반환
     """
 
-    def fetch(self, db: Session = None, conv_id: str = None, *args, **kwargs) -> pd.DataFrame:
+    def fetch(self, db: Session = None, conv_id: str = None, *args, **kwargs) -> Dict[str, Any]:
         if db is None:
             raise ValueError("❌ RawFetcher: db 세션이 필요합니다.")
         if not conv_id:
             raise ValueError("❌ RawFetcher: conv_id(UUID)가 필요합니다.")
 
-        # 1) conversation 메타 정보 조회
         meta = get_conversation_by_id(db, conv_id)
         if not meta:
             raise ValueError(f"❌ conversation 메타정보 없음 (conv_id={conv_id})")
 
-        # 2) 🔧 conversation_file에서 원문(raw_content) 조회
         file_row = get_conversation_file_by_conv_id(db, conv_id)
         if not file_row:
-            raise ValueError(f"❌ raw_content 없음 (conversation_file에 데이터 없음)")
+            raise ValueError(f"❌ conversation_file row 없음 (conv_id={conv_id})")
 
-        raw_text = file_row["raw_content"]
+        # DB에 저장된 정보 사용
+        file_type = file_row.get("file_type")
+        audio_url = file_row.get("audio_url")
+        speaker_segments = file_row.get("speaker_segments")
+        raw_text = file_row.get("raw_content")
+
         if not raw_text:
             raise ValueError(f"❌ raw_content 비어 있음 (conv_id={conv_id})")
 
-        # 3) 🔧 원문 텍스트를 DataFrame으로 파싱
         df = self._to_dataframe(raw_text)
 
         print(f"✅ [RawFetcher] raw_content 로드 완료 → {len(df)}개 발화")
-        return df
 
+        return {
+            "df": df,
+            "file_type": file_type,
+            "audio_url": audio_url,
+            "speaker_segments": speaker_segments,
+        }
 
+    # ===============================================================
     def _to_dataframe(self, raw_text: str) -> pd.DataFrame:
-        """
-        🔧 기존 conversation_to_dataframe 제거 → 여기로 통합
-        변경 이유:
-        - DB 구조가 conversation_file.raw_content로 단일화되었기 때문
-        """
-
         lines = raw_text.strip().split("\n")
 
         data = []
@@ -72,7 +74,6 @@ class RawFetcher:
             if not line:
                 continue
 
-            # 예: "참석자 1:"
             if line.startswith("참석자"):
                 if current_speaker is not None and current_text:
                     data.append({
@@ -80,7 +81,7 @@ class RawFetcher:
                         "text": current_text.strip(),
                     })
                 parts = line.split()
-                current_speaker = int(parts[1].replace(":", ""))  # "1:" → 1
+                current_speaker = int(parts[1].replace(":", ""))
                 current_text = ""
             else:
                 current_text += line + " "
@@ -94,48 +95,170 @@ class RawFetcher:
         return pd.DataFrame(data)
 
 
-
-# =========================================
-# ✅ DataInspector (turn ≥ 3)
-# =========================================
+# ===============================================================
+# 2) DataInspector (turn ≥ 3)
+# ===============================================================
 @dataclass
 class DataInspector:
     def inspect(self, df: pd.DataFrame, state=None) -> Tuple[pd.DataFrame, List[str]]:
         issues = []
-
-        # 🔧 발화 갯수(턴) 검증
         if len(df) < 3:
             issues.append("not_enough_turns")
-
         return df, issues
 
 
-
-# =========================================
-# ✅ TokenCounter (화자별 25 어절 이상)
-# =========================================
+# ===============================================================
+# 3) TokenCounter (speaker별 25 tokens)
+# ===============================================================
 @dataclass
 class TokenCounter:
     def count(self, df: pd.DataFrame, state=None) -> Tuple[pd.DataFrame, List[str]]:
         issues = []
-        
-        # 화자별 어절수 계산
         grouped = df.groupby("speaker")["text"].apply(
             lambda x: sum(len(s.split()) for s in x)
         )
 
-        for speaker, token_count in grouped.items():
-            if token_count < 25:
-                issues.append(f"speaker_{speaker}_not_enough_tokens")
+        for spk, tcount in grouped.items():
+            if tcount < 25:
+                issues.append(f"speaker_{spk}_not_enough_tokens")
 
         return df, issues
 
 
+# ===============================================================
+# 4) FileTypeClassifier
+# ===============================================================
+@dataclass
+class FileTypeClassifier:
+    """
+    DB file_type 기반으로 text/audio 여부 판별
+    """
 
-# =========================================
-# ✅ ExceptionHandler
-# =========================================
+    ALLOWED_AUDIO = ["wav", "mp3", "webm", "m4a"]
+    ALLOWED_TEXT = ["txt", "pdf", "doc", "docx"]
+
+    def classify(self, file_type: str) -> str:
+        if not file_type:
+            raise ValueError("❌ file_type 없음")
+
+        file_type = file_type.lower()
+
+        if file_type in self.ALLOWED_AUDIO:
+            return "audio"
+        if file_type in self.ALLOWED_TEXT:
+            return "text"
+
+        raise ValueError(f"❌ 지원하지 않는 파일 타입: {file_type}")
+
+
+# ===============================================================
+# 5) AudioFeatureExtractor
+# ===============================================================
+@dataclass
+class AudioFeatureExtractor:
+    """
+    speaker_segments = [
+        {"speaker": 1, "start": 0.0, "end": 2.4},
+        {"speaker": 2, "start": 2.5, "end": 4.2},
+    ]
+    audio_url에서 구간별 audio 신호를 잘라서 특징 추출
+    """
+
+    def extract(self, audio_url: str, speaker_segments: List[Dict]) -> List[Dict]:
+
+        if not audio_url:
+            raise ValueError("❌ audio_url 없음 (audio 파일이 아님)")
+
+        # GCP URL 다운로드
+        resp = requests.get(audio_url)
+        if resp.status_code != 200:
+            raise ValueError("❌ audio_url 다운로드 실패")
+
+        audio_bytes = resp.content
+
+        # librosa로 로드 (메모리 스트림)
+        import io
+        y, sr = librosa.load(io.BytesIO(audio_bytes), sr=None)
+
+        features = []
+
+        for seg in speaker_segments or []:
+            start = int(seg["start"] * sr)
+            end = int(seg["end"] * sr)
+            chunk = y[start:end]
+
+            if len(chunk) == 0:
+                continue
+
+            # 특징 추출
+            pitch = librosa.yin(chunk, fmin=50, fmax=500).mean()
+            energy = float(np.mean(chunk ** 2))
+            tempo, _ = librosa.beat.beat_track(y=chunk, sr=sr)
+
+            features.append({
+                "speaker": seg["speaker"],
+                "start": seg["start"],
+                "end": seg["end"],
+                "pitch": float(pitch),
+                "energy": energy,
+                "tempo": float(tempo),
+            })
+
+        print(f"🎛️ [AudioFeatureExtractor] {len(features)}개 발화 audio 특징 추출 완료")
+        return features
+
+
+# ===============================================================
+# 6) ContentValidator (텍스트 전용)
+# ===============================================================
+@dataclass
+class ContentValidator:
+    """
+    텍스트 전용 후처리 (필요하면 추가 규칙 적용 가능)
+    """
+    def validate(self, df: pd.DataFrame) -> pd.DataFrame:
+        # 현재는 그대로 pass
+        return df
+
+
+# ===============================================================
+# 7) ContentMerger (text + audio features)
+# ===============================================================
+@dataclass
+class ContentMerger:
+    """
+    audio_features 를 speaker-match 기반으로 df에 merge
+    """
+
+    def merge(self, text_df: pd.DataFrame, audio_features: Optional[List[Dict]]) -> pd.DataFrame:
+
+        df = text_df.copy()
+        df["pitch"] = None
+        df["energy"] = None
+        df["tempo"] = None
+
+        if audio_features:
+            for feat in audio_features:
+                spk = feat["speaker"]
+
+                # 해당 speaker의 첫 번째 발화에 붙이기
+                idx_list = df.index[df["speaker"] == spk].tolist()
+                if not idx_list:
+                    continue
+
+                first_idx = idx_list[0]
+                df.at[first_idx, "pitch"] = feat["pitch"]
+                df.at[first_idx, "energy"] = feat["energy"]
+                df.at[first_idx, "tempo"] = feat["tempo"]
+
+        return df
+
+
+# ===============================================================
+# ExceptionHandler
+# ===============================================================
 @dataclass
 class ExceptionHandler:
     def handle(self, err: Exception) -> Dict[str, Any]:
         return {"status": "error", "error": str(err)}
+

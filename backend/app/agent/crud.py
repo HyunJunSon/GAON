@@ -1,5 +1,3 @@
-# app/agent/crud.py
-
 """
 ✅ Agent 파이프라인용 CRUD 함수
 
@@ -91,12 +89,6 @@ def get_conversations_by_user(db: Session, id: int, limit: int = 10) -> List[Dic
 
 
 # =========================================
-# 🔧 삭제됨: conversation_to_dataframe
-# → RawFetcher 내부로 이동했으므로 완전 제거
-# =========================================
-
-
-# =========================================
 # 2️⃣ User 관련 CRUD
 # =========================================
 
@@ -122,16 +114,23 @@ def get_user_by_id(db: Session, id: int) -> Optional[Dict[str, Any]]:
 
 
 # =========================================
-# 3️⃣ conversation_file 조회 CRUD (신규 로직)
+# 3️⃣ conversation_file 조회 CRUD  (🔥 중요: Audio/Text 대응)
 # =========================================
 
 def get_conversation_file_by_conv_id(db: Session, conv_id: str) -> Optional[Dict[str, Any]]:
     """
-    🔥 conversation_file.raw_content 조회 (TO-BE 기준 핵심)
+    - raw_content + file_type + audio_url + speaker_segments 모두 조회
+    - Audio/Text 분기 로직은 Cleaner의 RawFetcher가 처리
     """
     query = text("""
         SELECT 
-            id, conv_id, file_type, raw_content, create_date
+            id,
+            conv_id,
+            file_type,       
+            raw_content,
+            audio_url,         
+            speaker_segments,   
+            create_date
         FROM conversation_file
         WHERE conv_id = :conv_id
     """)
@@ -142,9 +141,11 @@ def get_conversation_file_by_conv_id(db: Session, conv_id: str) -> Optional[Dict
         return {
             "file_id": result[0],
             "conv_id": result[1],
-            "file_type": result[2],
+            "file_type": result[2],         
             "raw_content": result[3],
-            "create_date": result[4]
+            "audio_url": result[4],         
+            "speaker_segments": result[5],   
+            "create_date": result[6]
         }
     return None
 
@@ -325,4 +326,3 @@ def get_analysis_by_conv_id(db: Session, conv_id: str) -> Optional[Dict[str, Any
             "create_date": result[10]
         }
     return None
-

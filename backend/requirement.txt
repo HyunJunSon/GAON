@@ -95,3 +95,4 @@ ruff
 # === Data ===
 pandas
 konlpy
+librosa

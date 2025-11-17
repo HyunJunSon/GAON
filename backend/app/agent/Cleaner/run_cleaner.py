@@ -1,8 +1,10 @@
-# app/agent/Cleaner/run_cleaner.py
+# ===============================================================
+# app/agent/Cleaner/run_cleaner.py (FINAL VERSION)
+# ===============================================================
 
 """
 ✅ Cleaner 모듈 실행 진입점 (DB 연동)
-
+Cleaner 최종 output = merged_df + file_type + audio_features 포함
 """
 
 from app.agent.Cleaner.graph_cleaner import CleanerGraph
@@ -14,7 +16,11 @@ import traceback
 def run_cleaner(conv_id: str = None):
     """
     ✅ Cleaner 모듈 실행 함수
-
+    - DB에서 conversation_file.raw_content 불러오기
+    - turn/token 검사
+    - text/audio 분리
+    - audio면 음성 요소 추출
+    - 최종 merged_df 생성
     """
 
     print("\n🚀 [Cleaner] 실행 시작")
@@ -40,10 +46,10 @@ def run_cleaner(conv_id: str = None):
             print(f"✅ 자동 선택된 대화: conv_id={conv_id}")
 
         # ======================================================
-        # 🔧 CleanerGraph 실행 
+        # 🔧 CleanerGraph 실행
         # ======================================================
         cg = CleanerGraph(verbose=True)
-        result_state = cg.run(
+        state = cg.run(
             db=db,
             conv_id=conv_id,
         )
@@ -52,14 +58,17 @@ def run_cleaner(conv_id: str = None):
         print("=" * 60)
 
         # ======================================================
-        # 🔧 결과 반환 
+        # 🔧 최신 구조 기반 반환 값 구성
         # ======================================================
         return {
-            "conv_id": result_state.conv_id,
-            "raw_df": result_state.raw_df,                 # 원문 DF
-            "inspected_df": result_state.inspected_df,     # 검사 후 DF
-            "validated": result_state.validated,
-            "issues": result_state.issues,
+            "conv_id": conv_id,
+            "file_type": state.file_type,                 
+            "raw_df": state.raw_df,
+            "inspected_df": state.inspected_df,
+            "merged_df": state.merged_df,                 # ← 최종 분석 입력 DF
+            "audio_features": state.audio_features,       # ← audio면 존재
+            "validated": state.validated,
+            "issues": state.issues,
         }
 
     except Exception as e:
@@ -71,9 +80,9 @@ def run_cleaner(conv_id: str = None):
         db.close()
 
 
-# =========================================
-# ✅ 단독 실행 지원
-# =========================================
+# ===============================================================
+# 단독 실행 지원
+# ===============================================================
 def main():
     """
     TO-BE 구조 기준 Cleaner 단독 실행 테스트
@@ -87,18 +96,19 @@ def main():
     print("\n📊 [실행 결과]")
     print("-" * 60)
     print(f"conv_id: {result['conv_id']}")
+    print(f"file_type: {result['file_type']}")
     print(f"validated: {result['validated']}")
     print(f"issues: {result['issues']}")
 
-    # 🔧 cleaned_df 제거됨 → raw_df / inspected_df 출력
-    if result["inspected_df"] is not None:
-        print(f"\n🔍 inspected_df 미리보기:")
-        print(result["inspected_df"].head(5))
+    if result["merged_df"] is not None:
+        print("\n🔍 merged_df 미리보기:")
+        print(result["merged_df"].head(5))
     else:
-        print("inspected_df is None")
+        print("merged_df is None")
 
     return result
 
 
 if __name__ == "__main__":
     main()
+
