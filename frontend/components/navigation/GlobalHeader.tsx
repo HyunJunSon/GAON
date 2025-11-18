@@ -4,7 +4,8 @@
 import { usePathname, useRouter } from 'next/navigation';
 import { useMounted } from '@/hooks/useMounted';
 import { authStorage } from '@/utils/authStorage';
-import { useLogout, useMe } from '@/hooks/useAuth'; // 이미 있으므로 재사용
+import { useLogout, useMe } from '@/hooks/useAuth';
+import GaonLogo from '@/components/ui/GaonLogo';
 
 const AUTH_PAGES = new Set(['/login', '/signup']);
 
@@ -38,7 +39,7 @@ export default function GlobalHeader() {
     <header className="sticky top-0 z-30 shrink-0 border-b bg-white/80 backdrop-blur supports-[backdrop-filter]:bg-white/60">
       <div className="mx-4 flex h-12 items-center justify-between">
         <div className="flex items-center gap-2">
-          <h2 className="text-lg font-semibold">GAON</h2>
+          <GaonLogo size="sm" variant="full" />
         </div>
 
         {/* 우측 액션: 로그인 상태에서만 노출 */}
