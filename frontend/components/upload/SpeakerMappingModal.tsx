@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import { getSpeakerMapping, updateSpeakerMapping } from '@/apis/analysis';
 import { getFamily, type FamilyMember } from '@/apis/family';
 import { useMe } from '@/hooks/useAuth';
+import ConversationQuotes from '@/components/ui/ConversationQuotes';
 
 type SpeakerMappingModalProps = {
   conversationId: string;
@@ -200,6 +201,7 @@ export default function SpeakerMappingModal({
               <div className="w-8 h-8 border-2 border-gray-300 border-t-black rounded-full animate-spin mx-auto"></div>
               <p className="text-sm text-gray-600">업로드 중입니다...</p>
             </div>
+            <ConversationQuotes />
           </div>
         )}
 
@@ -211,6 +213,7 @@ export default function SpeakerMappingModal({
               <div className="w-8 h-8 border-2 border-gray-300 border-t-black rounded-full animate-spin mx-auto"></div>
               <p className="text-sm text-gray-600">음성을 텍스트로 변환 중입니다...</p>
             </div>
+            <ConversationQuotes />
           </div>
         )}
 
@@ -229,6 +232,7 @@ export default function SpeakerMappingModal({
               <div className="text-center py-12">
                 <div className="w-8 h-8 border-2 border-gray-300 border-t-black rounded-full animate-spin mx-auto mb-4"></div>
                 <p className="text-sm text-gray-600">처리 중...</p>
+                <ConversationQuotes />
               </div>
             ) : (
               <>
