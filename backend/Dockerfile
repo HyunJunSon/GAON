@@ -28,9 +28,10 @@ COPY pyproject.toml ./
 # requirement.txt가 있으면 복사, 없으면 무시
 COPY requirement.tx[t] ./
 
-# Python 의존성 설치 (requirement.txt 우선, 실패시 pyproject.toml 사용)
-RUN pip install --no-cache-dir --upgrade pip && \
-    (pip install --no-cache-dir -r requirement.txt 2>/dev/null || pip install --no-cache-dir .)
+# Python 의존성 설치 (uv 사용으로 빠른 설치)
+RUN pip install --no-cache-dir uv && \
+    uv pip install --system --no-cache . && \
+    which uvicorn
 
 # Stage 2: 최종 이미지
 FROM python:3.11-slim
@@ -69,5 +70,5 @@ USER gaon-admin
 # 포트 노출
 EXPOSE 8000
 
-# 애플리케이션 실행 명령
-CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]
+# 애플리케이션 실행 명령 (python -m 사용)
+CMD ["python", "-m", "uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]
