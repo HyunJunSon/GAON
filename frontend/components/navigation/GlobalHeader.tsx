@@ -5,6 +5,7 @@ import { usePathname, useRouter } from 'next/navigation';
 import { useMounted } from '@/hooks/useMounted';
 import { authStorage } from '@/utils/authStorage';
 import { useLogout, useMe } from '@/hooks/useAuth'; // 이미 있으므로 재사용
+import NotificationCenter from './NotificationCenter';
 
 const AUTH_PAGES = new Set(['/login', '/signup']);
 
@@ -43,14 +44,19 @@ export default function GlobalHeader() {
 
         {/* 우측 액션: 로그인 상태에서만 노출 */}
         {authed && (
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-4">
+            {/* 알림 센터 */}
+            <NotificationCenter />
+            
+            {/* 사용자 정보 */}
             {me && (
-              <div className="text-right text-xs text-gray-600 mr-2">
+              <div className="text-right text-xs text-gray-600">
                 <div>{me.name}</div>
                 <div className="text-[10px] text-gray-500">{me.email}</div>
               </div>
             )}
-            {/* 추후 프로필/설정 드롭다운으로 확장 가능 */}
+            
+            {/* 로그아웃 버튼 */}
             <button
               type="button"
               onClick={onLogout}

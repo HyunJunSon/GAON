@@ -44,10 +44,38 @@ class ConversationFileService:
             if not user:
                 raise HTTPException(status_code=404, detail="사용자를 찾을 수 없습니다.")
             
+            # 텍스트 추출
+            raw_content = self.file_processor.extract_text(file_content, file_extension)
+            
+            # 텍스트 파일인 경우 화자 매핑 적용
+            if file_extension == "txt":
+                from .text_mapping_service import TextMappingService
+                
+                text_service = TextMappingService()
+                formatted_content, speaker_mapping, can_analyze = text_service.apply_speaker_mapping_to_text(
+                    raw_content, user_id
+                )
+                
+                if not can_analyze:
+                    raise HTTPException(
+                        status_code=400, 
+                        detail="텍스트에서 2명 이상의 화자를 찾을 수 없어 대화 분석이 불가능합니다. "
+                               "대화 형식(화자: 내용)으로 작성해주세요."
+                    )
+                
+                # 대화 형식으로 변환된 내용 사용
+                processed_content = formatted_content
+                processing_status = "speaker_mapping_required"  # 화자 매핑 필요 상태
+            else:
+                # 다른 파일 형식은 기존 로직
+                processed_content = raw_content
+                speaker_mapping = None
+                processing_status = "completed"
+            
             # 새 conversation 생성
             conversation = Conversation(
                 title=f"대화 분석 - {file.filename}",
-                content="",  # 파일 처리 후 업데이트
+                content=processed_content[:1000] if processed_content else raw_content[:1000],
                 family_id=family_id,
                 create_date=datetime.now()
             )
@@ -61,9 +89,6 @@ class ConversationFileService:
             # GCS에 업로드
             gcs_path = self.file_processor.upload_to_gcs(file_content, user_id, file.filename)
             
-            # 텍스트 추출
-            raw_content = self.file_processor.extract_text(file_content, file_extension)
-            
             # 파일 정보 DB에 저장
             db_file = ConversationFile(
                 conv_id=conversation.conv_id,
@@ -71,16 +96,13 @@ class ConversationFileService:
                 original_filename=file.filename,
                 file_type=file_extension,
                 file_size=file_size,
-                processing_status="completed",
+                processing_status=processing_status,
                 raw_content=raw_content,
-                processed_date=datetime.now()
+                processed_date=datetime.now(),
+                speaker_mapping=speaker_mapping  # 텍스트 파일의 경우 화자 매핑 저장
             )
             
             self.db.add(db_file)
-            
-            # conversation content 업데이트
-            conversation.content = raw_content[:1000]  # 처음 1000자만 저장
-            
             self.db.commit()
             
             logger.info(f"파일 업로드 완료: {file.filename}, Conversation ID: {conversation.id}")
