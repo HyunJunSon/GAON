@@ -174,21 +174,21 @@ export default function SpeakerMappingModal({
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-      <div className="bg-white rounded-2xl shadow-2xl p-8 w-full max-w-2xl mx-4 max-h-[90vh] overflow-y-auto border border-orange-100">
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl max-h-[90vh] overflow-y-auto border border-orange-100">
         
         {/* 헤더 */}
-        <div className="mb-8 text-center">
-          <div className="w-16 h-16 bg-gradient-to-br from-orange-100 to-red-100 rounded-full flex items-center justify-center mx-auto mb-4">
-            <svg className="w-8 h-8 text-orange-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <div className="p-4 sm:p-8 text-center border-b border-gray-100">
+          <div className="w-12 h-12 sm:w-16 sm:h-16 bg-gradient-to-br from-orange-100 to-red-100 rounded-full flex items-center justify-center mx-auto mb-3 sm:mb-4">
+            <svg className="w-6 h-6 sm:w-8 sm:h-8 text-orange-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
             </svg>
           </div>
-          <h2 className="text-2xl font-bold text-gray-800 mb-2">화자 설정</h2>
-          <p className="text-gray-600">
+          <h2 className="text-xl sm:text-2xl font-bold text-gray-800 mb-2">화자 설정</h2>
+          <p className="text-sm sm:text-base text-gray-600 mb-2">
             음성에서 인식된 화자들에게 이름을 지정해주세요.
           </p>
-          <p className="text-sm text-orange-600 mt-2 bg-orange-50 rounded-lg px-3 py-2">
+          <p className="text-xs sm:text-sm text-orange-600 bg-orange-50 rounded-lg px-3 py-2">
             ⚠️ 분석을 위해 최소 1명은 가족 구성원으로 선택해야 합니다.
           </p>
         </div>
@@ -350,10 +350,10 @@ export default function SpeakerMappingModal({
                 </div>
 
                 {/* 버튼 영역 */}
-                <div className="flex space-x-3">
+                <div className="flex flex-col sm:flex-row gap-3 p-4 sm:p-6 border-t border-gray-100">
                   <button
                     onClick={onClose}
-                    className="flex-1 rounded-lg border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 hover:border-gray-400 transition-all duration-200"
+                    className="flex-1 rounded-lg border border-gray-300 px-4 py-3 text-sm font-medium text-gray-700 hover:bg-gray-50 hover:border-gray-400 transition-all duration-200 touch-target"
                   >
                     취소
                   </button>
@@ -364,7 +364,7 @@ export default function SpeakerMappingModal({
                       Object.keys(userMapping).length === 0 || 
                       isLoading
                     }
-                    className="flex-1 rounded-lg bg-gradient-to-r from-orange-500 to-red-500 px-4 py-2 text-sm font-medium text-white hover:from-orange-600 hover:to-red-600 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200 shadow-md hover:shadow-lg"
+                    className="flex-1 rounded-lg bg-gradient-to-r from-orange-500 to-red-500 px-4 py-3 text-sm font-medium text-white hover:from-orange-600 hover:to-red-600 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200 shadow-md hover:shadow-lg touch-target"
                   >
                     {isLoading ? '저장 중...' : '확인'}
                   </button>

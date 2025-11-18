@@ -119,5 +119,47 @@
   }
   body {
     @apply bg-background text-foreground;
+    /* 모바일 최적화 */
+    -webkit-text-size-adjust: 100%;
+    -moz-text-size-adjust: 100%;
+    text-size-adjust: 100%;
+    -webkit-overflow-scrolling: touch;
+  }
+  
+  /* 모바일 터치 개선 */
+  button, a, [role="button"] {
+    -webkit-tap-highlight-color: transparent;
+    touch-action: manipulation;
+  }
+  
+  /* 입력 필드 줌 방지 (iOS) */
+  input, textarea, select {
+    font-size: 16px;
+  }
+  
+  @media (max-width: 768px) {
+    input, textarea, select {
+      font-size: 16px !important;
+    }
+  }
+}
+
+@layer utilities {
+  /* 모바일 친화적 터치 타겟 */
+  .touch-target {
+    min-height: 44px;
+    min-width: 44px;
+  }
+  
+  /* 텍스트 줄바꿈 */
+  .break-anywhere {
+    word-break: break-word;
+    overflow-wrap: anywhere;
+  }
+  
+  /* 모바일 스크롤 개선 */
+  .scroll-touch {
+    -webkit-overflow-scrolling: touch;
+    overscroll-behavior: contain;
   }
 }

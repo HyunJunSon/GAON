@@ -52,18 +52,18 @@ export default function AnalysisIndexPage() {
   };
 
   return (
-    <main className="space-y-6">
-      <header>
-        <h1 className="text-2xl font-semibold">분석</h1>
-        <p className="text-sm text-gray-600">이전 분석 결과를 확인하거나 새로운 분석을 시작하세요.</p>
+    <main className="space-y-4 sm:space-y-6">
+      <header className="px-1">
+        <h1 className="text-xl sm:text-2xl font-semibold">분석</h1>
+        <p className="text-sm sm:text-base text-gray-600 mt-1">이전 분석 결과를 확인하거나 새로운 분석을 시작하세요.</p>
       </header>
 
       {/* 새 분석 시작 */}
       <section className="rounded-lg border bg-gradient-to-r from-orange-50 to-red-50 p-4">
-        <h2 className="font-medium mb-2">새 분석 시작</h2>
+        <h2 className="font-medium mb-3 text-sm sm:text-base">새 분석 시작</h2>
         <Link 
           href="/conversation" 
-          className="inline-flex items-center px-4 py-2 bg-gradient-to-r from-orange-500 to-red-500 text-white rounded-lg hover:from-orange-600 hover:to-red-600 transition-all"
+          className="inline-flex items-center px-4 py-3 bg-gradient-to-r from-orange-500 to-red-500 text-white rounded-lg hover:from-orange-600 hover:to-red-600 transition-all text-sm sm:text-base font-medium touch-target"
         >
           대화 업로드하기
         </Link>
@@ -71,8 +71,8 @@ export default function AnalysisIndexPage() {
 
       {/* 분석 히스토리 */}
       {history.length > 0 && (
-        <section className="space-y-4">
-          <h2 className="text-lg font-medium">이전 분석 결과</h2>
+        <section className="space-y-3 sm:space-y-4">
+          <h2 className="text-base sm:text-lg font-medium px-1">이전 분석 결과</h2>
           <div className="grid gap-3">
             {history.map((item) => (
               <div
@@ -84,13 +84,13 @@ export default function AnalysisIndexPage() {
                 }`}
                 onClick={() => handleSelectAnalysis(item.conversationId)}
               >
-                <div className="flex items-center justify-between">
-                  <div className="flex-1">
-                    <div className="flex items-center gap-2 mb-1">
-                      <span className="text-sm font-medium">
+                <div className="flex items-start justify-between gap-3">
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2 mb-2 flex-wrap">
+                      <span className="text-sm sm:text-base font-medium break-anywhere">
                         {item.title || `분석 ${item.conversationId.slice(0, 8)}...`}
                       </span>
-                      <span className={`px-2 py-1 text-xs rounded-full ${
+                      <span className={`px-2 py-1 text-xs rounded-full flex-shrink-0 ${
                         item.status === 'ready' ? 'bg-green-100 text-green-700' :
                         item.status === 'processing' ? 'bg-yellow-100 text-yellow-700' :
                         'bg-red-100 text-red-700'
@@ -99,23 +99,23 @@ export default function AnalysisIndexPage() {
                          item.status === 'processing' ? '처리중' : '실패'}
                       </span>
                     </div>
-                    <p className="text-xs text-gray-500">
+                    <p className="text-xs sm:text-sm text-gray-500 mb-2">
                       {new Date(item.createdAt).toLocaleString('ko-KR')}
                     </p>
                     {item.summary && (
-                      <p className="text-sm text-gray-600 mt-1 line-clamp-2">
+                      <p className="text-sm text-gray-600 line-clamp-2 break-anywhere">
                         {item.summary}
                       </p>
                     )}
                   </div>
-                  <div className="flex items-center gap-2">
+                  <div className="flex flex-col sm:flex-row items-end sm:items-center gap-2 flex-shrink-0">
                     {item.status === 'ready' && (
                       <button
                         onClick={(e) => {
                           e.stopPropagation();
                           router.push(`/analysis/${item.conversationId}/summary`);
                         }}
-                        className="px-3 py-1 text-xs bg-orange-500 text-white rounded hover:bg-orange-600 transition-colors"
+                        className="px-3 py-2 text-xs sm:text-sm bg-orange-500 text-white rounded hover:bg-orange-600 transition-colors touch-target"
                       >
                         보기
                       </button>
@@ -125,7 +125,7 @@ export default function AnalysisIndexPage() {
                         e.stopPropagation();
                         handleDeleteAnalysis(item.conversationId);
                       }}
-                      className="px-2 py-1 text-xs bg-red-500 text-white rounded hover:bg-red-600 transition-colors"
+                      className="px-2 py-2 text-xs bg-red-500 text-white rounded hover:bg-red-600 transition-colors touch-target"
                       title="삭제"
                     >
                       🗑️
