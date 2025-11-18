@@ -4,6 +4,7 @@
 import { useState } from 'react';
 import { useParams, useSearchParams, useRouter } from 'next/navigation';
 import { useSubmitPracticeLogs } from '@/hooks/usePractice';
+import { getErrorMessage } from '@/utils/erros';
 
 type PracticeMode = 'chat' | 'voice';
 
@@ -231,6 +232,45 @@ function ChatBubble({ message }: { message: ChatMessage }) {
  * - 추후 Web Speech API / 서버 STT 연동을 위한 자리
  */
 function VoiceMode() {
+  const router = useRouter();
+  const { sessionId } = useParams<{ sessionId: string}>();
+  const submitLogs = useSubmitPracticeLogs(sessionId);
+  const [submitting, setSubmitting] = useState(false);
+  const [serverError, setServerError] = useState<string | null>(null);
+
+  // ⚠️ 1차 버전:
+  // 아직 음성 인식/채팅 로그 구조가 없으니,
+  // placeholder 형태의 메시지 한 개만 서버에 보내도록 구현.
+  // 나중에 실제 음성 인식 결과를 messages 배열로 쌓아서 넘기면 됨.
+  async function handleFinishClick() {
+    if (submitting) return;
+    setSubmitting(true);
+    setServerError(null);
+
+    try {
+      const payload = [
+          {
+            role: 'user' as const,
+            content:
+              '음성 모드에서 연습을 진행했습니다. (현재는 목업 메시지입니다.)',
+            createdAt: new Date().toISOString(),
+          },
+        ];
+
+      await submitLogs.mutateAsync(payload);
+      router.push(`/practice/result/${sessionId}`);
+    } catch (e) {
+      setServerError(
+        getErrorMessage(
+          e,
+          '연습 결과를 분석하는 중 오류가 발생했습니다. 잠시 후 다시 시도해주세요.',
+        ),
+      );
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
   return (
     <section className="flex flex-1 flex-col items-center justify-center rounded-xl border bg-white p-6 text-center">
       <h2 className="text-lg font-semibold">음성 대화 연습</h2>
@@ -248,6 +288,18 @@ function VoiceMode() {
           먼저 채팅 모드에서 대화 내용을 다듬어 보는 것부터 시작해 보세요.
         </p>
       </div>
+      {serverError && (
+        <p className="mt-4 text-xs text-red-500">{serverError}</p>
+      )}
+
+      <button
+        type="button"
+        onClick={handleFinishClick}
+        disabled={submitting}
+        className="mt-6 rounded-lg border border-gray-300 bg-white px-4 py-2 text-xs font-medium text-gray-800 hover:border-red-500 hover:bg-red-50 hover:text-red-600 disabled:cursor-not-allowed disabled:opacity-60"
+      >
+        {submitting ? '분석 중…' : '연습 종료하기'}
+      </button>
     </section>
   );
 }
