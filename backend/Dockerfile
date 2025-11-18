@@ -30,7 +30,8 @@ COPY requirement.tx[t] ./
 
 # Python 의존성 설치 (uv 사용으로 빠른 설치)
 RUN pip install --no-cache-dir uv && \
-    uv pip install --system --no-cache .
+    uv pip install --system --no-cache . && \
+    which uvicorn
 
 # Stage 2: 최종 이미지
 FROM python:3.11-slim
@@ -69,5 +70,5 @@ USER gaon-admin
 # 포트 노출
 EXPOSE 8000
 
-# 애플리케이션 실행 명령
-CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]
+# 애플리케이션 실행 명령 (절대 경로 사용)
+CMD ["/opt/venv/bin/uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]
