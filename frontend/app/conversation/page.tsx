@@ -4,6 +4,7 @@ import { useState } from 'react';
 import Link from 'next/link';
 import { useStartAnalysis } from '@/hooks/useAnalysis';
 import { useServerError } from '@/hooks/useServerError';
+import { useGlobalNotification } from '@/hooks/useGlobalNotification';
 import ErrorAlert from '@/components/ui/ErrorAlert';
 import FileDropzone from '@/components/upload/FileDropzone';
 import AudioRecorder from '@/components/upload/AudioRecorder';
@@ -30,6 +31,7 @@ export default function ConversationPage() {
   const [modalStatus, setModalStatus] = useState<'uploading' | 'processing' | 'ready'>('uploading');
   const { mutate, isPending } = useStartAnalysis();
   const { serverError, handleError, clearError } = useServerError();
+  const { showNotification } = useGlobalNotification();
   const router = useRouter();
 
   const handleSelect = (files: File[]) => {
@@ -79,10 +81,21 @@ export default function ConversationPage() {
   const handleSpeakerMappingComplete = (mapping: Record<string, string>) => {
     console.log('화자 맵핑 완료:', mapping);
     
-    if (currentConversationId) {
-      // 분석 결과 페이지로 이동
-      router.push(`/analysis/${currentConversationId}/summary`);
-    }
+    // 화자 매핑 완료 후 모달 닫고 홈으로 돌아가기
+    setShowSpeakerModal(false);
+    setCurrentConversationId(null);
+    setModalStatus('uploading');
+    
+    // 사용자에게 알림 표시
+    showNotification({
+      title: '화자 설정 완료!',
+      body: '분석이 백그라운드에서 진행됩니다. 완료되면 알려드릴게요.',
+      onClick: () => {
+        if (currentConversationId) {
+          router.push(`/analysis/${currentConversationId}/summary`);
+        }
+      }
+    });
   };
 
   const handleModalClose = () => {
