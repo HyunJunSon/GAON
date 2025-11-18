@@ -133,7 +133,8 @@ class CleanerGraph:
             return state
 
         except Exception as e:
-            return self.exception_handler.handle(e)
+            return self.exception_handler.handle(state, e)
+
 
 
 
@@ -157,7 +158,8 @@ class CleanerGraph:
             return state
 
         except Exception as e:
-            return self.exception_handler.handle(e)
+            return self.exception_handler.handle(state, e)
+
 
 
 
@@ -180,7 +182,8 @@ class CleanerGraph:
             return state
 
         except Exception as e:
-            return self.exception_handler.handle(e)
+            return self.exception_handler.handle(state, e)
+
 
 
 
@@ -199,7 +202,8 @@ class CleanerGraph:
             return state
 
         except Exception as e:
-            return self.exception_handler.handle(e)
+            return self.exception_handler.handle(state, e)
+
 
 
 
@@ -216,7 +220,8 @@ class CleanerGraph:
             return state
 
         except Exception as e:
-            return self.exception_handler.handle(e)
+            return self.exception_handler.handle(state, e)
+
 
 
 
@@ -236,7 +241,8 @@ class CleanerGraph:
             return state
 
         except Exception as e:
-            return self.exception_handler.handle(e)
+            return self.exception_handler.handle(state, e)
+
 
 
 
@@ -257,7 +263,8 @@ class CleanerGraph:
             return state
 
         except Exception as e:
-            return self.exception_handler.handle(e)
+            return self.exception_handler.handle(state, e)
+
 
 
 

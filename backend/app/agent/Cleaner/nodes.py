@@ -6,8 +6,6 @@ from typing import Any, Dict, List, Tuple, Optional
 import pandas as pd
 import numpy as np
 import requests
-import librosa
-
 from sqlalchemy.orm import Session
 
 # CRUD
@@ -152,60 +150,96 @@ class FileTypeClassifier:
 
 
 # ===============================================================
-# 5) AudioFeatureExtractor
+# 5) AudioFeatureExtractor (OpenSMILE 기반,음성 요소 추출)
 # ===============================================================
 @dataclass
 class AudioFeatureExtractor:
     """
-    speaker_segments = [
-        {"speaker": 1, "start": 0.0, "end": 2.4},
-        {"speaker": 2, "start": 2.5, "end": 4.2},
-    ]
-    audio_url에서 구간별 audio 신호를 잘라서 특징 추출
+    OpenSMILE 기반 오디오 특징 추출
+    - turn(=speaker segment) 단위로 직접 WAV chunk 생성
+    - eGeMAPS FeatureSet 사용 → 감정/스트레스/긴장도에 최적화
     """
 
-    def extract(self, audio_url: str, speaker_segments: List[Dict]) -> List[Dict]:
-
-        if not audio_url:
-            raise ValueError("❌ audio_url 없음 (audio 파일이 아님)")
-
-        # GCP URL 다운로드
+    def _load_audio(self, audio_url: str):
+        """오디오 URL → numpy array(y), sample rate(sr)로 변환"""
+        import requests, io, librosa
         resp = requests.get(audio_url)
         if resp.status_code != 200:
             raise ValueError("❌ audio_url 다운로드 실패")
 
         audio_bytes = resp.content
-
-        # librosa로 로드 (메모리 스트림)
-        import io
         y, sr = librosa.load(io.BytesIO(audio_bytes), sr=None)
+        return y, sr
 
-        features = []
+    def _extract_segment(self, y, sr, start, end):
+        """시작~끝 시간 구간 슬라이싱"""
+        start_idx = int(start * sr)
+        end_idx = int(end * sr)
+        return y[start_idx:end_idx]
 
-        for seg in speaker_segments or []:
-            start = int(seg["start"] * sr)
-            end = int(seg["end"] * sr)
-            chunk = y[start:end]
+    def extract(self, audio_url: str, speaker_segments: List[Dict]) -> List[Dict]:
+        """
+        최종 반환 형태:
+        [
+            {
+                "speaker": 1,
+                "start": 0.0,
+                "end": 2.4,
+                "features": {... eGeMAPS feature dict ...}
+            },
+            ...
+        ]
+        """
+        if not audio_url:
+            raise ValueError("❌ audio_url 없음")
 
-            if len(chunk) == 0:
+        if not speaker_segments:
+            raise ValueError("❌ speaker_segments 없음")
+
+        import opensmile
+        smile = opensmile.Smile(
+            feature_set=opensmile.FeatureSet.eGeMAPSv02,
+            feature_level=opensmile.FeatureLevel.Functionals,
+        )
+
+        # 전체 오디오 로드
+        y, sr = self._load_audio(audio_url)
+        results = []
+
+        for seg in speaker_segments:
+            speaker = seg["speaker"]
+            start = seg["start"]
+            end = seg["end"]
+
+            try:
+                chunk = self._extract_segment(y, sr, start, end)
+                if len(chunk) == 0:
+                    continue
+
+                # numpy chunk를 임시 wav 파일 형태로 저장 후 분석
+                import soundfile as sf
+                import tempfile
+
+                with tempfile.NamedTemporaryFile(suffix=".wav") as tmp_wav:
+                    sf.write(tmp_wav.name, chunk, sr)
+                    feats = smile.process_file(tmp_wav.name)
+
+                # pandas DataFrame → dict 변환
+                feat_dict = feats.iloc[0].to_dict()
+
+                results.append({
+                    "speaker": speaker,
+                    "start": start,
+                    "end": end,
+                    "features": feat_dict,
+                })
+
+            except Exception as e:
+                print(f"❌ Audio segment 처리 실패: {speaker}, {start}-{end}: {e}")
                 continue
 
-            # 특징 추출
-            pitch = librosa.yin(chunk, fmin=50, fmax=500).mean()
-            energy = float(np.mean(chunk ** 2))
-            tempo, _ = librosa.beat.beat_track(y=chunk, sr=sr)
-
-            features.append({
-                "speaker": seg["speaker"],
-                "start": seg["start"],
-                "end": seg["end"],
-                "pitch": float(pitch),
-                "energy": energy,
-                "tempo": float(tempo),
-            })
-
-        print(f"🎛️ [AudioFeatureExtractor] {len(features)}개 발화 audio 특징 추출 완료")
-        return features
+        print(f"🎛️ [AudioFeatureExtractor_v2] {len(results)}개 segment 특징 추출 완료")
+        return results
 
 
 # ===============================================================
@@ -243,34 +277,42 @@ class ContentValidator:
 
 
 # ===============================================================
-# 7) ContentMerger (text + audio features)
+# 7) ContentMerger (text_df + audio_features 병합)
 # ===============================================================
 @dataclass
 class ContentMerger:
     """
-    audio_features 를 speaker-match 기반으로 df에 merge
+    text_df + audio_features(turn-level) 병합
+    - audio_features: [
+        { "speaker": 1, "start": 0.0, "end": 1.8, "features": {...} },
+        ...
+      ]
     """
 
     def merge(self, text_df: pd.DataFrame, audio_features: Optional[List[Dict]]) -> pd.DataFrame:
-
         df = text_df.copy()
-        df["pitch"] = None
-        df["energy"] = None
-        df["tempo"] = None
+        df["audio_features"] = None  # turn-level audio feature dict
 
-        if audio_features:
-            for feat in audio_features:
-                spk = feat["speaker"]
+        if not audio_features:
+            # text-only 케이스 → audio_features None 유지
+            return df
 
-                # 해당 speaker의 첫 번째 발화에 붙이기
-                idx_list = df.index[df["speaker"] == spk].tolist()
-                if not idx_list:
-                    continue
+        # speaker별로 segment를 큐(queue)처럼 관리
+        from collections import defaultdict, deque
 
-                first_idx = idx_list[0]
-                df.at[first_idx, "pitch"] = feat["pitch"]
-                df.at[first_idx, "energy"] = feat["energy"]
-                df.at[first_idx, "tempo"] = feat["tempo"]
+        seg_dict = defaultdict(deque)
+        for seg in audio_features:
+            seg_dict[seg["speaker"]].append(seg)
+
+        # 각 text turn에 segment 하나씩 매칭
+        for idx, row in df.iterrows():
+            spk = row["speaker"]
+
+            if spk in seg_dict and len(seg_dict[spk]) > 0:
+                seg = seg_dict[spk].popleft()
+                df.at[idx, "audio_features"] = seg["features"]
+            else:
+                df.at[idx, "audio_features"] = None  # audio가 없는 turn
 
         return df
 
@@ -280,6 +322,10 @@ class ContentMerger:
 # ===============================================================
 @dataclass
 class ExceptionHandler:
-    def handle(self, err: Exception) -> Dict[str, Any]:
-        return {"status": "error", "error": str(err)}
+    def handle(self, state, err: Exception):
+        # State 객체 손상 방지
+        if hasattr(state, "issues"):
+            state.issues.append(str(err))
+        state.validated = False
+        return state
 

@@ -130,7 +130,7 @@ def get_conversation_file_by_conv_id(db: Session, conv_id: str) -> Optional[Dict
             raw_content,
             audio_url,         
             speaker_segments,   
-            create_date
+            upload_date
         FROM conversation_file
         WHERE conv_id = :conv_id
     """)
@@ -145,7 +145,7 @@ def get_conversation_file_by_conv_id(db: Session, conv_id: str) -> Optional[Dict
             "raw_content": result[3],
             "audio_url": result[4],         
             "speaker_segments": result[5],   
-            "create_date": result[6]
+            "upload_date": result[6]
         }
     return None
 

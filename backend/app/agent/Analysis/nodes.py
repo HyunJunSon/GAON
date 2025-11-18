@@ -13,10 +13,12 @@ from sqlalchemy.orm import Session
 from collections import Counter
 import re
 import json
+from ..Analysis.dialect_normalizer import DialectProsodyNormalizer
 
 # 🧩 형태소 분석기 추가
-from konlpy.tag import Okt
-okt = Okt()
+from kiwipiepy import Kiwi
+
+kiwi = Kiwi()
 
 # =========================================
 # CRUD import
@@ -32,7 +34,7 @@ from app.agent.crud import (
 # =========================================
 def extract_content_words_korean(text: str) -> List[str]:
     """한국어 내용어(명사·동사·형용사·부사)만 추출"""
-    morphs = okt.pos(text, stem=True)
+    morphs = kiwi.pos(text, stem=True)
     content_pos = ["Noun", "Verb", "Adjective", "Adverb"]
     return [word for word, pos in morphs if pos in content_pos]
 
