@@ -14,7 +14,7 @@ from app.core.database import Base
 
 # 모델들을 import 해서 Base에 등록되도록 함
 from app.domains.auth import user_models as auth_models
-from app.domains.family import models as family_models
+from app.domains.family import family_models
 from app.domains.conversation import models as conversation_models
 
 # this is the Alembic Config object, which provides

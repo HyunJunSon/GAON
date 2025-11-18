@@ -3,7 +3,7 @@ from sqlalchemy.orm import relationship
 from sqlalchemy.dialects.postgresql import UUID
 import uuid
 from app.core.database import Base
-from app.domains.family.models import Family
+from app.domains.family.family_models import Family
 
 # Many-to-Many 중간 테이블
 user_conversations = Table(
