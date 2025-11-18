@@ -11,7 +11,7 @@ from .domains.conversation.websocket import websocket_endpoint
 from .domains.auth.user_models import User
 from .domains.conversation.models import Conversation
 from .domains.conversation.file_models import ConversationFile
-from .domains.family.models import Family
+from .domains.family.family_models import Family
 
 app = FastAPI()
 
