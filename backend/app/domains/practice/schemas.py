@@ -62,7 +62,16 @@ class PracticeChatMessage(BaseModel):
 
 
 class SubmitPracticeLogsRequest(BaseModel):
-  """연습 종료 시 서버로 보내는 전체 채팅 로그."""
+  """
+  연습 종료 시 서버로 보내는 전체 채팅 로그.
+  프론트에서 보내는 JSON 예시:
+  {
+    "messages": [
+      { "role": "user", "content": "...", "createdAt": "2025-11-17T..." },
+      { "role": "assistant", "content": "...", "createdAt": "..." }
+    ]
+  }
+  """
   messages: List[PracticeChatMessage]
 
 
