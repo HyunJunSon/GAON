@@ -152,14 +152,20 @@ export default function SpeakerMappingModal({
       }
 
       setIsLoading(true);
-      const response = await updateSpeakerMapping(conversationId, mapping, userMapping);
       
-      // 화자 매핑 완료 후 바로 완료 처리 (분석은 백그라운드에서 진행)
+      // 백그라운드에서 화자 매핑 저장 (에러가 나도 진행)
+      updateSpeakerMapping(conversationId, mapping, userMapping).catch(err => {
+        console.error('화자 매핑 저장 실패:', err);
+      });
+      
+      // 바로 완료 처리 (분석은 백그라운드에서 진행)
       onComplete(mapping);
       onClose();
     } catch (err) {
-      setError('화자 맵핑 저장에 실패했습니다.');
-      console.error('화자 맵핑 저장 실패:', err);
+      // 에러가 나도 일단 진행
+      console.error('화자 맵핑 처리 중 오류:', err);
+      onComplete(mapping);
+      onClose();
     } finally {
       setIsLoading(false);
     }
