@@ -1,9 +1,9 @@
 # backend/app/domains/practice/services.py
-
 from __future__ import annotations
+from dotenv import load_dotenv
 
 from datetime import datetime
-from typing import Dict, List
+from typing import Dict, List, AsyncIterator
 
 from uuid import uuid4
 
@@ -17,6 +17,13 @@ from .schemas import (
     SubmitPracticeLogsRequest
 )
 
+from langchain_google_genai import ChatGoogleGenerativeAI
+from langchain_core.messages import SystemMessage, HumanMessage
+from app.core.config import settings  # ✅ LLM 키 사용
+from langchain_openai import ChatOpenAI  # ✅ LLM 연결
+
+load_dotenv()
+
 # TODO:
 #  - 현재는 메모리 상에만 세션/결과를 저장하는 임시 구현
 #  - 추후에는 DB 테이블 (practice_sessions, practice_results 등)로 대체 필요
@@ -29,6 +36,16 @@ _PRACTICE_RESULTS: Dict[str, PracticeResult] = {}
 
 # 세션별 채팅 로그 저장소 (임시, 인메모리): sessionId → [PracticeMessage, ...]
 _PRACTICE_LOGS: Dict[str, List[PracticeChatMessage]] = {}
+
+# --- Gemini 2.5 Flash 기반 연습용 LLM (스트리밍) ---
+practice_llm = ChatGoogleGenerativeAI(
+    model="gemini-2.5-flash",
+    temperature=0.7,
+    streaming=True,
+    api_key=settings.gemini_api_key
+)
+
+# practice_llm = ChatOpenAI(model="gpt-4o-mini", api_key=settings.openai_api_key)
 
 def _analyze_practice_session(
     session: StartPracticeResponse,
@@ -198,3 +215,43 @@ def finish_practice_session(
     # 결과 캐시
     _PRACTICE_RESULTS[session_id] = result
     return result
+
+
+async def stream_practice_llm_reply(user_text: str) -> AsyncIterator[str]:
+    """연습 세션용 LLM 스트리밍 응답.
+
+    - 입력: 사용자의 한 턴 발화 텍스트
+    - 출력: 토큰/조각(str)을 Async iterator로 yield
+    - 나중에 session_id, 과거 대화 로그 등을 받아서
+      전체 컨텍스트를 구성하는 쪽으로 확장할 수 있다.
+    """
+
+    # 1) 기본 시스템 프롬프트
+    system_prompt = (
+        "너는 가족 간의 대화를 코칭해주는 대화 연습 코치야. "
+        "사용자의 말을 비난하지 않고, 공감하면서 "
+        "가족에게 실제로 건네볼 수 있는 표현을 같이 찾아가는 방식으로 답해줘. "
+        "답변은 한국어로, 너무 길게 말하지 말고 2~3문단 이내로 정리해줘."
+    )
+
+    messages = [
+        SystemMessage(content=system_prompt),
+        HumanMessage(content=user_text),
+    ]
+
+    # 2) LangChain 스트리밍: astream()은 Async iterator를 반환
+    async for chunk in practice_llm.astream(messages):
+        # chunk는 ChatGenerationChunk 형태고, content는 str 또는 list일 수 있음
+        text = getattr(chunk, "content", None)
+
+        # content가 list인 경우(멀티 파트)에는 각 part의 텍스트를 이어붙여도 됨
+        if isinstance(text, list):
+            # ["...", "..."]인 경우를 대비
+            combined = "".join(str(part) for part in text if part)
+            if combined:
+                yield combined
+        elif isinstance(text, str):
+            if text:
+                yield text
+        # 그 외 타입은 스킵
+

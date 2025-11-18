@@ -1,5 +1,4 @@
 # backend/app/domains/practice/router.py
-
 from __future__ import annotations
 
 from fastapi import APIRouter, HTTPException, status, WebSocket, WebSocketDisconnect
@@ -16,6 +15,7 @@ from .services import (
     start_practice_session,
     get_practice_result,
     submit_practice_logs,
+    stream_practice_llm_reply
 )
 
 router = APIRouter(
@@ -87,7 +87,7 @@ def submit_logs(
         )
     
 # --- 텍스트 LLM 스트리밍 목업 (나중에 LangGraph/LLM으로 교체 예정) ---
-
+# 교체완료. 추후에 LLM쪽에 문제가 생겼을 때 fallback으로 사용가능
 async def _fake_llm_stream(user_text: str) -> AsyncIterator[str]:
     """사용자 입력을 받아서 토막 토막 흉내내며 응답을 스트리밍하는 목업.
 
@@ -155,8 +155,8 @@ async def practice_ws(websocket: WebSocket, session_id: str) -> None:
             # 1) 먼저 사용자의 발화를 서버 로그에 넣고 싶다면,
             #    services.submit_practice_logs 등에 통합 가능 (지금은 생략)
 
-            # 2) LLM 스트리밍 응답 보내기 (목업 버전)
-            async for chunk in _fake_llm_stream(content):
+            # 2) LLM 스트리밍 응답 보내기
+            async for chunk in stream_practice_llm_reply(content):
                 out = {"type": "assistant_delta", "content": chunk}
                 await websocket.send_text(json.dumps(out))
 
