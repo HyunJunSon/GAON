@@ -47,6 +47,9 @@ export function useAnalysis(conversationId: string): UseQueryResult<AnalysisRes,
       const status = query.state.data?.status;
       return status === 'ready' || status === 'completed' || status === 'failed' ? false : 2000;
     },
-    staleTime: 0,
+    staleTime: 5 * 60 * 1000, // 5분간 캐시 유지
+    gcTime: 10 * 60 * 1000, // 10분간 메모리 보존
+    refetchOnWindowFocus: false, // 탭 전환 시 재요청 방지
+    refetchOnMount: false, // 마운트 시 재요청 방지 (캐시 우선 사용)
   })
 }
