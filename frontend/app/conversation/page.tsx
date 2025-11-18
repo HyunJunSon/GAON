@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { useStartAnalysis } from '@/hooks/useAnalysis';
 import { useServerError } from '@/hooks/useServerError';
 import { useGlobalNotification } from '@/hooks/useGlobalNotification';
+import { useGlobalWebSocket } from '@/hooks/useGlobalWebSocket';
 import { analysisHistoryStorage } from '@/utils/analysisHistoryStorage';
 import ErrorAlert from '@/components/ui/ErrorAlert';
 import FileDropzone from '@/components/upload/FileDropzone';
@@ -33,6 +34,7 @@ export default function ConversationPage() {
   const { mutate, isPending } = useStartAnalysis();
   const { serverError, handleError, clearError } = useServerError();
   const { showNotification } = useGlobalNotification();
+  useGlobalWebSocket(currentConversationId || undefined); // WebSocket 연결
   const router = useRouter();
 
   const handleSelect = (files: File[]) => {
