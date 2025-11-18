@@ -35,7 +35,8 @@ export function useWebSocket({
     }
 
     // 페이지별 WebSocket 연결 (실시간 진행률 등을 위해)
-    const wsUrl = `ws://localhost:8000/ws/analysis/${conversationId}`;
+    const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
+    const wsUrl = apiUrl.replace('http', 'ws') + `/ws/analysis/${conversationId}`;
     const ws = new WebSocket(wsUrl);
     wsRef.current = ws;
 

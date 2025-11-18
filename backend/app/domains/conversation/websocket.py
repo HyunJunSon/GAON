@@ -42,22 +42,46 @@ class ConnectionManager:
     
     async def send_to_conversation(self, conversation_id: str, message: dict):
         """특정 대화의 모든 클라이언트에게 메시지 전송"""
+        logger.info(f"📡 WebSocket 메시지 전송 시도: conversation_id={conversation_id}")
+        
         if conversation_id not in self.active_connections:
+            logger.warning(f"📡 연결된 클라이언트 없음: conversation_id={conversation_id}")
             return
+        
+        client_count = len(self.active_connections[conversation_id])
+        logger.info(f"📡 연결된 클라이언트 수: {client_count}")
         
         # 연결이 끊어진 클라이언트 제거를 위한 리스트
         disconnected = []
+        success_count = 0
         
         for websocket in self.active_connections[conversation_id]:
             try:
-                await websocket.send_text(json.dumps(message))
+                # JSON 직렬화 안전성 확보
+                safe_message = self._make_json_safe(message)
+                await websocket.send_text(json.dumps(safe_message))
+                success_count += 1
+                logger.debug(f"📡 클라이언트 전송 성공")
             except Exception as e:
-                logger.warning(f"WebSocket 전송 실패: {e}")
+                logger.warning(f"📡 WebSocket 전송 실패: {e}")
                 disconnected.append(websocket)
         
         # 끊어진 연결 정리
         for ws in disconnected:
             self.disconnect(ws, conversation_id)
+        
+        logger.info(f"📡 메시지 전송 완료: 성공={success_count}, 실패={len(disconnected)}")
+    
+    def _make_json_safe(self, obj):
+        """JSON 직렬화 안전한 객체로 변환"""
+        if isinstance(obj, dict):
+            return {k: self._make_json_safe(v) for k, v in obj.items()}
+        elif isinstance(obj, list):
+            return [self._make_json_safe(item) for item in obj]
+        elif hasattr(obj, '__str__') and not isinstance(obj, (str, int, float, bool, type(None))):
+            return str(obj)  # UUID 등을 문자열로 변환
+        else:
+            return obj
     
     async def broadcast_progress(self, conversation_id: str, progress_data: dict):
         """분석 진행률 브로드캐스트"""
@@ -137,9 +161,19 @@ async def update_analysis_progress(
 
 async def notify_analysis_complete(conversation_id: str, result: dict):
     """분석 완료 알림"""
-    await manager.broadcast_completion(conversation_id, result)
+    logger.info(f"📡 분석 완료 알림 전송: conversation_id={conversation_id}, result={result}")
+    try:
+        await manager.broadcast_completion(conversation_id, result)
+        logger.info(f"📡 분석 완료 알림 전송 성공")
+    except Exception as e:
+        logger.error(f"📡 분석 완료 알림 전송 실패: {e}")
 
 
 async def notify_analysis_error(conversation_id: str, error: str):
     """분석 실패 알림"""
-    await manager.broadcast_error(conversation_id, error)
+    logger.info(f"📡 분석 실패 알림 전송: conversation_id={conversation_id}, error={error}")
+    try:
+        await manager.broadcast_error(conversation_id, error)
+        logger.info(f"📡 분석 실패 알림 전송 성공")
+    except Exception as e:
+        logger.error(f"📡 분석 실패 알림 전송 실패: {e}")
