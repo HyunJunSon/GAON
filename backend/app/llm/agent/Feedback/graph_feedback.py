@@ -1,7 +1,6 @@
 # backend/app/llm/agent/Feedback/graph_feedback.py
 # -*- coding: utf-8 -*-
 
-# app/agent/Feedback/graph_feedback.py
 from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Optional, Dict, Any, List
@@ -78,12 +77,14 @@ class FeedbackGraph:
         conv_id: str,
         id: int,
         conversation_df: pd.DataFrame,
+        analysis_id: Optional[str] = None,
     ) -> Dict[str, Any]:
         state = FeedbackState(
             db=db,
             conv_id=conv_id,
             id=id,
             conversation_df=conversation_df,
+            analysis_id=analysis_id,
             verbose=self.verbose,
         )
 

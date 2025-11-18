@@ -176,18 +176,43 @@ class RAGAndAdviceNode:
             raise ValueError("query is empty")
         return client.embeddings.create(model=model, input=[t]).data[0].embedding
 
-    def _knn_search(self, conn, qvec: list, table: str, limit: int = 50):
+    def _knn_search(
+        self,
+        conn,
+        qvec: list,
+        table: str,
+        limit: int = 50,
+        for_counsel: bool | None = None,
+    ):
+        # for_counsel:
+        #   True  → 상담 책만
+        #   False → 상담 아닌 책만
+        #   None  → 전체
+        where = ""
+        if for_counsel is True:
+            where = "WHERE book_title LIKE '%%상담%%'"
+        elif for_counsel is False:
+            where = "WHERE (book_title NOT LIKE '%%상담%%' OR book_title IS NULL)"
+
         sql = f"""
-          SELECT snippet_id, section_id, canonical_path, chunk_ix,
-                 page_start, page_end, citation, full_text,
+          SELECT snippet_id,
+                 section_id,
+                 canonical_path,
+                 chunk_ix,
+                 page_start,
+                 page_end,
+                 citation,
+                 full_text,
                  book_title,
                  (embedding <=> %s::vector) AS distance
           FROM {table}
-          ORDER BY embedding <=> %s::vector
+          {where}
+          ORDER BY distance
           LIMIT %s
         """
         with conn.cursor(cursor_factory=extras.RealDictCursor) as cur:
-            cur.execute(sql, (qvec, qvec, limit))
+            # ⚠️ 여기 파라미터는 두 개만!
+            cur.execute(sql, (qvec, limit))
             return cur.fetchall()
 
     def _fetch_full_sections(self, conn, table: str, section_ids: list[str]) -> list[dict]:
@@ -235,21 +260,25 @@ class RAGAndAdviceNode:
         qvec: list,
         table: str,
         sim_threshold: float,
+        for_counsel: bool | None = None,
     ) -> List[Dict[str, Any]]:
-        # 1) knn rows
         conn = engine.raw_connection()
         try:
-            with conn.cursor(cursor_factory=extras.RealDictCursor) as cur:
-                rows = self._knn_search(conn, qvec, table=table, limit=50)
+            rows = self._knn_search(conn, qvec, table=table, limit=50, for_counsel=for_counsel)
         finally:
             conn.close()
-        
-        if self.verbose:
-            print(f"\n🔎 [RAG] knn 결과 {len(rows)}개")
-            for r in rows[:10]:
-                print(f"   section_id={r['section_id']}, book_title={r.get('book_title')}, citation={r.get('citation')}, distance={r.get('distance')}")
 
-        # 2) distance → similarity: sim = 1 - distance >= sim_threshold
+        if self.verbose:
+            print(f"\n🔎 [RAG] knn 결과 {len(rows)}개 (for_counsel={for_counsel})")
+            for r in rows[:10]:
+                d = float(r["distance"])
+                sim = 1.0 - d
+                print(
+                    f"   section_id={r['section_id']}, "
+                    f"book_title={r.get('book_title')}, "
+                    f"distance={d:.4f}, sim={sim:.4f}"
+                )
+
         filtered_ids = set()
         best_dist_map: Dict[str, float] = {}
 
@@ -257,21 +286,23 @@ class RAGAndAdviceNode:
             d = r.get("distance")
             if d is None:
                 continue
+            d = float(d)
+            sim = 1.0 - d
 
-            d = float(d)  # cosine distance (0 = 완전 같음)
-            sim = 1.0 - d  # cosine similarity 대략
-            
             if sim < sim_threshold:
                 continue
+
             sid = r["section_id"]
             filtered_ids.add(sid)
             if sid not in best_dist_map or d < best_dist_map[sid]:
                 best_dist_map[sid] = d
 
+        if self.verbose:
+            print(f"   🔍 sim_threshold={sim_threshold}, 통과 section 수={len(filtered_ids)}")
+
         if not filtered_ids:
             return []
 
-        # 3) full sections
         conn2 = engine.raw_connection()
         try:
             sections = self._fetch_full_sections(conn2, table, sorted(filtered_ids))
@@ -281,8 +312,13 @@ class RAGAndAdviceNode:
         for s in sections:
             s["best_dist"] = best_dist_map.get(s["section_id"])
 
-        sections.sort(key=lambda z: (float("inf") if z.get("best_dist") is None else z["best_dist"]))
+        sections.sort(
+            key=lambda z: (
+                float("inf") if z.get("best_dist") is None else z["best_dist"]
+            )
+        )
         return sections[:6]
+
 
     def __call__(self, state: "FeedbackState") -> "FeedbackState":
         API_KEY = os.getenv("OPENAI_API_KEY") or settings.openai_api_key
@@ -313,15 +349,19 @@ class RAGAndAdviceNode:
         qvec_talk    = self._make_query_embedding(client, talk_query)
 
         # 2) ideal_answer에서 섹션 가져오기 (유사도 0.45 이상만)
-        sections_cand_counsel = self._build_sections_with_filter(qvec_counsel, TABLE, SIM_TH)
-        sections_cand_talk    = self._build_sections_with_filter(qvec_talk,    TABLE, SIM_TH)
-
-        # 3) book_title에 "상담" 포함 여부로 상담/대화법 분리
-        counsel_sections = [s for s in sections_cand_counsel if "상담" in (s.get("book_title") or "")]
-        talk_sections    = [s for s in sections_cand_talk    if "상담" not in (s.get("book_title") or "")]
+        sections_cand_counsel = self._build_sections_with_filter(
+            qvec_counsel, TABLE, SIM_TH, for_counsel=True
+        )
+        sections_cand_talk    = self._build_sections_with_filter(
+            qvec_talk,    TABLE, SIM_TH, for_counsel=False
+        )
+        
+        # 3)이제는 이미 KNN에서 상담/비상담 나눠졌으니까 그대로 씀
+        counsel_sections = sections_cand_counsel
+        talk_sections    = sections_cand_talk
 
         state.counsel_sections = counsel_sections
-        state.talk_sections = talk_sections
+        state.talk_sections    = talk_sections
 
         # 4) 컨텍스트 문자열 만들기
         def ctx_block(prefix: str, sections: List[Dict[str, Any]]) -> str:

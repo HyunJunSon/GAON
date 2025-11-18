@@ -35,6 +35,10 @@ def main():
     print("\n🚀 [GAON MAIN PIPELINE] 실행 시작")
     print("=" * 60)
 
+    # 🔒 고정 실행용 conv_id / user_id
+    #FIXED_CONV_ID = "a7c215d8-cf9c-4715-8c84-e6655b3e3445"
+    #FIXED_USER_ID = 9  # 혹시 필요하면
+
     # =========================================
     # 1️⃣ Cleaner 실행
     # =========================================
@@ -43,6 +47,8 @@ def main():
     # 🔧 수정: sample 파라미터 제거
     # run_cleaner()는 자동으로 최근 대화 조회
     cleaner_result = run_cleaner()
+
+    #cleaner_result = run_cleaner(conv_id=FIXED_CONV_ID, id=FIXED_USER_ID)
     
     print("\n📊 [Cleaner 결과]")
     print("-" * 60)
@@ -118,6 +124,7 @@ def main():
         conv_id=conv_id,
         id=id,
         conversation_df=cleaned_df,
+        analysis_id=analysis_result["analysis_id"],
     )
 
     print("\n📊 [Feedback 결과]")

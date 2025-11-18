@@ -1,7 +1,7 @@
 # backend/app/llm/agent/Feedback/run_feedback.py
 # -*- coding: utf-8 -*-
 
-from typing import Dict, Any
+from typing import Dict, Any, Optional
 import pandas as pd
 from sqlalchemy.orm import Session
 
@@ -13,6 +13,8 @@ def run_feedback(
     conv_id: str,
     id: int,
     conversation_df: pd.DataFrame,
+    analysis_id: Optional[str] = None,   # ✅ 어떤 분석 결과랑 묶을지 명시
+    db: Optional[Session] = None,        # (옵션) 이미 열린 세션 재사용 가능
     verbose: bool = True,
 ) -> Dict[str, Any]:
     if verbose:
@@ -27,13 +29,18 @@ def run_feedback(
     if conversation_df is None or conversation_df.empty:
         raise ValueError("❌ conversation_df가 비어 있습니다!")
 
-    db: Session = SessionLocal()
+    owns_session = False
+    if db is None:
+        db = SessionLocal()
+        owns_session = True
+
     try:
         graph = FeedbackGraph(verbose=verbose)
         result = graph.run(
             db=db,
             conv_id=conv_id,
             id=id,
+            analysis_id=analysis_id,        # ✅ 그래프 state 로 전달
             conversation_df=conversation_df,
         )
 
@@ -46,4 +53,5 @@ def run_feedback(
         return result
 
     finally:
-        db.close()
+        if owns_session:
+            db.close()
