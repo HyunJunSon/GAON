@@ -306,6 +306,7 @@ async def get_audio_conversation_detail(
 async def update_speaker_mapping(
     conversation_id: UUID,
     request: SpeakerMappingRequest,
+    background_tasks: BackgroundTasks,
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
