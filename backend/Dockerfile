@@ -30,8 +30,7 @@ COPY requirement.tx[t] ./
 
 # Python 의존성 설치 (uv 사용으로 빠른 설치)
 RUN pip install --no-cache-dir uv && \
-    uv pip install --system --no-cache . && \
-    which uvicorn
+    uv pip install --python /opt/venv/bin/python --no-cache .
 
 # Stage 2: 최종 이미지
 FROM python:3.11-slim
