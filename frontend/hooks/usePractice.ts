@@ -5,12 +5,12 @@ import { useQuery, useMutation, useQueryClient, UseQueryResult } from '@tanstack
 import { qk } from '@/constants/queryKeys';
 import {
   fetchParticipants, startPractice, finishPractice, fetchPracticeResult,
-  startPracticeSession
+  startPracticeSession, submitPracticeLogs
 } from '@/apis/practice';
 import type {
   StartPracticeReq, StartPracticeRes,
   FinishPracticeReq, FinishPracticeRes,
-  PracticeResult
+  PracticeResult, PracticeChatMessage
 } from '@/schemas/practice';
 
 export function useParticipants() {
@@ -64,5 +64,15 @@ export function usePracticeResult(sessionId: string): UseQueryResult<PracticeRes
     queryKey: ['practice', 'result', sessionId],
     queryFn: () => fetchPracticeResult(sessionId),
     enabled: !!sessionId,
+  });
+}
+
+/**
+ * 연습 세션 로그 제출 훅
+ * - /practice/chat/[sessionId]에서 사용
+ */
+export function useSubmitPracticeLogs(sessionId: string) {
+  return useMutation<void, Error, PracticeChatMessage[]>({
+    mutationFn: (messages) => submitPracticeLogs(sessionId, messages),
   });
 }

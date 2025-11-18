@@ -3,6 +3,7 @@
 
 import { useState } from 'react';
 import { useParams, useSearchParams, useRouter } from 'next/navigation';
+import { useSubmitPracticeLogs } from '@/hooks/usePractice';
 
 type PracticeMode = 'chat' | 'voice';
 
@@ -35,12 +36,6 @@ export default function PracticeChatPage() {
   const mode: PracticeMode =
     modeParam === 'voice' ? 'voice' : 'chat'; // 잘못된 값이면 기본값은 chat으로 처리
 
-  // 공통: 연습 종료 시 결과 페이지로 이동
-  function handleFinish() {
-    // TODO: 추후 여기에서 서버로 로그/결과 분석 요청을 보낸 뒤 이동
-    router.push(`/practice/result/${sessionId}`);
-  }
-
   return (
     // <main className="mx-auto flex h-[calc(100dvh-56px)] min-h-0 max-w-3xl flex-col p-4 md:p-6">      
     // <main className="flex h-[calc(100dvh-120px)] min-h-5 max-w-3xl flex-col p-4 md:p-6">
@@ -59,14 +54,6 @@ export default function PracticeChatPage() {
             </span>
           </p>
         </div>
-
-        <button
-          type="button"
-          onClick={handleFinish}
-          className="rounded-lg border border-gray-300 bg-white px-3 py-2 text-xs font-medium text-gray-800 hover:border-red-500 hover:text-red-600 hover:bg-red-50"
-        >
-          연습 종료하기
-        </button>
       </header>
 
       {/* 모드에 따라 다른 UI 렌더 */}
@@ -85,6 +72,9 @@ export default function PracticeChatPage() {
  * - 목업 assistant 응답
  */
 function ChatMode() {
+  const router = useRouter();
+  const { sessionId } = useParams<{ sessionId: string}>();
+  const submitLogs = useSubmitPracticeLogs(sessionId);
   const [messages, setMessages] = useState<ChatMessage[]>([
     {
       id: 'm1',
@@ -139,6 +129,26 @@ function ChatMode() {
     }
   }
 
+  async function handleFinishClick() {
+    if (submitLogs.isPending) return;
+
+    try {
+      // 서버에 보낼 형태로 매핑 (id는 필요 없으니 제외)
+      const payload = messages.map((m) => ({
+        role: m.role,
+        content: m.content,
+        createdAt: m.createdAt,
+      }));
+
+      await submitLogs.mutateAsync(payload);
+      router.push(`/practice/result/${sessionId}`);
+    } catch (e) {
+      // TODO: 공통 에러 핸들링 훅으로 바꿀 수 있음
+      console.error('연습 로그 전송 실패:', e);
+      alert('연습 결과 분석 요청에 실패했어요. 잠시 후 다시 시도해주세요.');
+    }
+  }
+
   return (
     <section className="flex flex-1 min-h-[68vh] max-h-[68vh] flex-col rounded-xl border bg-white p-3 md:p-4">
       {/* 메시지 리스트 */}
@@ -148,30 +158,39 @@ function ChatMode() {
         ))}
       </div>
 
-      {/* 입력창 */}
+      {/* 입력창 + 연습 종료 버튼 */}
       <div className="border-t pt-3">
         <label className="mb-1 block text-xs font-medium text-gray-600">
           지금 떠오르는 말, 그대로 적어보세요.
         </label>
-        <div className="flex gap-2">
+        <div className="flex flex-col gap-2 md:flex-row">
           <textarea
             className="min-h-[60px] flex-1 resize-none rounded-lg border border-gray-300 p-2 text-sm outline-none focus:border-black focus:ring-1 focus:ring-black/10"
             placeholder="예: 그때는 내가 너무 몰아붙였던 것 같아…"
             value={input}
             onChange={(e) => setInput(e.target.value)}
             onKeyDown={handleKeyDown}
-            // 🔹 한글 조합 상태 플래그
             onCompositionStart={() => setIsComposing(true)}
             onCompositionEnd={() => setIsComposing(false)}
           />
-          <button
-            type="button"
-            onClick={handleSend}
-            disabled={!input.trim()}
-            className="h-[60px] shrink-0 rounded-lg bg-black px-3 text-sm font-medium text-white disabled:cursor-not-allowed disabled:bg-gray-400"
-          >
-            보내기
-          </button>
+          <div className="flex shrink-0 gap-2">
+            <button
+              type="button"
+              onClick={handleSend}
+              disabled={!input.trim()}
+              className="h-[60px] flex-1 rounded-lg bg-black px-3 text-sm font-medium text-white disabled:cursor-not-allowed disabled:bg-gray-400"
+            >
+              보내기
+            </button>
+            <button
+              type="button"
+              onClick={handleFinishClick}
+              disabled={submitLogs.isPending}
+              className="h-[60px] flex-1 rounded-lg border border-gray-300 bg-white px-3 text-sm font-medium text-gray-800 hover:border-red-500 hover:text-red-600 hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-60"
+            >
+              {submitLogs.isPending ? '분석 요청 중…' : '연습 종료하기'}
+            </button>
+          </div>
         </div>
         <p className="mt-1 text-[11px] text-gray-400">
           Enter: 전송 / Shift + Enter: 줄바꿈

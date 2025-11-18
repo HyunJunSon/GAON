@@ -44,3 +44,9 @@ export type PracticeResult = {
   summary: string;
   createdAt: string;
 };
+
+export type PracticeChatMessage = {
+  role: 'user' | 'assistant';
+  content: string;
+  createdAt: string; // ISO 문자열 (Date.toISOString())
+};

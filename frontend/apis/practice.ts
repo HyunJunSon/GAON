@@ -4,7 +4,7 @@ import type {
   PracticeParticipant,
   StartPracticeReq, StartPracticeRes,
   FinishPracticeReq, FinishPracticeRes,
-  PracticeResult
+  PracticeResult, PracticeChatMessage
 } from '@/schemas/practice';
 
 export async function startPracticeSession(payload: StartPracticeReq): Promise<StartPracticeRes> {
@@ -13,6 +13,19 @@ export async function startPracticeSession(payload: StartPracticeReq): Promise<S
 
 export async function fetchPracticeResult(sessionId: string,): Promise<PracticeResult> {
   return apiFetch<PracticeResult>(`/api/practice/result/${sessionId}`, {method: 'GET'});
+}
+
+export async function submitPracticeLogs(
+  sessionId: string,
+  messages: PracticeChatMessage[],
+): Promise<void> {
+  await apiFetch<void>(`/api/practice/session/${sessionId}/logs`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({ messages }),
+  });
 }
 
 export async function fetchParticipants(): Promise<{ participants: PracticeParticipant[] }> {
