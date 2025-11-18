@@ -38,6 +38,19 @@ export default function AnalysisIndexPage() {
     setSelectedId(conversationId);
   };
 
+  // 분석 삭제
+  const handleDeleteAnalysis = (conversationId: string) => {
+    if (confirm('이 분석 결과를 삭제하시겠습니까?')) {
+      analysisHistoryStorage.remove(conversationId);
+      setHistory(analysisHistoryStorage.getAll());
+      
+      // 현재 선택된 분석이 삭제된 경우 선택 해제
+      if (selectedId === conversationId) {
+        setSelectedId(null);
+      }
+    }
+  };
+
   return (
     <main className="space-y-6">
       <header>
@@ -95,17 +108,29 @@ export default function AnalysisIndexPage() {
                       </p>
                     )}
                   </div>
-                  {item.status === 'ready' && (
+                  <div className="flex items-center gap-2">
+                    {item.status === 'ready' && (
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          router.push(`/analysis/${item.conversationId}/summary`);
+                        }}
+                        className="px-3 py-1 text-xs bg-orange-500 text-white rounded hover:bg-orange-600 transition-colors"
+                      >
+                        보기
+                      </button>
+                    )}
                     <button
                       onClick={(e) => {
                         e.stopPropagation();
-                        router.push(`/analysis/${item.conversationId}/summary`);
+                        handleDeleteAnalysis(item.conversationId);
                       }}
-                      className="px-3 py-1 text-xs bg-orange-500 text-white rounded hover:bg-orange-600 transition-colors"
+                      className="px-2 py-1 text-xs bg-red-500 text-white rounded hover:bg-red-600 transition-colors"
+                      title="삭제"
                     >
-                      보기
+                      🗑️
                     </button>
-                  )}
+                  </div>
                 </div>
               </div>
             ))}
