@@ -2,8 +2,9 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import { useNavLinks, AUTH_PAGES, type NavLink } from "./NavLinks";
+import GaonLogo from "@/components/ui/GaonLogo";
 
 /**
  * 공통 네비게이션
@@ -44,8 +45,14 @@ export default function AppNavigation() {
   return (
     <>
       {/* 데스크탑/태블릿: 좌측 사이드바 */}
-      <aside className="hidden md:flex md:flex-col md:w-56 md:shrink-0 md:border-r md:border-gray-200 md:bg-white">
+      <aside className="hidden md:flex md:flex-col md:w-56 md:shrink-0 md:border-r md:border-gray-200 md:bg-gradient-to-b md:from-orange-50 md:to-white">
         <div className="sticky top-0 h-screen p-4">
+          {/* 사이드바 로고 */}
+          <div className="mb-8 pb-4 border-b border-orange-100">
+            <Link href="/" className="block">
+              <GaonLogo size="md" variant="full" />
+            </Link>
+          </div>
           <SideNav links={NAV_LINKS} currentPath={pathname} />
         </div>
       </aside>
@@ -70,14 +77,14 @@ function SideNav ({ links, currentPath }: {links: NavLink[], currentPath: string
               if (isActive) e.preventDefault(); // 동일 페이지 이동 방지
             }}
             className={[
-              'flex items-center gap-2 rounded-lg px-3 py-2 text-sm transition',
+              'flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm transition-all duration-200',
               isActive
-                ? 'bg-gray-900 text-white cursor-default'
-                : 'text-gray-700 hover:bg-gray-100',
+                ? 'bg-gradient-to-r from-orange-500 to-red-500 text-white shadow-md cursor-default'
+                : 'text-gray-700 hover:bg-orange-50 hover:text-orange-700',
             ].join(' ')}
           >
             <Icon className="h-4 w-4" />
-            <span>{label}</span>
+            <span className="font-medium">{label}</span>
           </Link>
         );
       })}
@@ -87,10 +94,8 @@ function SideNav ({ links, currentPath }: {links: NavLink[], currentPath: string
 
 function BottomTabNav({ links, currentPath }: {links: NavLink[], currentPath: string}) {
   // iOS 안전 영역 대응: safe-area-inset-bottom
-  const style = useMemo(
-    () => ({ paddingBottom: 'env(safe-area-inset-bottom)' }),
-    []
-  );
+  const style = { paddingBottom: 'env(safe-area-inset-bottom)' };
+  
   return (
     <nav
       className="fixed bottom-0 left-0 right-0 z-50 border-t border-gray-200 bg-white md:hidden"

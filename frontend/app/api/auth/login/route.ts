@@ -1,39 +1,28 @@
-// frontend/app/api/auth/login/route.ts
-import { NextResponse } from 'next/server';
+import { NextRequest } from 'next/server';
 
-const BACKEND_URL = process.env.NEXT_PUBLIC_API_URL || 'http://127.0.0.1:8000';
-
-export async function POST(req: Request) {
+export async function POST(request: NextRequest) {
   try {
-    const body = await req.formData();
+    const formData = await request.formData();
+    const backendUrl = 'http://127.0.0.1:8000';
     
-    // 백엔드로 프록시
-    const response = await fetch(`${BACKEND_URL}/api/auth/login`, {
+    console.log('Proxying login to:', `${backendUrl}/api/auth/login`);
+    console.log('Form data:', Object.fromEntries(formData));
+    
+    const response = await fetch(`${backendUrl}/api/auth/login`, {
       method: 'POST',
-      body: body,
+      body: formData,
     });
 
     const data = await response.json();
-
-    if (response.ok) {
-      // 성공 시 토큰을 쿠키에 저장
-      const res = NextResponse.json(data, { status: 200 });
-      res.cookies.set({
-        name: 'ga_token',
-        value: data.access_token,
-        path: '/',
-        httpOnly: false,
-        sameSite: 'lax',
-        maxAge: 60 * 60 * 24, // 1일
-      });
-      return res;
-    } else {
-      return NextResponse.json(data, { status: response.status });
-    }
+    console.log('Backend login response:', response.status, data);
+    
+    return Response.json(data, { 
+      status: response.status
+    });
   } catch (error) {
     console.error('Login proxy error:', error);
-    return NextResponse.json(
-      { message: '서버 연결 오류가 발생했습니다.' },
+    return Response.json(
+      { error: 'Internal server error', details: error.message }, 
       { status: 500 }
     );
   }
