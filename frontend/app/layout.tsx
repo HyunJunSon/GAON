@@ -18,6 +18,9 @@ const geistMono = Geist_Mono({
 export const metadata: Metadata = {
   title: "GAON | 대화에 온도를 더하다",
   description: "AI 기반 대화 분석으로 인간관계에 따뜻함을 더하는 서비스",
+  icons: {
+    icon: '/icon.svg',
+  },
 };
 
 export default function RootLayout({
