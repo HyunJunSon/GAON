@@ -4,7 +4,7 @@ AI 기반 문서 분석 및 대화형 서비스
 
 ## 아키텍처
 
-![GAON Architecture](https://drive.google.com/uc?export=view&id=13ZG8Vv1zc4j6am-FKz1rdq_2qSUG7KTH)
+![GAON Architecture](https://drive.google.com/file/d/1z6AgPhBGHLIPm3oSrTDgwsPQqxgX69AT/view?usp=sharing)
 
 ## 기술 스택
 - **Frontend**: Next.js 16, React 19, TanStack Query
