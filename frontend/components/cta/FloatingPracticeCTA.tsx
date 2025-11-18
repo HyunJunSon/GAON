@@ -40,18 +40,18 @@ export default function FloatingPracticeCTA() {
         className={[
           'pointer-events-auto',
           docked
-            ? 'static mt-4' // 도킹: 문서 흐름으로, 내용 가리지 않음
+            ? 'static mt-8' // 도킹: 문서 흐름으로, 내용 가리지 않음
             : [
                 // 플로팅: 화면 하단 고정 + 모바일 네비 높이만큼 띄우기 + 안전영역
                 'fixed inset-x-0 z-50',
-                'bottom-[calc(56px+env(safe-area-inset-bottom))] md:bottom-0', // <-- 핵심
+                'bottom-[calc(56px+env(safe-area-inset-bottom))] md:bottom-0',
               ].join(' '),
         ].join(' ')}
       >
         <div
           className={[
-            // 탭 본문 폭에 맞춤 (프로젝트 기준으로 조정: max-w-2xl 사용)
-            'mx-auto w-full max-w-2xl px-4 py-3',
+            // 탭 본문 폭에 맞춤
+            'mx-auto w-full max-w-4xl px-6 py-4',
             // 플로팅일 때만 버튼 인터랙션 허용
             docked ? '' : 'pointer-events-auto',
           ].join(' ')}
@@ -60,23 +60,24 @@ export default function FloatingPracticeCTA() {
             type="button"
             onClick={goPractice}
             className={[
-              'group w-full rounded-xl cursor-pointer',
-              // 글라스: 반투명 + 블러 + 약한 링/보더
-              'bg-black/50 text-white border border-white/10 ring-1 ring-white/10',
-              'backdrop-blur supports-[backdrop-filter]:backdrop-blur-md backdrop-saturate-150',
-              // 기본 그림자
-              'shadow-md',
-              // 패딩(모바일 하단 안전영역 고려)
-              'py-3 text-sm font-medium',
-              'pb-[calc(0.75rem+env(safe-area-inset-bottom))]',
-              // 인터랙션: 자연스러운 전환 + 호버/액티브 변형
+              'group w-full rounded-2xl cursor-pointer flex items-center justify-center gap-3',
+              // GAON 브랜드 그라데이션
+              'bg-gradient-to-r from-orange-500 to-red-500 text-white',
+              'hover:from-orange-600 hover:to-red-600',
+              // 그림자 및 애니메이션
+              'shadow-lg hover:shadow-xl',
+              'py-4 text-lg font-semibold',
+              'pb-[calc(1rem+env(safe-area-inset-bottom))]',
+              // 인터랙션
               'transition-all duration-200 ease-out',
-              'hover:bg-black/55 hover:shadow-lg hover:-translate-y-0.5',
-              'active:translate-y-0',
+              'hover:-translate-y-1 active:translate-y-0',
               // 접근성 포커스
-              'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/40',
+              'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-orange-300',
             ].join(' ')}
           >
+            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.746 0 3.332.477 4.5 1.253v13C19.832 18.477 18.246 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" />
+            </svg>
             연습하러 가기
           </button>
         </div>

@@ -34,9 +34,6 @@ export default function AnalysisProgress({
 
   const { isConnected } = useWebSocket({
     conversationId,
-    onAnalysisProgress: (data) => {
-      setProgressData(data);
-    },
     onAnalysisComplete: (data) => {
       setProgressData(data);
       addNotification({
@@ -47,6 +44,9 @@ export default function AnalysisProgress({
         link: `/analysis/${conversationId}/summary`
       });
       onComplete?.();
+    },
+    onAnalysisProgress: (data) => {
+      setProgressData(data);
     },
     onAnalysisError: (error) => {
       addNotification({

@@ -241,18 +241,18 @@ export default function AudioRecorder({
 
   // 기존 FileDropzone 스타일 패턴 따름
   const containerClass = `
-    relative border-2 border-dashed rounded p-8 text-center transition-colors
-    ${isRecording ? 'border-gray-400 bg-gray-50' : 'border-gray-300 bg-gray-50'}
-    ${!isRecording && !audioBlob ? 'hover:border-gray-400 hover:bg-gray-100' : ''}
+    relative border-2 border-dashed rounded-2xl p-8 text-center transition-all duration-300
+    ${isRecording ? 'border-orange-400 bg-gradient-to-br from-orange-50 to-red-50' : 'border-gray-300 bg-gray-50'}
+    ${!isRecording && !audioBlob ? 'hover:border-orange-300 hover:bg-orange-50' : ''}
   `;
 
   return (
     <div className={containerClass}>
       {/* 녹음 상태 표시 */}
       {isRecording && (
-        <div className="absolute top-2 right-2 flex items-center space-x-2">
-          <div className="w-3 h-3 bg-red-500 rounded-full animate-pulse"></div>
-          <span className="text-sm font-medium text-red-500">REC</span>
+        <div className="absolute top-4 right-4 flex items-center space-x-2 bg-red-500 px-3 py-1 rounded-full">
+          <div className="w-2 h-2 bg-white rounded-full animate-pulse"></div>
+          <span className="text-sm font-medium text-white">REC</span>
         </div>
       )}
 
@@ -272,23 +272,27 @@ export default function AudioRecorder({
             {isRecording ? (
               <div className="relative flex items-center justify-center">
                 {/* 중앙 마이크 아이콘 */}
-                <div className="w-12 h-12 bg-black rounded-full flex items-center justify-center text-white text-xl z-10">
+                <div className="w-16 h-16 bg-gradient-to-br from-orange-500 to-red-500 rounded-full flex items-center justify-center text-white text-2xl z-10 shadow-lg">
                   🎙️
                 </div>
                 {/* 파동 효과 */}
-                <div className="absolute w-16 h-16 border-2 border-black rounded-full animate-ping opacity-75"></div>
-                <div className="absolute w-24 h-24 border-2 border-gray-400 rounded-full animate-ping opacity-50" style={{animationDelay: '0.5s'}}></div>
-                <div className="absolute w-32 h-32 border-2 border-gray-300 rounded-full animate-ping opacity-25" style={{animationDelay: '1s'}}></div>
+                <div className="absolute w-20 h-20 border-2 border-orange-400 rounded-full animate-ping opacity-75"></div>
+                <div className="absolute w-28 h-28 border-2 border-orange-300 rounded-full animate-ping opacity-50" style={{animationDelay: '0.5s'}}></div>
+                <div className="absolute w-36 h-36 border-2 border-orange-200 rounded-full animate-ping opacity-25" style={{animationDelay: '1s'}}></div>
               </div>
             ) : audioBlob ? (
-              <div className="flex items-center space-x-2 text-black">
-                <span className="text-2xl">🎵</span>
-                <span className="font-medium">녹음 완료 ({formatTime(recordingTime)})</span>
+              <div className="flex items-center space-x-3 text-gray-800">
+                <div className="w-12 h-12 bg-gradient-to-br from-green-100 to-emerald-100 rounded-full flex items-center justify-center">
+                  <span className="text-xl">🎵</span>
+                </div>
+                <span className="font-semibold">녹음 완료 ({formatTime(recordingTime)})</span>
               </div>
             ) : (
-              <div className="text-gray-400 text-sm text-center">
-                <div className="text-4xl mb-2">🎤</div>
-                <div>음성 녹음 준비</div>
+              <div className="text-gray-500 text-center">
+                <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-3">
+                  <span className="text-2xl">🎤</span>
+                </div>
+                <div className="font-medium">음성 녹음 준비</div>
               </div>
             )}
           </div>
@@ -296,7 +300,7 @@ export default function AudioRecorder({
 
         {/* 시간 표시 */}
         {(isRecording || audioBlob) && (
-          <div className="text-2xl font-mono font-bold text-black">
+          <div className="text-3xl font-mono font-bold bg-gradient-to-r from-orange-600 to-red-600 bg-clip-text text-transparent">
             {formatTime(recordingTime)}
           </div>
         )}
@@ -320,7 +324,7 @@ export default function AudioRecorder({
                   console.log('🔴 녹음 시작 버튼 클릭됨!');
                   startRecording();
                 }}
-                className="px-6 py-2 bg-black text-white rounded hover:bg-gray-800 transition-colors disabled:opacity-50"
+                className="px-6 py-2 bg-gradient-to-r from-orange-500 to-red-500 text-white rounded hover:from-orange-600 hover:to-red-600 transition-all duration-200 shadow-md hover:shadow-lg disabled:opacity-50"
               >
                 녹음 시작
               </button>
@@ -343,7 +347,7 @@ export default function AudioRecorder({
               </button>
               <button
                 onClick={stopRecording}
-                className="px-4 py-2 bg-black text-white rounded hover:bg-gray-800 transition-colors"
+                className="px-4 py-2 bg-gradient-to-r from-orange-500 to-red-500 text-white rounded hover:from-orange-600 hover:to-red-600 transition-all duration-200 shadow-md hover:shadow-lg"
               >
                 중지
               </button>
@@ -354,7 +358,7 @@ export default function AudioRecorder({
             <>
               <button
                 onClick={handleComplete}
-                className="px-6 py-2 bg-black text-white rounded hover:bg-gray-800 transition-colors"
+                className="px-6 py-2 bg-gradient-to-r from-orange-500 to-red-500 text-white rounded hover:from-orange-600 hover:to-red-600 transition-all duration-200 shadow-md hover:shadow-lg"
               >
                 완료
               </button>
@@ -403,7 +407,7 @@ export default function AudioRecorder({
               <button
                 onClick={handleConfirmSubmit}
                 disabled={isProcessing}
-                className="flex-1 px-4 py-2 bg-black text-white rounded hover:bg-gray-800 transition-colors disabled:opacity-50"
+                className="flex-1 px-4 py-2 bg-gradient-to-r from-orange-500 to-red-500 text-white rounded hover:from-orange-600 hover:to-red-600 transition-all duration-200 shadow-md hover:shadow-lg disabled:opacity-50"
               >
                 {isProcessing ? '전송 중...' : '전송'}
               </button>

@@ -40,12 +40,14 @@ async def upload_conversation_file(
             current_user.id, family_id, file
         )
         
-        # 🚀 자동 분석 시작 추가
-        background_tasks.add_task(
-            run_agent_pipeline_async, 
-            str(conversation.conv_id), 
-            current_user.id
-        )
+        # 🚀 자동 분석 시작 추가 (즉시 실행)
+        logger.info(f"🚀 즉시 분석 시작: conversation_id={conversation.conv_id}, user_id={current_user.id}")
+        try:
+            import asyncio
+            asyncio.create_task(run_agent_pipeline_async(str(conversation.conv_id), current_user.id))
+            logger.info(f"🚀 분석 태스크 생성 완료: conversation_id={conversation.conv_id}")
+        except Exception as e:
+            logger.error(f"❌ 분석 태스크 생성 실패: {e}")
         
         logger.info(f"파일 업로드 성공 및 분석 시작: conversation_id={conversation.conv_id}, file_id={db_file.id}")
         
@@ -170,43 +172,57 @@ async def start_analysis_pipeline(
 
 async def run_agent_pipeline_async(conversation_id: str, user_id: int):
     """비동기 Agent 파이프라인 실행 (재시도 로직 포함)"""
+    logger.info(f"🎯 BackgroundTask 실행 시작: conv_id={conversation_id}, user_id={user_id}")
+    
     try:
         logger.info(f"재시도 가능한 Agent 파이프라인 실행 시작: conv_id={conversation_id}")
         
         # 재시도 로직이 포함된 파이프라인 실행
         from app.llm.agent.retry_pipeline import run_agent_pipeline_with_retry
         
+        logger.info(f"🔄 retry_pipeline 모듈 import 완료")
         result = await run_agent_pipeline_with_retry(conversation_id)
+        logger.info(f"🔄 retry_pipeline 실행 완료: {result.get('status')}")
         
         logger.info(f"Agent 파이프라인 완료: conv_id={conversation_id}, status={result.get('status')}")
         
         # WebSocket으로 프론트엔드에 완료 알림
         from .websocket import notify_analysis_complete, notify_analysis_error
+        logger.info(f"📡 WebSocket 모듈 import 완료")
         
         if result.get("status") == "completed":
             logger.info(f"분석 성공: score={result.get('score')}, confidence={result.get('confidence')}")
             
             # 성공 알림
+            logger.info(f"📡 WebSocket 성공 알림 전송 시작")
             await notify_analysis_complete(conversation_id, {
                 "analysisId": result.get("analysis_id"),
                 "score": result.get("score"),
                 "confidence": result.get("confidence"),
                 "status": "completed"
             })
+            logger.info(f"📡 WebSocket 성공 알림 전송 완료")
         else:
             logger.error(f"분석 실패: {result.get('error')}")
             
             # 실패 알림
+            logger.info(f"📡 WebSocket 실패 알림 전송 시작")
             await notify_analysis_error(conversation_id, result.get('error', '분석 실패'))
+            logger.info(f"📡 WebSocket 실패 알림 전송 완료")
         
         return result
         
     except Exception as e:
-        logger.error(f"Agent 파이프라인 실행 실패: conv_id={conversation_id}, error={str(e)}")
+        logger.error(f"❌ Agent 파이프라인 실행 실패: conv_id={conversation_id}, error={str(e)}", exc_info=True)
         
         # 예외 발생 시에도 WebSocket 알림
-        from .websocket import notify_analysis_error
-        await notify_analysis_error(conversation_id, str(e))
+        try:
+            from .websocket import notify_analysis_error
+            logger.info(f"📡 WebSocket 예외 알림 전송 시작")
+            await notify_analysis_error(conversation_id, str(e))
+            logger.info(f"📡 WebSocket 예외 알림 전송 완료")
+        except Exception as ws_error:
+            logger.error(f"❌ WebSocket 알림 실패: {ws_error}")
         
         return {"status": "failed", "error": str(e)}
 

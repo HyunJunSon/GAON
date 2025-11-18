@@ -2,28 +2,28 @@ import { NextRequest } from 'next/server';
 
 export async function POST(request: NextRequest) {
   try {
-    const body = await request.json();
-    const backendUrl = 'http://127.0.0.1:8000';
+    const authHeader = request.headers.get('authorization');
+    const backendUrl = 'http://127.0.0.1:8000'; // 127.0.0.1 사용
     
-    console.log('Proxying signup to:', `${backendUrl}/api/auth/signup`);
-    console.log('Signup data:', body);
+    console.log('Proxying logout to:', `${backendUrl}/api/auth/logout`);
+    console.log('Auth header:', authHeader);
     
-    const response = await fetch(`${backendUrl}/api/auth/signup`, {
+    const response = await fetch(`${backendUrl}/api/auth/logout`, {
       method: 'POST',
       headers: {
+        'Authorization': authHeader || '',
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify(body),
     });
 
     const data = await response.json();
-    console.log('Backend signup response:', response.status, data);
+    console.log('Backend response:', response.status, data);
     
     return Response.json(data, { 
       status: response.status
     });
   } catch (error) {
-    console.error('Signup proxy error:', error);
+    console.error('Logout proxy error:', error);
     return Response.json(
       { error: 'Internal server error', details: error.message }, 
       { status: 500 }
