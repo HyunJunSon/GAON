@@ -30,8 +30,16 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="ko">
+      <head>
+        <link
+          rel="stylesheet"
+          as="style"
+          crossOrigin=""
+          href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable.min.css"
+        />
+      </head>
       <body
-        className={`${geistSans.variable} ${geistMono.variable} antialiased md:overflow-hidden`}
+        className={`${geistSans.variable} ${geistMono.variable} font-pretendard antialiased md:overflow-hidden`}
       >
         <Providers>
           <div className="flex min-h-[100svh] flex-col">
