@@ -1,7 +1,7 @@
 // app/practice/chat/[sessionId]/page.tsx
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useParams, useSearchParams, useRouter } from 'next/navigation';
 import { useSubmitPracticeLogs } from '@/hooks/usePractice';
 import { getErrorMessage } from '@/utils/erros';
@@ -16,6 +16,16 @@ type ChatMessage = {
   content: string;
   createdAt: string;
 };
+
+type WsOutboundMessage = {
+  type: 'user_text';
+  content: string;
+};
+
+type WsInboundMessage =
+  | { type: 'assistant_delta'; content: string }
+  | { type: 'assistant_done' }
+  | { type: 'error'; message: string };
 
 /**
  * /practice/chat/[sessionId]
@@ -59,7 +69,7 @@ export default function PracticeChatPage() {
 
       {/* 모드에 따라 다른 UI 렌더 */}
       {mode === 'chat' ? (
-        <ChatMode />
+        <ChatMode sessionId={String(sessionId)} />
       ) : (
         <VoiceMode />
       )}
@@ -72,9 +82,9 @@ export default function PracticeChatPage() {
  * - 로컬 state로 메시지 목록 관리
  * - 목업 assistant 응답
  */
-function ChatMode() {
+function ChatMode({ sessionId }: { sessionId: string }) {
   const router = useRouter();
-  const { sessionId } = useParams<{ sessionId: string}>();
+  // const { sessionId } = useParams<{ sessionId: string}>();
   const submitLogs = useSubmitPracticeLogs(sessionId);
   const [messages, setMessages] = useState<ChatMessage[]>([
     {
@@ -86,6 +96,102 @@ function ChatMode() {
   ]);
   const [input, setInput] = useState('');
   const [isComposing, setIsComposing] = useState(false);
+
+  // 🔌 WebSocket 관련 상태
+  const wsRef = useRef<WebSocket | null>(null);
+  const [wsReady, setWsReady] = useState(false);
+  const [wsError, setWsError] = useState<string | null>(null);
+
+  useEffect(() => {
+  if (typeof window === 'undefined') return;
+
+  // 이미 열린 소켓이 있으면 다시 만들지 않음
+  if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
+    return;
+  }
+
+  let isCancelled = false;
+
+  const base =
+    process.env.NEXT_PUBLIC_BACKEND_WS_BASE ?? 'ws://127.0.0.1:8000';
+  const url = `${base}/api/practice/ws/${sessionId}`;
+
+  const socket = new WebSocket(url);
+  wsRef.current = socket;
+  // eslint-disable-next-line react-hooks/set-state-in-effect
+  setWsError(null);
+
+  socket.onopen = () => {
+    if (isCancelled) {
+      // StrictMode 첫 번째 렌더에서 이미 cleanup된 경우
+      socket.close();
+      return;
+    }
+    setWsReady(true);
+  };
+
+  socket.onclose = () => {
+    setWsReady(false);
+    // Strict 모드에서 첫 번째 렌더가 닫히고 두 번째 렌더가 다시 열 수 있으니,
+    // 여기서 wsRef를 항상 null로 초기화해두면 다음 effect에서 새로 연결 가능
+    if (wsRef.current === socket) {
+      wsRef.current = null;
+    }
+  };
+
+  socket.onerror = () => {
+    if (!isCancelled) {
+      setWsError('연습 서버와의 연결에 문제가 발생했어요.');
+    }
+  };
+
+  socket.onmessage = (event: MessageEvent<string>) => {
+    if (isCancelled) return;
+
+    try {
+      const parsed = JSON.parse(event.data) as WsInboundMessage;
+
+      if (parsed.type === 'assistant_delta') {
+        const chunk = parsed.content;
+        setMessages((prev) => {
+          const last = prev[prev.length - 1];
+          if (last && last.role === 'assistant' && last.id.startsWith('a_stream_')) {
+            const updated = { ...last, content: last.content + chunk };
+            return [...prev.slice(0, -1), updated];
+          }
+          const now = new Date().toISOString();
+          const assistantMsg: ChatMessage = {
+            id: `a_stream_${now}`,
+            role: 'assistant',
+            content: chunk,
+            createdAt: now,
+          };
+          return [...prev, assistantMsg];
+        });
+      } else if (parsed.type === 'assistant_done') {
+        // 지금은 별도 처리 필요 없음
+      } else if (parsed.type === 'error') {
+        setWsError(parsed.message);
+      }
+    } catch (e) {
+      console.error('[practice chat] invalid ws message', e);
+    }
+  };
+
+  return () => {
+    // StrictMode 첫 번째 렌더 cleanup에서 "이제 이 소켓은 더 이상 쓰지 않는다" 표시
+    isCancelled = true;
+
+    // onopen이 나중에 와도 위에서 isCancelled 체크
+    // 여기서는 이미 열린 소켓만 정리
+    if (
+      socket.readyState === WebSocket.OPEN ||
+      socket.readyState === WebSocket.CLOSING
+    ) {
+      socket.close();
+    }
+  };
+}, [sessionId]);
 
   // 메시지 전송 핸들러
   function handleSend() {
@@ -104,17 +210,17 @@ function ChatMode() {
     setMessages((prev) => [...prev, userMsg]);
     setInput('');
 
-    // 목업 assistant 응답 (나중에 LLM 응답으로 교체 예정)
-    setTimeout(() => {
-      const assistantMsg: ChatMessage = {
-        id: `a_${Date.now()}`,
-        role: 'assistant',
-        content:
-          '그렇게 느낄 수 있어요. 그때 가족에게 어떤 말부터 건네고 싶으세요?',
-        createdAt: new Date().toISOString(),
+    // 👉 WebSocket으로 서버에 전송
+    if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
+      const payload: WsOutboundMessage = {
+        type: 'user_text',
+        content: trimmed,
       };
-      setMessages((prev) => [...prev, assistantMsg]);
-    }, 600);
+      wsRef.current.send(JSON.stringify(payload));
+    } else {
+      // 연결이 안 되어 있으면 에러 표시 (간단 버전)
+      setWsError('서버와의 연결이 아직 준비되지 않았어요. 잠시 후 다시 시도해주세요.');
+    }
   }
 
   function handleKeyDown(e: React.KeyboardEvent<HTMLTextAreaElement>) {
@@ -157,6 +263,16 @@ function ChatMode() {
         {messages.map((m) => (
           <ChatBubble key={m.id} message={m} />
         ))}
+                {!wsReady && (
+          <p className="mt-2 text-[11px] text-gray-400">
+            연습 서버에 연결 중입니다...
+          </p>
+        )}
+        {wsError && (
+          <p className="mt-1 text-[11px] text-red-500">
+            {wsError}
+          </p>
+        )}
       </div>
 
       {/* 입력창 + 연습 종료 버튼 */}
