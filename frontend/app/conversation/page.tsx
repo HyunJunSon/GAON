@@ -92,97 +92,135 @@ export default function ConversationPage() {
   };
 
   return (
-    <main className="space-y-6">
-      <header>
-        <h1 className="text-2xl font-semibold">대화 분석</h1>
-        <p className="text-sm text-gray-600">
-          다양한 형식의 파일 또는 음성 녹음으로 대화 분석을 시작합니다.
+    <main className="space-y-8">
+      {/* 헤더 섹션 */}
+      <header className="text-center">
+        <div className="inline-flex items-center gap-3 mb-4">
+          <div className="w-12 h-12 bg-gradient-to-br from-orange-100 to-red-100 rounded-xl flex items-center justify-center">
+            <svg className="w-6 h-6 text-orange-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
+            </svg>
+          </div>
+          <h1 className="text-3xl font-bold text-gray-800">대화 분석</h1>
+        </div>
+        <p className="text-gray-600 text-lg max-w-2xl mx-auto">
+          다양한 형식의 파일 또는 음성 녹음으로 대화 분석을 시작하여<br />
+          관계의 온도를 측정해보세요
         </p>
       </header>
 
       {/* 탭 네비게이션 */}
-      <div className="border-b border-gray-200">
-        <nav className="-mb-px flex space-x-8">
-          <button
-            onClick={() => setActiveTab('text')}
-            className={`py-2 px-1 border-b-2 font-medium text-sm ${
-              activeTab === 'text'
-                ? 'border-black text-black'
-                : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
-            }`}
-          >
-            📄 파일 업로드
-          </button>
-          <button
-            onClick={() => setActiveTab('audio')}
-            className={`py-2 px-1 border-b-2 font-medium text-sm ${
-              activeTab === 'audio'
-                ? 'border-black text-black'
-                : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
-            }`}
-          >
-            🎙️ 음성 녹음
-          </button>
-        </nav>
+      <div className="max-w-4xl mx-auto">
+        <div className="bg-white rounded-2xl shadow-lg border border-orange-100 overflow-hidden">
+          <nav className="flex">
+            <button
+              onClick={() => setActiveTab('text')}
+              className={`flex-1 py-4 px-6 font-medium text-center transition-all duration-200 ${
+                activeTab === 'text'
+                  ? 'bg-gradient-to-r from-orange-500 to-red-500 text-white'
+                  : 'text-gray-600 hover:text-orange-600 hover:bg-orange-50'
+              }`}
+            >
+              <div className="flex items-center justify-center gap-2">
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                </svg>
+                파일 업로드
+              </div>
+            </button>
+            <button
+              onClick={() => setActiveTab('audio')}
+              className={`flex-1 py-4 px-6 font-medium text-center transition-all duration-200 ${
+                activeTab === 'audio'
+                  ? 'bg-gradient-to-r from-orange-500 to-red-500 text-white'
+                  : 'text-gray-600 hover:text-orange-600 hover:bg-orange-50'
+              }`}
+            >
+              <div className="flex items-center justify-center gap-2">
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 01-3-3V5a3 3 0 116 0v6a3 3 0 01-3 3z" />
+                </svg>
+                음성 녹음
+              </div>
+            </button>
+          </nav>
+
+          {serverError && (
+            <div className="p-6 border-t border-orange-100">
+              <ErrorAlert message={serverError} />
+            </div>
+          )}
+
+          {/* 탭 컨텐츠 */}
+          <div className="p-8">
+            {activeTab === 'text' && (
+              <section className="space-y-6">
+                <div className="text-center">
+                  <h2 className="text-xl font-semibold text-gray-800 mb-2">대화 파일 업로드</h2>
+                  <p className="text-gray-600">
+                    텍스트 파일(.txt, .md), 문서 파일(.pdf, .docx, .epub)을 업로드하여 대화 분석을 시작합니다.
+                  </p>
+                </div>
+
+                <div className="max-w-2xl mx-auto space-y-6">
+                  <FileDropzone
+                    acceptExt={ACCEPT_EXT}
+                    acceptMime={ACCEPT_MIME}
+                    maxMB={MAX_MB}
+                    multiple={false}
+                    onFileSelect={handleSelect}
+                    onError={(msg) => handleError(new Error(msg))}
+                    placeholder="여기로 파일을 드래그하거나 클릭하여 선택하세요"
+                  />
+
+                  <div className="bg-orange-50 border border-orange-200 rounded-lg px-4 py-3 text-center">
+                    {file ? (
+                      <div className="text-gray-700">
+                        <span className="font-medium text-orange-700">선택된 파일:</span> {file.name}
+                        <span className="text-sm text-gray-500 ml-2">
+                          ({(file.size / 1024 / 1024).toFixed(2)} MB)
+                        </span>
+                      </div>
+                    ) : (
+                      <span className="text-gray-500">선택된 파일 없음</span>
+                    )}
+                  </div>
+
+                  <div className="text-center">
+                    <button
+                      type="button"
+                      onClick={onStart}
+                      disabled={!file || isPending}
+                      className="bg-gradient-to-r from-orange-500 to-red-500 text-white px-8 py-3 rounded-lg font-medium hover:from-orange-600 hover:to-red-600 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200 shadow-md hover:shadow-lg"
+                    >
+                      {isPending ? '분석 시작 중…' : '분석 시작'}
+                    </button>
+                  </div>
+                </div>
+              </section>
+            )}
+
+            {activeTab === 'audio' && (
+              <section className="space-y-6">
+                <div className="text-center">
+                  <h2 className="text-xl font-semibold text-gray-800 mb-2">음성 녹음</h2>
+                  <p className="text-gray-600">
+                    실시간 음성 녹음으로 대화 분석을 시작합니다.
+                  </p>
+                </div>
+
+                <div className="max-w-2xl mx-auto">
+                  <AudioRecorder
+                    onRecordingComplete={handleRecordingComplete}
+                    onError={handleError}
+                    maxDurationMinutes={10}
+                  />
+                </div>
+              </section>
+            )}
+          </div>
+        </div>
       </div>
-
-      {serverError && <ErrorAlert message={serverError} />}
-
-      {/* 탭 컨텐츠 */}
-      {activeTab === 'text' && (
-        <section className="space-y-4">
-          <div className="max-w-2xl">
-            <h2 className="text-lg font-medium mb-2">대화 파일 업로드</h2>
-            <p className="text-sm text-gray-600 mb-4">
-              텍스트 파일(.txt, .md), 문서 파일(.pdf, .docx, .epub)을 업로드하여 대화 분석을 시작합니다.
-            </p>
-
-            <FileDropzone
-              acceptExt={ACCEPT_EXT}
-              acceptMime={ACCEPT_MIME}
-              maxMB={MAX_MB}
-              multiple={false}
-              onFileSelect={handleSelect}
-              onError={(msg) => handleError(new Error(msg))}
-              placeholder="여기로 파일을 드래그하거나 클릭하여 선택하세요. (txt, pdf, docx, epub, md 지원)"
-            />
-
-            <div className="rounded border bg-white px-4 py-3 text-sm text-gray-700 mb-4">
-              {file
-                ? <>선택된 파일: <strong>{file.name}</strong> ({(file.size / 1024 / 1024).toFixed(2)} MB)</>
-                : '선택된 파일 없음'}
-            </div>
-
-            <div className='flex justify-center'>
-              <button
-                type="button"
-                onClick={onStart}
-                disabled={!file || isPending}
-                className="rounded bg-black w-full max-w-80 px-4 py-2 text-white disabled:opacity-50"
-              >
-                {isPending ? '분석 시작 중…' : '분석 시작'}
-              </button>
-            </div>
-          </div>
-        </section>
-      )}
-
-      {activeTab === 'audio' && (
-        <section className="space-y-4">
-          <div className="max-w-2xl">
-            <h2 className="text-lg font-medium mb-2">음성 녹음</h2>
-            <p className="text-sm text-gray-600 mb-4">
-              실시간 음성 녹음으로 대화 분석을 시작합니다.
-            </p>
-
-            <AudioRecorder
-              onRecordingComplete={handleRecordingComplete}
-              onError={handleError}
-              maxDurationMinutes={10}
-            />
-          </div>
-        </section>
-      )}
       
       {/* 화자 맵핑 모달 */}
       <SpeakerMappingModal

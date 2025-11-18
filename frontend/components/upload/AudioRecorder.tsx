@@ -320,7 +320,7 @@ export default function AudioRecorder({
                   console.log('🔴 녹음 시작 버튼 클릭됨!');
                   startRecording();
                 }}
-                className="px-6 py-2 bg-black text-white rounded hover:bg-gray-800 transition-colors disabled:opacity-50"
+                className="px-6 py-2 bg-gradient-to-r from-orange-500 to-red-500 text-white rounded hover:from-orange-600 hover:to-red-600 transition-all duration-200 shadow-md hover:shadow-lg disabled:opacity-50"
               >
                 녹음 시작
               </button>
@@ -343,7 +343,7 @@ export default function AudioRecorder({
               </button>
               <button
                 onClick={stopRecording}
-                className="px-4 py-2 bg-black text-white rounded hover:bg-gray-800 transition-colors"
+                className="px-4 py-2 bg-gradient-to-r from-orange-500 to-red-500 text-white rounded hover:from-orange-600 hover:to-red-600 transition-all duration-200 shadow-md hover:shadow-lg"
               >
                 중지
               </button>
@@ -354,7 +354,7 @@ export default function AudioRecorder({
             <>
               <button
                 onClick={handleComplete}
-                className="px-6 py-2 bg-black text-white rounded hover:bg-gray-800 transition-colors"
+                className="px-6 py-2 bg-gradient-to-r from-orange-500 to-red-500 text-white rounded hover:from-orange-600 hover:to-red-600 transition-all duration-200 shadow-md hover:shadow-lg"
               >
                 완료
               </button>
@@ -403,7 +403,7 @@ export default function AudioRecorder({
               <button
                 onClick={handleConfirmSubmit}
                 disabled={isProcessing}
-                className="flex-1 px-4 py-2 bg-black text-white rounded hover:bg-gray-800 transition-colors disabled:opacity-50"
+                className="flex-1 px-4 py-2 bg-gradient-to-r from-orange-500 to-red-500 text-white rounded hover:from-orange-600 hover:to-red-600 transition-all duration-200 shadow-md hover:shadow-lg disabled:opacity-50"
               >
                 {isProcessing ? '전송 중...' : '전송'}
               </button>
