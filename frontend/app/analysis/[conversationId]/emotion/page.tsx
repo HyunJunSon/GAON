@@ -213,7 +213,7 @@ export default function ResultsEmotionPage() {
               <h4 className="font-semibold text-gray-800 mb-4 text-center">대화 참여도 비교</h4>
               <div className="flex items-center justify-center gap-4">
                 <div className="text-center">
-                  <div className="text-2xl font-bold text-green-600">{statistics.user.word_count}</div>
+                  <div className="text-2xl font-bold text-green-600">{statistics?.user?.word_count ?? 0}</div>
                   <div className="text-sm text-gray-600">사용자</div>
                 </div>
                 <div className="flex-1 max-w-xs">
@@ -221,19 +221,19 @@ export default function ResultsEmotionPage() {
                     <div 
                       className="bg-green-500 transition-all duration-1000"
                       style={{ 
-                        width: `${(statistics.user.word_count / (statistics.user.word_count + statistics.others.word_count)) * 100}%` 
+                        width: `${((statistics?.user?.word_count ?? 0) / Math.max((statistics?.user?.word_count ?? 0) + (statistics?.others?.word_count ?? 0), 1)) * 100}%` 
                       }}
                     ></div>
                     <div 
                       className="bg-blue-500 transition-all duration-1000"
                       style={{ 
-                        width: `${(statistics.others.word_count / (statistics.user.word_count + statistics.others.word_count)) * 100}%` 
+                        width: `${((statistics?.others?.word_count ?? 0) / Math.max((statistics?.user?.word_count ?? 0) + (statistics?.others?.word_count ?? 0), 1)) * 100}%` 
                       }}
                     ></div>
                   </div>
                 </div>
                 <div className="text-center">
-                  <div className="text-2xl font-bold text-blue-600">{statistics.others.word_count}</div>
+                  <div className="text-2xl font-bold text-blue-600">{statistics?.others?.word_count ?? 0}</div>
                   <div className="text-sm text-gray-600">상대방</div>
                 </div>
               </div>
