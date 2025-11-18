@@ -72,3 +72,22 @@ class SpeakerMappingInfo(BaseModel):
 class ConversationSpeakers(BaseModel):
     conversation_id: str
     speakers: List[SpeakerMappingInfo]
+
+
+# 프론트엔드용 간단한 스키마
+class FamilyMemberSimple(BaseModel):
+    id: str
+    name: str
+    email: str
+    joinedAt: Optional[str] = None
+
+    class Config:
+        from_attributes = True
+
+
+class SimpleMemberAdd(BaseModel):
+    email: str
+
+
+class SimpleFamilyResponse(BaseModel):
+    members: List[FamilyMemberSimple]

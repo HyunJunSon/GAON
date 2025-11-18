@@ -12,22 +12,21 @@ export type GetFamilyRes = {
 }
 
 export type AddFamilyReq = { email: string }
-export type AddFamilyRes = { ok: true, member?: FamilyMember };
+export type AddFamilyRes = FamilyMember;
 
 export async function getFamily(): Promise<GetFamilyRes> {
-  // 목업 /api/family 사용
-  return apiFetch<GetFamilyRes>('/api/family', { method: 'GET' });
+  return apiFetch<GetFamilyRes>('/api/family/members', { method: 'GET' });
 }
 
 export async function addFamily(payload: AddFamilyReq): Promise<AddFamilyRes> {
-  return apiFetch<AddFamilyRes>('/api/family', {
+  return apiFetch<AddFamilyRes>('/api/family/members', {
     method: 'POST',
     json: payload,
   })
 }
 
 export async function removeFamily(memberId: string): Promise<{ ok: true }> {
-  return apiFetch<{ ok: true }>(`/api/family/${memberId}`, {
+  return apiFetch<{ ok: true }>(`/api/family/members/${memberId}`, {
     method: 'DELETE'
   })
 }
