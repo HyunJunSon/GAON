@@ -28,9 +28,10 @@ COPY pyproject.toml ./
 # requirement.txt가 있으면 복사, 없으면 무시
 COPY requirement.tx[t] ./
 
-# Python 의존성 설치 (uv 사용으로 빠른 설치)
+# Python 의존성 설치 (uv 사용)
 RUN pip install --no-cache-dir uv && \
-    uv pip install --python /opt/venv/bin/python --no-cache .
+    uv venv /opt/venv && \
+    /opt/venv/bin/uv pip install --no-cache .
 
 # Stage 2: 최종 이미지
 FROM python:3.11-slim
