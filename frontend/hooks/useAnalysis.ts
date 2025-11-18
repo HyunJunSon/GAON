@@ -3,9 +3,10 @@
 import { AnalysisRes, fetchAnalysis, getConversationId, startAnalysis, StartAnalysisAny } from "@/apis/analysis";
 import { qk } from "@/constants/queryKeys";
 import { conversationIdStorage } from "@/utils/conversationIdStorage";
+import { analysisHistoryStorage } from "@/utils/analysisHistoryStorage";
 import { useMutation, useQuery, UseQueryResult } from "@tanstack/react-query";
 import { useRouter } from "next/navigation";
-import { startTransition } from "react";
+import { startTransition, useEffect } from "react";
 
 /**
  * 업로드 → 분석 시작
@@ -37,7 +38,7 @@ export function useStartAnalysis() {
 
 /** 분석 상세 조회 + 폴링 */
 export function useAnalysis(conversationId: string): UseQueryResult<AnalysisRes, Error> {
-  return useQuery<AnalysisRes>({
+  const query = useQuery<AnalysisRes>({
     queryKey: qk.analysis.byId(conversationId),
     queryFn: () => fetchAnalysis(conversationId),
     enabled: !!conversationId,
@@ -51,5 +52,21 @@ export function useAnalysis(conversationId: string): UseQueryResult<AnalysisRes,
     gcTime: 10 * 60 * 1000, // 10분간 메모리 보존
     refetchOnWindowFocus: false, // 탭 전환 시 재요청 방지
     refetchOnMount: false, // 마운트 시 재요청 방지 (캐시 우선 사용)
-  })
+  });
+
+  // 분석 완료 시 히스토리 업데이트
+  useEffect(() => {
+    if (query.data && conversationId) {
+      const existingItem = analysisHistoryStorage.get(conversationId);
+      if (existingItem) {
+        analysisHistoryStorage.save({
+          ...existingItem,
+          status: query.data.status === 'completed' ? 'ready' : query.data.status as 'processing' | 'ready' | 'failed',
+          summary: query.data.summary || existingItem.summary
+        });
+      }
+    }
+  }, [query.data, conversationId]);
+
+  return query;
 }

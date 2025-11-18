@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { useStartAnalysis } from '@/hooks/useAnalysis';
 import { useServerError } from '@/hooks/useServerError';
 import { useGlobalNotification } from '@/hooks/useGlobalNotification';
+import { analysisHistoryStorage } from '@/utils/analysisHistoryStorage';
 import ErrorAlert from '@/components/ui/ErrorAlert';
 import FileDropzone from '@/components/upload/FileDropzone';
 import AudioRecorder from '@/components/upload/AudioRecorder';
@@ -80,6 +81,16 @@ export default function ConversationPage() {
 
   const handleSpeakerMappingComplete = (mapping: Record<string, string>) => {
     console.log('화자 맵핑 완료:', mapping);
+    
+    // 분석 히스토리에 저장
+    if (currentConversationId) {
+      analysisHistoryStorage.save({
+        conversationId: currentConversationId,
+        title: `대화 분석 ${new Date().toLocaleDateString('ko-KR')}`,
+        createdAt: new Date().toISOString(),
+        status: 'processing'
+      });
+    }
     
     // 화자 매핑 완료 후 모달 닫고 홈으로 돌아가기
     setShowSpeakerModal(false);
