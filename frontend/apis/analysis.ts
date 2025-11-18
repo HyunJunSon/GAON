@@ -112,7 +112,11 @@ export async function updateSpeakerMapping(
   speakerMapping: SpeakerMapping, 
   userMapping?: Record<string, number>
 ) {
-  return apiFetch<{ message: string }>(`/api/conversation/audio/${conversationId}/speaker-mapping`, {
+  return apiFetch<{ 
+    message: string;
+    analysis_started?: boolean;
+    can_proceed?: boolean;
+  }>(`/api/conversation/audio/${conversationId}/speaker-mapping`, {
     method: 'PUT',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ 
