@@ -33,37 +33,30 @@ export default function AnalysisProgress({
   const { addNotification } = useNotificationStore();
 
   const { isConnected } = useWebSocket({
-    url: `ws://localhost:8000/ws/analysis/${conversationId}`,
-    onMessage: (message) => {
-      switch (message.type) {
-        case 'analysis_progress':
-          setProgressData(message.data);
-          break;
-          
-        case 'analysis_complete':
-          setProgressData(message.data);
-          addNotification({
-            type: 'success',
-            title: '분석 완료!',
-            message: '대화 분석이 성공적으로 완료되었습니다.',
-            conversationId,
-            link: `/analysis/${conversationId}/summary`
-          });
-          onComplete?.();
-          break;
-          
-        case 'analysis_failed':
-          addNotification({
-            type: 'error',
-            title: '분석 실패',
-            message: message.data.error || '분석 중 오류가 발생했습니다.',
-            conversationId
-          });
-          onError?.(message.data.error);
-          break;
-      }
+    conversationId,
+    onAnalysisProgress: (data) => {
+      setProgressData(data);
     },
-    enabled: !!conversationId
+    onAnalysisComplete: (data) => {
+      setProgressData(data);
+      addNotification({
+        type: 'success',
+        title: '분석 완료!',
+        message: '대화 분석이 성공적으로 완료되었습니다.',
+        conversationId,
+        link: `/analysis/${conversationId}/summary`
+      });
+      onComplete?.();
+    },
+    onAnalysisError: (error) => {
+      addNotification({
+        type: 'error',
+        title: '분석 실패',
+        message: error || '분석 중 오류가 발생했습니다.',
+        conversationId
+      });
+      onError?.(error);
+    }
   });
 
   const getStepLabel = (step: AnalysisStep) => {
