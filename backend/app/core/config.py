@@ -31,7 +31,7 @@ class Settings(BaseSettings):
     allowed_file_types: List[str] = ["pdf", "txt", "docx", "epub", "md"]
 
     # LLM 설정
-    gemini_api_key: str = ""
+    gemini_api_key: str = os.getenv("GEMINI_API_KEY")
 
     # LangChain 설정
     langchain_tracing_v2: str = "false"
