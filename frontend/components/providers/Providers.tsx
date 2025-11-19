@@ -3,15 +3,29 @@
  * 전역 Provider 컴포넌트
  * - React Query: 서버 상태(요청/캐시/에러)를 전역에서 관리
  * - Global WebSocket: 분석 완료 알림을 전역에서 관리
+ * - User WebSocket: 사용자별 실시간 알림을 전역에서 관리
  * - children: 모든 페이지를 감싸도록 app/layout.tsx에서 사용
 **/
-import { PropsWithChildren, useState } from "react";
+import { PropsWithChildren, useState, useEffect } from "react";
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { useGlobalWebSocket } from '@/hooks/useGlobalWebSocket';
+import { useUserWebSocket } from '@/hooks/useUserWebSocket';
 
 function GlobalNotificationProvider({ children }: PropsWithChildren) {
+  const [userEmail, setUserEmail] = useState<string>();
+  
+  // 사용자 이메일 가져오기
+  useEffect(() => {
+    const email = localStorage.getItem('userEmail');
+    if (email) {
+      setUserEmail(email);
+    }
+  }, []);
+  
   // 전역 알림 시스템 활성화
   useGlobalWebSocket();
+  useUserWebSocket(userEmail);
+  
   return <>{children}</>;
 }
 
