@@ -1,107 +1,169 @@
 'use client';
 
 import { useAnalysis } from "@/hooks/useAnalysis";
-// app/(main)/analysis/page.tsx
-// [1단계: 라우팅만] /analysis 기본 진입 페이지
-// - 특정 conversationId 없이 접근했을 때의 안내용.
-// - 3단계(탭 작업) 전에 간단 가이드를 제공하고, 나중에 "최근 분석 이동" UI를 추가할 수 있습니다.
-
-import { conversationIdStorage } from "@/utils/conversationIdStorage";
+import { analysisHistoryStorage, type AnalysisHistoryItem } from "@/utils/analysisHistoryStorage";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 
-
-
 export default function AnalysisIndexPage() {
   const router = useRouter();
-  const [id, setId] = useState<string | null>(() => conversationIdStorage.get());  
-  // id가 null일 수 있으므로 빈 문자열로 대체하여 훅 호출 순서를 유지합니다.
-  const safeId = id ?? '';
-  const { data, isLoading, isError, error } = useAnalysis(safeId);
+  const [history, setHistory] = useState<AnalysisHistoryItem[]>([]);
+  const [selectedId, setSelectedId] = useState<string | null>(null);
+  
+  const safeId = selectedId ?? '';
+  const { data, isLoading } = useAnalysis(safeId);
 
-  // 준비 완료면 탭으로 이동 (기본: summary)
+  // 히스토리 로드
   useEffect(() => {
-    if (data?.status === 'ready') {
-      router.replace(`/analysis/${id}/summary`);
+    const loadedHistory = analysisHistoryStorage.getAll();
+    setHistory(loadedHistory);
+    
+    // 최근 분석이 있으면 자동 선택
+    const latest = analysisHistoryStorage.getLatest();
+    if (latest && latest.status === 'ready') {
+      setSelectedId(latest.conversationId);
     }
-  }, [data?.status, id, router]);
+  }, []);
 
-  // id 없으면 가이드 노출
-  if (!id) {
-    return (
-      <main className="space-y-4">
-        <h1 className="text-2xl font-semibold">분석</h1>
-        <p className="text-sm text-gray-600">
-          먼저 대화 파일을 업로드하고 분석을 시작하세요. 분석이 시작되면 conversation-id로 결과를 조회할 수 있습니다.
-        </p>
-        <ul className="list-disc pl-5 text-sm text-gray-700 space-y-1">
-          <li>
-            <Link href="/conversation" className="font-medium text-blue-600 hover:underline">
-              <strong>대화 페이지</strong>
-            </Link>에서 파일 업로드 & 분석 시작</li>
-          <li>성공 시 <strong>분석 결과 페이지</strong>로 자동 이동</li>
-          <li>해당 페이지에서 분석 상태(대기/진행/완료)를 확인</li>
-        </ul>
-      </main>
-    );
-  }
+  // 분석 완료 시 해당 페이지로 이동
+  useEffect(() => {
+    if (data?.status === 'ready' && selectedId) {
+      router.replace(`/analysis/${selectedId}/summary`);
+    }
+  }, [data?.status, selectedId, router]);
 
-  // 로딩/에러/상태별 안내
-  if (isLoading) {
-    return (
-      <div className="space-y-4 p-4">
-        <div className="h-6 w-40 rounded bg-gray-200 animate-pulse" />
-        <div className="h-4 w-64 rounded bg-gray-200 animate-pulse" />
-        <div className="h-24 w-full rounded bg-gray-200 animate-pulse" />
-      </div>
-    );
-  }
+  // 분석 선택
+  const handleSelectAnalysis = (conversationId: string) => {
+    setSelectedId(conversationId);
+  };
 
-  if (isError || !data) {
-    // 404 등으로 아예 못 가져온다면 저장소 정리 + 가이드로 회귀하는 것도 방법
-    return (
-      <main className="space-y-4">
-        <h1 className="text-2xl font-semibold">분석</h1>
-        <div className="rounded border border-red-300 bg-red-50 p-3 text-sm text-red-700">
-          {(error as Error)?.message ?? '결과를 불러오지 못했습니다.'}
-        </div>
-        <button
-          type="button"
-          onClick={() => { conversationIdStorage.clear(); setId(null); }}
-          className="rounded border px-3 py-2 text-sm"
+  // 분석 삭제
+  const handleDeleteAnalysis = (conversationId: string) => {
+    if (confirm('이 분석 결과를 삭제하시겠습니까?')) {
+      analysisHistoryStorage.remove(conversationId);
+      setHistory(analysisHistoryStorage.getAll());
+      
+      // 현재 선택된 분석이 삭제된 경우 선택 해제
+      if (selectedId === conversationId) {
+        setSelectedId(null);
+      }
+    }
+  };
+
+  return (
+    <main className="space-y-4 sm:space-y-6">
+      <header className="px-1">
+        <h1 className="text-xl sm:text-2xl font-semibold">분석</h1>
+        <p className="text-sm sm:text-base text-gray-600 mt-1">이전 분석 결과를 확인하거나 새로운 분석을 시작하세요.</p>
+      </header>
+
+      {/* 새 분석 시작 */}
+      <section className="rounded-lg border bg-gradient-to-r from-orange-50 to-red-50 p-4">
+        <h2 className="font-medium mb-3 text-sm sm:text-base">새 분석 시작</h2>
+        <Link 
+          href="/conversation" 
+          className="inline-flex items-center px-4 py-3 bg-gradient-to-r from-orange-500 to-red-500 text-white rounded-lg hover:from-orange-600 hover:to-red-600 transition-all text-sm sm:text-base font-medium touch-target"
         >
-          최근 분석 ID 지우기
-        </button>
-      </main>
-    );
-  }
+          대화 업로드하기
+        </Link>
+      </section>
 
-  // queued / processing / failed 안내 (폴링은 useAnalysis에 이미 내장)
-  if (data.status !== 'ready') {
-    return (
-      <main className="space-y-6">
-        <header>
-          <h1 className="text-2xl font-semibold">분석</h1>
-          <p className="text-sm text-gray-600">
-            대화 ID: <code className="rounded bg-gray-100 px-1 py-0.5">{id}</code>
-          </p>
-        </header>
-
-        <section className="rounded-lg border bg-white p-4">
-          <p className="text-sm text-gray-700">
-            현재 상태: <strong>{data.status}</strong>
-          </p>
-          {data.status === 'failed' && (
-            <p className="text-xs text-red-600 mt-1">
-              처리에 실패했습니다. 다시 시도하거나 다른 파일로 분석을 시작해 주세요.
-            </p>
-          )}
+      {/* 분석 히스토리 */}
+      {history.length > 0 && (
+        <section className="space-y-3 sm:space-y-4">
+          <h2 className="text-base sm:text-lg font-medium px-1">이전 분석 결과</h2>
+          <div className="grid gap-3">
+            {history.map((item) => (
+              <div
+                key={item.conversationId}
+                className={`p-4 rounded-lg border cursor-pointer transition-all ${
+                  selectedId === item.conversationId 
+                    ? 'border-orange-500 bg-orange-50' 
+                    : 'border-gray-200 hover:border-gray-300 bg-white'
+                }`}
+                onClick={() => handleSelectAnalysis(item.conversationId)}
+              >
+                <div className="flex items-start justify-between gap-3">
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2 mb-2 flex-wrap">
+                      <span className="text-sm sm:text-base font-medium break-anywhere">
+                        {item.title || `분석 ${item.conversationId.slice(0, 8)}...`}
+                      </span>
+                      <span className={`px-2 py-1 text-xs rounded-full flex-shrink-0 ${
+                        item.status === 'ready' ? 'bg-green-100 text-green-700' :
+                        item.status === 'processing' ? 'bg-yellow-100 text-yellow-700' :
+                        'bg-red-100 text-red-700'
+                      }`}>
+                        {item.status === 'ready' ? '완료' : 
+                         item.status === 'processing' ? '처리중' : '실패'}
+                      </span>
+                    </div>
+                    <p className="text-xs sm:text-sm text-gray-500 mb-2">
+                      {new Date(item.createdAt).toLocaleString('ko-KR')}
+                    </p>
+                    {item.summary && (
+                      <p className="text-sm text-gray-600 line-clamp-2 break-anywhere">
+                        {item.summary}
+                      </p>
+                    )}
+                  </div>
+                  <div className="flex flex-col sm:flex-row items-end sm:items-center gap-2 flex-shrink-0">
+                    {item.status === 'ready' && (
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          router.push(`/analysis/${item.conversationId}/summary`);
+                        }}
+                        className="px-3 py-2 text-xs sm:text-sm bg-orange-500 text-white rounded hover:bg-orange-600 transition-colors touch-target"
+                      >
+                        보기
+                      </button>
+                    )}
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleDeleteAnalysis(item.conversationId);
+                      }}
+                      className="px-2 py-2 text-xs bg-red-500 text-white rounded hover:bg-red-600 transition-colors touch-target"
+                      title="삭제"
+                    >
+                      🗑️
+                    </button>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
         </section>
-      </main>
-    );
-  }
+      )}
 
-  // ready면 위 useEffect에서 summary로 이동하므로 여기까지 안 옴
-  return null;
+      {/* 선택된 분석의 로딩 상태 */}
+      {selectedId && isLoading && (
+        <section className="rounded-lg border bg-white p-4">
+          <div className="flex items-center gap-3">
+            <div className="w-5 h-5 border-2 border-gray-300 border-t-orange-500 rounded-full animate-spin"></div>
+            <span className="text-sm text-gray-600">분석 결과를 불러오는 중...</span>
+          </div>
+        </section>
+      )}
+
+      {/* 히스토리가 없을 때 */}
+      {history.length === 0 && (
+        <section className="text-center py-12">
+          <div className="text-4xl mb-4">📊</div>
+          <h3 className="text-lg font-medium mb-2">아직 분석 결과가 없습니다</h3>
+          <p className="text-sm text-gray-600 mb-4">
+            첫 번째 대화를 업로드하고 분석을 시작해보세요.
+          </p>
+          <Link 
+            href="/conversation" 
+            className="inline-flex items-center px-4 py-2 bg-gradient-to-r from-orange-500 to-red-500 text-white rounded-lg hover:from-orange-600 hover:to-red-600 transition-all"
+          >
+            대화 업로드하기
+          </Link>
+        </section>
+      )}
+    </main>
+  );
 }

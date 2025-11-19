@@ -5,13 +5,14 @@ from .core.config import settings
 from .domains.auth.auth_router import router as auth_router
 from .domains.conversation.router import router as conversation_router
 from .domains.conversation.audio_router import router as audio_router
+from .domains.family.family_router import router as family_router
 from .domains.conversation.websocket import websocket_endpoint
 
 # 모든 모델 import (SQLAlchemy 관계 설정을 위해 필요)
 from .domains.auth.user_models import User
 from .domains.conversation.models import Conversation
 from .domains.conversation.file_models import ConversationFile
-from .domains.family.models import Family
+from .domains.family.family_models import Family
 
 app = FastAPI()
 
@@ -39,6 +40,7 @@ def health_check():
 app.include_router(auth_router)
 app.include_router(conversation_router)
 app.include_router(audio_router)
+app.include_router(family_router)
 
 # WebSocket 라우트
 @app.websocket("/ws/analysis/{conversation_id}")

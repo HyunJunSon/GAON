@@ -306,6 +306,7 @@ async def get_audio_conversation_detail(
 async def update_speaker_mapping(
     conversation_id: UUID,
     request: SpeakerMappingRequest,
+    background_tasks: BackgroundTasks,
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
@@ -393,7 +394,9 @@ async def update_speaker_mapping(
             file_id=audio_file.id,
             speaker_mapping=request.speaker_mapping,
             user_mapping=request.user_mapping,
-            message="화자 매핑이 성공적으로 설정되었습니다."
+            message="화자 매핑이 성공적으로 설정되었습니다.",
+            analysis_started=True,  # 분석이 백그라운드에서 시작됨
+            can_proceed=True  # 사용자는 바로 다음 단계로 진행 가능
         )
         
     except HTTPException:
