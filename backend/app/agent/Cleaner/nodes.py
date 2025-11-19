@@ -1,5 +1,3 @@
-# app/agent/Cleaner/nodes.py 
-
 from __future__ import annotations
 from dataclasses import dataclass
 from typing import Any, Dict, List, Tuple, Optional
@@ -20,12 +18,27 @@ from app.agent.crud import (
 # ===============================================================
 @dataclass
 class RawFetcher:
-    """
-    DB에서 conversation_file.raw_content 및 file_type/audio_url/speaker_segments 를 읽어
-    → DataFrame(df)와 메타 정보 반환
-    """
 
-    def fetch(self, db: Session = None, conv_id: str = None, *args, **kwargs) -> Dict[str, Any]:
+    def fetch(
+        self,
+        db: Session = None,
+        conv_id: str = None,
+        conversation_df: Optional[pd.DataFrame] = None,  
+        *args,
+        **kwargs
+    ) -> Dict[str, Any]:
+
+        # ⭐ NEW — 외부에서 DF가 들어왔으면 raw_content 무시하고 그대로 사용
+        if conversation_df is not None:
+            print("✅ [RawFetcher] 외부 전달 conversation_df 사용")
+            return {
+                "df": conversation_df,
+                "file_type": "external",  # 분석 흐름 위해 타입만 세팅
+                "audio_url": None,
+                "speaker_segments": None,
+            }
+
+        # ------- 기존 raw_content 기반 로직 그대로 유지 -------
         if db is None:
             raise ValueError("❌ RawFetcher: db 세션이 필요합니다.")
         if not conv_id:
@@ -112,6 +125,8 @@ class DataInspector:
 class TokenCounter:
     def count(self, df: pd.DataFrame, state=None) -> Tuple[pd.DataFrame, List[str]]:
         issues = []
+
+        # ⭐ MODIFIED — speaker가 문자열일 수도 있으므로 그대로 groupby
         grouped = df.groupby("speaker")["text"].apply(
             lambda x: sum(len(s.split()) for s in x)
         )
@@ -133,7 +148,7 @@ class FileTypeClassifier:
     """
 
     ALLOWED_AUDIO = ["wav", "mp3", "webm", "m4a"]
-    ALLOWED_TEXT = ["txt", "pdf", "doc", "docx"]
+    ALLOWED_TEXT = ["txt", "pdf", "doc", "docx", "external"]  # ⭐ NEW: external 추가
 
     def classify(self, file_type: str) -> str:
         if not file_type:
@@ -150,18 +165,11 @@ class FileTypeClassifier:
 
 
 # ===============================================================
-# 5) AudioFeatureExtractor (OpenSMILE 기반,음성 요소 추출)
+# 5) AudioFeatureExtractor (OpenSMILE 기반)
 # ===============================================================
 @dataclass
 class AudioFeatureExtractor:
-    """
-    OpenSMILE 기반 오디오 특징 추출
-    - turn(=speaker segment) 단위로 직접 WAV chunk 생성
-    - eGeMAPS FeatureSet 사용 → 감정/스트레스/긴장도에 최적화
-    """
-
     def _load_audio(self, audio_url: str):
-        """오디오 URL → numpy array(y), sample rate(sr)로 변환"""
         import requests, io, librosa
         resp = requests.get(audio_url)
         if resp.status_code != 200:
@@ -172,24 +180,11 @@ class AudioFeatureExtractor:
         return y, sr
 
     def _extract_segment(self, y, sr, start, end):
-        """시작~끝 시간 구간 슬라이싱"""
         start_idx = int(start * sr)
         end_idx = int(end * sr)
         return y[start_idx:end_idx]
 
     def extract(self, audio_url: str, speaker_segments: List[Dict]) -> List[Dict]:
-        """
-        최종 반환 형태:
-        [
-            {
-                "speaker": 1,
-                "start": 0.0,
-                "end": 2.4,
-                "features": {... eGeMAPS feature dict ...}
-            },
-            ...
-        ]
-        """
         if not audio_url:
             raise ValueError("❌ audio_url 없음")
 
@@ -202,7 +197,6 @@ class AudioFeatureExtractor:
             feature_level=opensmile.FeatureLevel.Functionals,
         )
 
-        # 전체 오디오 로드
         y, sr = self._load_audio(audio_url)
         results = []
 
@@ -216,7 +210,6 @@ class AudioFeatureExtractor:
                 if len(chunk) == 0:
                     continue
 
-                # numpy chunk를 임시 wav 파일 형태로 저장 후 분석
                 import soundfile as sf
                 import tempfile
 
@@ -224,7 +217,6 @@ class AudioFeatureExtractor:
                     sf.write(tmp_wav.name, chunk, sr)
                     feats = smile.process_file(tmp_wav.name)
 
-                # pandas DataFrame → dict 변환
                 feat_dict = feats.iloc[0].to_dict()
 
                 results.append({
@@ -247,64 +239,46 @@ class AudioFeatureExtractor:
 # ===============================================================
 @dataclass
 class ContentValidator:
-    """
-    텍스트 전용 후처리 (필요하면 추가 규칙 적용 가능)
-    """
     def validate(self, df: pd.DataFrame) -> pd.DataFrame:
-        # 현재는 그대로 pass
         return df
-    
+
     def _parse_batch_response(self, response: str, original_batch: List[str]) -> List[str]:
-        """배치 응답에서 개별 문장 추출"""
         lines = response.strip().split('\n')
         cleaned_batch = []
-        
+
         for i, original in enumerate(original_batch, 1):
-            # 번호로 시작하는 라인 찾기
             found = False
             for line in lines:
                 if line.strip().startswith(f"{i}."):
-                    cleaned_text = line.strip()[2:].strip()  # "1. " 제거
+                    cleaned_text = line.strip()[2:].strip()
                     cleaned_batch.append(cleaned_text)
                     found = True
                     break
-            
+
             if not found:
-                # 파싱 실패 시 원본 사용
                 cleaned_batch.append(original)
-        
+
         return cleaned_batch
 
 
 # ===============================================================
-# 7) ContentMerger (text_df + audio_features 병합)
+# 7) ContentMerger
 # ===============================================================
 @dataclass
 class ContentMerger:
-    """
-    text_df + audio_features(turn-level) 병합
-    - audio_features: [
-        { "speaker": 1, "start": 0.0, "end": 1.8, "features": {...} },
-        ...
-      ]
-    """
-
     def merge(self, text_df: pd.DataFrame, audio_features: Optional[List[Dict]]) -> pd.DataFrame:
         df = text_df.copy()
-        df["audio_features"] = None  # turn-level audio feature dict
+        df["audio_features"] = None
 
         if not audio_features:
-            # text-only 케이스 → audio_features None 유지
             return df
 
-        # speaker별로 segment를 큐(queue)처럼 관리
         from collections import defaultdict, deque
 
         seg_dict = defaultdict(deque)
         for seg in audio_features:
             seg_dict[seg["speaker"]].append(seg)
 
-        # 각 text turn에 segment 하나씩 매칭
         for idx, row in df.iterrows():
             spk = row["speaker"]
 
@@ -312,7 +286,7 @@ class ContentMerger:
                 seg = seg_dict[spk].popleft()
                 df.at[idx, "audio_features"] = seg["features"]
             else:
-                df.at[idx, "audio_features"] = None  # audio가 없는 turn
+                df.at[idx, "audio_features"] = None
 
         return df
 
@@ -323,9 +297,7 @@ class ContentMerger:
 @dataclass
 class ExceptionHandler:
     def handle(self, state, err: Exception):
-        # State 객체 손상 방지
         if hasattr(state, "issues"):
             state.issues.append(str(err))
         state.validated = False
         return state
-

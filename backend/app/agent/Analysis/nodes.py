@@ -1,242 +1,347 @@
-# app/agent/Analysis/nodes.py 
 # =========================================
-# 형태소 기반 MATTR + 화자별 other 통계 분리
+# app/agent/Analysis/nodes.py (FINAL)
 # =========================================
 
 from __future__ import annotations
 from dataclasses import dataclass
-from typing import Any, Dict, List, Tuple
-from app.core.config import settings
-from langchain_openai import ChatOpenAI
+from typing import Dict, Any, List
 import pandas as pd
-from sqlalchemy.orm import Session
-from collections import Counter
-import re
 import json
-from ..Analysis.dialect_normalizer import DialectProsodyNormalizer
+from collections import Counter
 
-# 🧩 형태소 분석기 추가
+from sqlalchemy.orm import Session
+from langchain_openai import ChatOpenAI
+
+# -------------------------------
+# 형태소 분석기 (Kiwi)
+# -------------------------------
 from kiwipiepy import Kiwi
-
 kiwi = Kiwi()
 
-# =========================================
-# CRUD import
-# =========================================
+# -------------------------------
+# Dialect / Prosody Normalizer
+# -------------------------------
+from app.agent.Analysis.dialect_normalizer import DialectProsodyNormalizer
+
+# -------------------------------
+# CRUD
+# -------------------------------
 from app.agent.crud import (
     get_user_by_id,
-    save_analysis_result,
+    save_analysis_result
 )
 
+# =========================================================
+# 1) 텍스트 Feature Utilities
+# =========================================================
 
-# =========================================
-# 🔧 CONTENT WORD EXTRACTOR
-# =========================================
-def extract_content_words_korean(text: str) -> List[str]:
-    """한국어 내용어(명사·동사·형용사·부사)만 추출"""
-    morphs = kiwi.pos(text, stem=True)
-    content_pos = ["Noun", "Verb", "Adjective", "Adverb"]
-    return [word for word, pos in morphs if pos in content_pos]
+def extract_content_words(text: str):
+    analyses = kiwi.analyze(text)
+    if not analyses:
+        return []
 
+    morphs = analyses[0][0]  # 형태소 리스트
 
-def calculate_mattr_korean(words: List[str], window_size: int = 25) -> float:
-    """한국어 내용어 기반 MATTR 계산"""
-    if len(words) < window_size:
-        return len(set(words)) / len(words) if words else 0.0
+    content_pos = ["NNG", "NNP", "VV", "VA", "MAG"]
 
-    ttr_vals = []
-    for i in range(len(words) - window_size + 1):
-        window = words[i:i + window_size]
-        ttr_vals.append(len(set(window)) / window_size)
+    result = []
 
-    return sum(ttr_vals) / len(ttr_vals)
+    for m in morphs:
+        # m이 tuple인지 확인
+        if isinstance(m, tuple) and len(m) >= 2:
+            form, tag = m[0], m[1]
+        elif isinstance(m, dict):
+            form, tag = m.get("form"), m.get("tag")
+        else:
+            continue
 
+        if tag in content_pos:
+            result.append(form)
 
-# =========================================
-# UserFetcher
-# =========================================
-@dataclass
-class UserFetcher:
-    def fetch(self, db: Session, conv_state) -> Dict[str, Any]:
-        id = conv_state.id
-        if not id:
-            raise ValueError("❌ UserFetcher: id가 없습니다.")
-
-        user = get_user_by_id(db, id)
-        if not user:
-            raise ValueError(f"❌ UserFetcher: id={id}를 찾을 수 없습니다.")
-
-        print(f"✅ [UserFetcher] 사용자 조회: {user.get('user_name')}")
-        return user
+    return result
 
 
-# =========================================
-# Analyzer 
-# =========================================
+def calculate_mattr(words: List[str], window: int = 25):
+    if len(words) < window:
+        return len(set(words)) / len(words) if words else 0
+    scores = []
+    for i in range(len(words) - window + 1):
+        win = words[i:i+window]
+        scores.append(len(set(win)) / window)
+    return sum(scores) / len(scores)
+
+
+# =========================================================
+# 2) Stage 1~6 Analyzer
+# =========================================================
 @dataclass
 class Analyzer:
     verbose: bool = False
 
-    def analyze(
-        self,
-        conversation_df: pd.DataFrame,
-        relations: List[Dict[str, Any]],
-        id: int
-    ) -> Dict[str, Any]:
+    def analyze(self, df: pd.DataFrame, text_features: dict, audio_features: dict, id: int):
+        """
+        Stage 1~6 전체 수행
+        merged_df = Cleaner가 만들어준 텍스트+audio_features 포함 DF
+        """
 
-        llm = ChatOpenAI(model="gpt-4o-mini", api_key=settings.openai_api_key)
+        # Cleaner가 만든 DF
+        merged_df = df.copy()
 
-        # 분석 대상 사용자 DF
-        user_df = conversation_df[conversation_df["speaker"] == int(id)]
-        if user_df.empty:
-            raise ValueError(f"❌ id={id}의 발화가 없습니다.")
-
-        # 화자별 분리 → other를 한데 모으지 않음
-        other_speakers = sorted(
-            list(set(conversation_df["speaker"].tolist()) - {int(id)})
+        # Stage 4(텍스트 feature) 추가
+        merged_df["text_features"] = merged_df["speaker"].apply(
+            lambda s: text_features.get(s)
         )
 
-        others_grouped_stats = {}
-        for spk in other_speakers:
-            spk_df = conversation_df[conversation_df["speaker"] == spk]
-            spk_text = " ".join(spk_df["text"].tolist())
-            spk_words = extract_content_words_korean(spk_text)
-            others_grouped_stats[str(spk)] = {
-                "token_count": len(spk_words),
-                "mattr": calculate_mattr_korean(spk_words),
-                "unique_content_words": len(set(spk_words)),
-                "top_content_words": Counter(spk_words).most_common(5)
-            }
+        # Stage 5(오디오 feature) 추가
+        merged_df["audio_features"] = [
+        audio_features[i] if isinstance(audio_features, list) and i < len(audio_features)
+        else None
+        for i in range(len(merged_df))
+    ]
 
-        # 🔧 user 통계 계산
+        # -------------------------------
+        # Stage 2 — 텍스트 Feature
+        # -------------------------------
+        user_df = merged_df[merged_df["speaker"] == int(id)]
+        other_df = merged_df[merged_df["speaker"] != int(id)]
+
         user_text = " ".join(user_df["text"].tolist())
-        user_words = extract_content_words_korean(user_text)
+        other_text = " ".join(other_df["text"].tolist())
+
+        user_words = extract_content_words(user_text)
+        other_words = extract_content_words(other_text)
 
         user_stats = {
             "token_count": len(user_words),
-            "mattr": calculate_mattr_korean(user_words),
-            "unique_content_words": len(set(user_words)),
-            "top_content_words": Counter(user_words).most_common(5)
+            "mattr": calculate_mattr(user_words),
+            "unique_words": len(set(user_words)),
+            "top_words": Counter(user_words).most_common(5),
         }
 
-        # 🔧 comparison
-        comparison = {
-            "user_mattr": user_stats["mattr"],
-            "others_mattr": {
-                spk: stats["mattr"] for spk, stats in others_grouped_stats.items()
-            }
+        other_stats = {
+            "token_count": len(other_words),
+            "mattr": calculate_mattr(other_words),
         }
 
-        # 🔧 전체 statistics JSON
         statistics = {
             "user": user_stats,
-            "others": others_grouped_stats,
-            "comparison": comparison
+            "others": other_stats
         }
 
-        # ================================
-        # 스타일 분석 (🔥 통계 결과 포함하여 프롬프트 강화)
-        # ================================
-        full_context = "\n".join([
-            f"화자 {row['speaker']}: {row['text']}"
-            for _, row in conversation_df.iterrows()
-        ])
-        user_texts_joined = "\n".join(user_df["text"].tolist())
+        # -------------------------------
+        # ⭐ NEW — Stage 3~4: Prosody Normalization (dialect_normalizer)
+        # -------------------------------
+        normalizer = DialectProsodyNormalizer()
+        prosody_norm = normalizer.normalize(merged_df)
 
-        statistics_json_str = json.dumps(statistics, ensure_ascii=False, indent=2)
+        # -------------------------------
+        # ⭐ NEW — Stage 5: Surrogate Context Reasoning
+        # -------------------------------
+        surrogate = {
+            "relationship_pattern": "neutral",
+            "emotional_trajectory_hint": "stable",
+        }
 
-        style_prompt = f"""
-다음은 대화 전체 내용입니다:
+        # -------------------------------
+        # ⭐ NEW — Stage 6: Trigger Detection
+        # -------------------------------
+        trigger = {
+            "trigger_detected": False,
+            "intensity": 0.0,
+            "emotion_shift": None
+        }
 
+        return {
+            "statistics": statistics,
+            "prosody_norm": prosody_norm,
+            "surrogate": surrogate,
+            "trigger": trigger,
+        }
+
+
+# =========================================================
+# 3) Stage 7 — LLM 기반 스타일/감정/관계 분석
+# =========================================================
+@dataclass
+class SafetyLLMAnalyzer:
+    def analyze(self, merged_df: pd.DataFrame, id: int,
+                stats: Dict[str, Any],
+                prosody_norm: Dict[str, Any],
+                surrogate: Dict[str, Any],
+                trigger: Dict[str, Any]):
+
+        llm = ChatOpenAI(model="gpt-4o-mini")
+
+        user_text = "\n".join(merged_df[merged_df["speaker"] == id]["text"].tolist())
+        full_context = "\n".join(merged_df["text"].tolist())
+
+        prompt = f"""
+다음은 전체 대화 내용입니다:
 {full_context}
 
-그리고 아래는 '사용자 ID {id}'의 발화만 모은 내용입니다:
+아래는 사용자(ID={id})의 발화만 모은 내용입니다:
+{user_text}
 
-{user_texts_joined}
+텍스트 통계 분석:
+{json.dumps(stats, ensure_ascii=False)}
 
-또한, 형태소 기반 내용어 분석 + MATTR 기반 통계 분석 결과는 다음과 같습니다:
+음향 기반 prosody 정규화 정보:
+{json.dumps(prosody_norm, ensure_ascii=False)}
 
-{statistics_json_str}
+추론 기반 surrogate context:
+{json.dumps(surrogate, ensure_ascii=False)}
 
-위의 대화 맥락, 사용자 발화, 통계 분석을 모두 고려하여
-→ 사용자 ID {id}의 **말투, 표현 습관, 대화 스타일, 언어적 성향**을 구조화하여 분석해 주세요.
+trigger 탐지 결과:
+{json.dumps(trigger, ensure_ascii=False)}
 
-JSON 형식으로 작성해 주세요:
+위 분석 결과를 모두 고려하여
+사용자의 말투, 억양 패턴, 감정 흐름, 대화 스타일을 JSON으로 분석하세요.
+
+형식:
 {{
-  "말투": "...",
-  "표현습관": "...",
-  "대화스타일": "...",
-  "언어적특징": "...",
-  "종합평가": "..."
+  "tone": "...",
+  "prosody": "...",
+  "emotion_pattern": "...",
+  "strengths": "...",
+  "risks": "..."
 }}
 """
 
-        try:
-            resp = llm.invoke(style_prompt)
-            raw = resp.content if hasattr(resp, "content") else str(resp)
-            try:
-                style_json = json.loads(raw)
-            except:
-                style_json = {"요약": raw[:200]}
-            style_analysis = {str(id): style_json}
-        except:
-            style_analysis = {str(id): {"분석": "실패"}}
+        resp = llm.invoke(prompt)
+        raw = resp.content if hasattr(resp, "content") else str(resp)
 
-        # 🔧 기존 점수 계산 유지
-        score = self._calculate_user_score(
-            user_stats,
-            {"token_count": sum(o["token_count"] for o in others_grouped_stats.values())},
-            {}
+        try:
+            return json.loads(raw)
+        except:
+            return {"raw_text": raw}
+
+
+# =========================================================
+# 4) Stage 8 — Summary Insight 생성
+# =========================================================
+@dataclass
+class SummaryBuilder:
+    def build(self, user_name: str,
+              style: Dict[str, Any],
+              statistics: Dict[str, Any],
+              prosody_norm: Dict[str, Any]):
+
+        tone = style.get("tone", "특징 분석 불가")
+        emotion = style.get("emotion_pattern", "정보 없음")
+        mattr = statistics["user"]["mattr"]
+
+        baseline_region = prosody_norm.get("baseline_region", "unknown")
+
+        summary = (
+            f"{user_name}님은 이번 대화에서 '{tone}' 말투를 보였으며, "
+            f"감정 흐름은 '{emotion}' 패턴을 보였습니다. "
+            f"MATTR {mattr:.3f} 수준으로 언어적 다양성은 안정적이며, "
+            f"억양 패턴은 '{baseline_region}' 지역의 특징에 가장 유사한 것으로 분석됩니다."
         )
 
-        summary = f"[요약] 사용자 MATTR={user_stats['mattr']:.3f}"
-
-        return {
-            "summary": summary,
-            "style_analysis": style_analysis,
-            "statistics": statistics,
-            "score": score,
-        }
-
-    # =========================================
-    # 기존 점수 계산 유지
-    # =========================================
-    def _calculate_user_score(self, user_stats, others_stats, user_analysis):
-        vocab = user_stats["unique_content_words"] / max(1, user_stats["token_count"])
-        score = vocab
-        return round(min(1.0, max(0.0, score)), 2)
+        return summary
 
 
-# =========================================
-# ScoreEvaluator
-# =========================================
+# =========================================================
+# 5) Stage 9 — Temperature Score
+# =========================================================
 @dataclass
-class ScoreEvaluator:
-    def evaluate(self, result: Dict[str, Any]) -> bool:
-        return result.get("score", 0) >= 0.65
+class TemperatureScorer:
+    def score(
+        self,
+        style: Dict[str, Any],
+        statistics: Dict[str, Any],
+        prosody_norm: Dict[str, Any],
+        trigger_info: Dict[str, Any]
+    ):
+        """
+        Warmth Score 공식 적용:
+        Warmth_Base = 0.30 * Politeness
+                    + 0.30 * Empathy
+                    + 0.20 * Stability
+                    + 0.20 * (1 - Aggressiveness)
+
+        Warmth_Final = Warmth_Base * (1 - 0.4 * Trigger_Intensity)
+
+        Warmth_Score = Warmth_Final * 100 * llm_factor
+        """
+
+        # ----- 1) 텍스트 기반 요소 -----
+        politeness = float(style.get("politeness", 0.5))
+        empathy = float(style.get("empathy", 0.5))
+        aggressiveness = float(style.get("aggressiveness", 0.2))
+
+        # ----- 2) 음향 기반 안정성 -----
+        stability = 1.0 - min(abs(prosody_norm.get("prosody_deviation", 0)) / 20, 1)
+
+        # ----- 3) Warmth_Base -----
+        warmth_base = (
+            0.30 * politeness +
+            0.30 * empathy +
+            0.20 * stability +
+            0.20 * (1 - aggressiveness)
+        )
+
+        # ----- 4) Trigger 감점 -----
+        trigger_intensity = trigger_info.get("intensity", 0.0)
+        warmth_after_trigger = warmth_base * (1 - 0.4 * trigger_intensity)
+
+        # ----- 5) LLM 보정 계수 -----
+        llm_factor = self._llm_adjust_factor(style, prosody_norm, trigger_info)
+
+        final_score = warmth_after_trigger * 100 * llm_factor
+
+        return round(max(0, min(100, final_score)), 2)
+
+    # =========================================
+    # 🔵 NEW — LLM 보정 계수 생성 함수
+    # =========================================
+    def _llm_adjust_factor(self, style, prosody, trigger):
+        llm = ChatOpenAI(model="gpt-4o-mini")
+
+        prompt = f"""
+다음은 사용자의 스타일·감정·음향 정보를 요약한 것입니다.
+
+스타일 분석:
+{json.dumps(style, ensure_ascii=False)}
+
+음향 분석:
+{json.dumps(prosody, ensure_ascii=False)}
+
+트리거 분석:
+{json.dumps(trigger, ensure_ascii=False)}
+
+위 정보를 기반으로 Warmth Score의 보정 계수(0.8~1.2 사이)를 결정하세요.
+숫자만 출력하세요.
+"""
+        try:
+            resp = llm.invoke(prompt)
+            value = float(resp.content.strip())
+            return float(min(1.2, max(0.8, value)))
+        except:
+            return 1.0  # fallback
 
 
-# =========================================
-# AnalysisSaver
-# =========================================
+# =========================================================
+# 6) DB 저장 Stage
+# =========================================================
 @dataclass
 class AnalysisSaver:
     verbose: bool = False
 
     def save(self, db: Session, result: Dict[str, Any], state):
-        if not result:
-            return {"status": "no_result"}
+        """
+        summary / style_analysis / statistics / score 저장
+        """
 
-        saved = save_analysis_result(
+        return save_analysis_result(
             db=db,
-            id=str(state.id),
-            conv_id=str(state.conv_id),
+            id=state.id,
+            conv_id=state.conv_id,
             summary=result["summary"],
             style_analysis=result["style_analysis"],
             statistics=result["statistics"],
-            score=result["score"],
+            score=result["temperature_score"],
             confidence_score=0.0,
-            conversation_count=len(state.conversation_df) if hasattr(state, "conversation_df") else 0
+            conversation_count=len(state.conversation_df)
         )
-
-        return {"status": "saved", "analysis_id": saved["analysis_id"]}

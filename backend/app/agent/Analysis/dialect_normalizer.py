@@ -1,19 +1,24 @@
+# =========================================
+# app/agent/Analysis/dialect_normalizer.py
+# =========================================
+
 from dataclasses import dataclass
 import numpy as np
 import pandas as pd
 from typing import Dict, List, Any
+
 
 @dataclass
 class DialectProsodyNormalizer:
     """
     GAON Prosody Normalizer
     - observed_slope 계산
-    - dialect likelihood
-    - emotional deviation
-    - variation (turn-level)
+    - dialect likelihood (지역 방언 확률)
+    - emotional deviation (감정 편차)
+    - variation (turn-level 변화량)
     """
 
-    # baseline slope ranges (Hz/turn)
+    # 🔵 방언별 baseline 구간 (기존 연구 기반)
     BASELINES = {
         "seoul": (-10, 0),
         "gyeongsang": (-30, -20),
@@ -21,22 +26,32 @@ class DialectProsodyNormalizer:
         "jeolla": (-5, 5),
     }
 
-    def _mean_baseline(self, region: str) -> float:
-        lo, hi = self.BASELINE[region]
-        return (lo + hi) / 2
-
     def _softmax(self, x):
+        """수치 안정성 softmax"""
         e = np.exp(x - np.max(x))
         return e / e.sum()
 
     def normalize(self, merged_df: pd.DataFrame) -> Dict[str, Any]:
+        """
+        최종 반환:
+        {
+            "turn_prosody": [... turn-level prosody 결과 ...],
+            "dialect_likelihood": {... 지역별 확률 ...},
+            "baseline_region": "...",
+            "baseline_slope_mean": float
+        }
+        """
+
         results = []
         slopes = []
 
+        # =========================================
+        # 1) turn-level slope 추출
+        # =========================================
         for idx, row in merged_df.iterrows():
             feats = row.get("audio_features")
+
             if feats is None:
-                # 텍스트-only turn
                 results.append({
                     "turn_index": idx,
                     "speaker": row["speaker"],
@@ -49,43 +64,46 @@ class DialectProsodyNormalizer:
                 slopes.append(None)
                 continue
 
-            # 1) observed slope = F0 semitone variability
+            # 🔵 핵심 Feature: F0semitone variability
             observed = feats.get("F0semitoneFrom27.5Hz_sma3nz_stddevNorm", None)
             slopes.append(observed)
 
             results.append({
                 "turn_index": idx,
                 "speaker": row["speaker"],
-                "observed_slope": observed
+                "observed_slope": observed,
             })
 
-        # dialect likelihood 계산
-        # 평균 observed slope (None 제외)
+        # =========================================
+        # 2) dialect likelihood 계산 (연구 기반)
+        # =========================================
         valid_slopes = [s for s in slopes if s is not None]
         mean_obs = np.mean(valid_slopes) if valid_slopes else 0
 
-        # 거리 기반 softmax
         distances = {}
         for region, (lo, hi) in self.BASELINES.items():
-            target = (lo + hi) / 2
-            distances[region] = abs(mean_obs - target)
+            center = (lo + hi) / 2
+            distances[region] = abs(mean_obs - center)
 
-        neg_dist = [-d for d in distances.values()]
-        probs = self._softmax(np.array(neg_dist))
+        neg_dist = np.array([-d for d in distances.values()])
+        probs = self._softmax(neg_dist)
 
         dialect_likelihood = {
-            region: float(prob) 
+            region: float(prob)
             for region, prob in zip(self.BASELINES.keys(), probs)
         }
 
-        # 가장 높은 likelihood 지역 baseline 선택
-        max_region = max(dialect_likelihood, key=dialect_likelihood.get)
-        baseline_mean = np.mean(self.BASELINES[max_region])
+        # 🔥 가장 가능성 높은 지역
+        baseline_region = max(dialect_likelihood, key=dialect_likelihood.get)
+        baseline_mean = np.mean(self.BASELINES[baseline_region])
 
-        # 이제 감정 deviation, variation 계산
+        # =========================================
+        # 3) turn-level 감정 deviation, variation 계산
+        # =========================================
         prev_slope = None
         for r in results:
             slope = r.get("observed_slope")
+
             if slope is None:
                 r.update({
                     "baseline_slope": None,
@@ -95,14 +113,11 @@ class DialectProsodyNormalizer:
                 })
                 continue
 
-            # baseline slope
             r["baseline_slope"] = baseline_mean
 
-            # deviation
             dev = slope - baseline_mean
             r["emotional_deviation"] = dev
 
-            # variation
             if prev_slope is None:
                 r["variation"] = 0
             else:
@@ -110,7 +125,6 @@ class DialectProsodyNormalizer:
 
             prev_slope = slope
 
-            # emotion category
             abs_dev = abs(dev)
             if abs_dev < 5:
                 cat = "stable"
@@ -126,4 +140,7 @@ class DialectProsodyNormalizer:
         return {
             "turn_prosody": results,
             "dialect_likelihood": dialect_likelihood,
+            "baseline_region": baseline_region,
+            "baseline_slope_mean": baseline_mean,
+            "mean_observed_slope": mean_obs,
         }

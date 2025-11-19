@@ -60,15 +60,33 @@ def run_cleaner(conv_id: str = None):
         # ======================================================
         # 🔧 반환 값 구성
         # ======================================================
+        # LangGraph 결과는 AddableValuesDict (dict 계열) 이므로, dict 처럼 다룬다
+        if hasattr(state, "keys"):  # AddableValuesDict 또는 dict
+            state_dict = dict(state)
+        else:
+            # 혹시나 CleanerState 인스턴스가 그대로 온 경우 fallback
+            state_dict = {
+                "file_type": getattr(state, "file_type", None),
+                "raw_df": getattr(state, "raw_df", None),
+                "inspected_df": getattr(state, "inspected_df", None),
+                "merged_df": getattr(state, "merged_df", None),
+                "audio_features": getattr(state, "audio_features", None),
+                "validated": getattr(state, "validated", False),
+                "issues": getattr(state, "issues", []),
+            }
+
+        # ======================================================
+        # 🔧 반환 값 구성
+        # ======================================================
         return {
             "conv_id": conv_id,
-            "file_type": state.file_type,                 
-            "raw_df": state.raw_df,
-            "inspected_df": state.inspected_df,
-            "merged_df": state.merged_df,                 # ← 최종 분석 입력 DF
-            "audio_features": state.audio_features,       # ← audio면 존재
-            "validated": state.validated,
-            "issues": state.issues,
+            "file_type": state_dict.get("file_type"),
+            "raw_df": state_dict.get("raw_df"),
+            "inspected_df": state_dict.get("inspected_df"),
+            "merged_df": state_dict.get("merged_df"),
+            "audio_features": state_dict.get("audio_features"),
+            "validated": state_dict.get("validated", False),
+            "issues": state_dict.get("issues", []),
         }
 
     except Exception as e:

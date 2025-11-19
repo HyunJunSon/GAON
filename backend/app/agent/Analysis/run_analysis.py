@@ -1,38 +1,53 @@
+# ===============================================
+# app/agent/Analysis/run_analysis.py
+# ===============================================
+
 """
-✅ Analysis 모듈 실행 진입점 (Updated: 가족 관계 및 사용자 조회 제거 버전)
+✅ Analysis 모듈 실행 진입점 (최신 구조 반영)
+- Cleaner → Analysis 연결을 위한 단일 실행 파일
 """
 
 from app.agent.Analysis.graph_analysis import AnalysisGraph
 from app.core.database import SessionLocal
 import pandas as pd
 import pprint
+from dotenv import load_dotenv
+load_dotenv()
 
 
-def run_analysis(conv_id: str = None, id: int = None, conversation_df: pd.DataFrame = None):
+# ============================================================
+# 🔵 NEW — run_analysis: audio_features 포함한 최신 구조
+# ============================================================
+def run_analysis(conv_id: str = None, id: int = None, conversation_df: pd.DataFrame = None, audio_features=None):
     """
-    ✅ Analysis 모듈 실행 함수 (DB 연동)
+    최신 Analysis 파이프라인 실행 함수
 
     Args:
         conv_id: 대화 UUID (필수)
-        id: 분석 대상 speaker ID (필수)
-        conversation_df: Cleaner에서 전달받은 정제된 대화 DataFrame (필수)
+        id: 분석 대상 speaker ID
+        conversation_df: Cleaner에서 전달받은 정제된 text DF
+        audio_features: Cleaner에서 추출된 segment-level audio features
 
     Returns:
-        dict: {
-            "conv_id": str,
-            "id": int,
-            "analysis_id": str,
-            "analysis_result": Dict,
-            "validated": bool
-        }
+        dict:
+            {
+                conv_id,
+                id,
+                analysis_id,
+                summary,
+                style_analysis,
+                statistics,
+                temperature_score,
+                validated
+            }
     """
 
     print("\n🚀 [Analysis] 실행 시작")
     print("=" * 60)
 
-    # =========================================
-    # 🔧 필수 파라미터 검증
-    # =========================================
+    # ---------------------------------------
+    # 🔧 필수 파라미터 검사
+    # ---------------------------------------
     if not conv_id:
         raise ValueError("❌ conv_id가 필요합니다!")
 
@@ -42,19 +57,23 @@ def run_analysis(conv_id: str = None, id: int = None, conversation_df: pd.DataFr
     if conversation_df is None or conversation_df.empty:
         raise ValueError("❌ conversation_df가 비어있습니다!")
 
-    # =========================================
-    # DB 세션 생성
-    # =========================================
+    if audio_features is None:
+        audio_features = []
+
+    # ---------------------------------------
+    # 🔧 DB 세션
+    # ---------------------------------------
     db = SessionLocal()
 
     try:
-        # =========================================
-        # 🔧 AnalysisGraph 실행
-        # =========================================
+        # ---------------------------------------
+        # 🔵 NEW — 최신 AnalysisGraph 실행
+        # ---------------------------------------
         graph = AnalysisGraph(verbose=True)
         result_state = graph.run(
             db=db,
             conversation_df=conversation_df,
+            audio_features=audio_features,
             id=id,
             conv_id=conv_id
         )
@@ -62,31 +81,19 @@ def run_analysis(conv_id: str = None, id: int = None, conversation_df: pd.DataFr
         print("\n✅ [Analysis] 실행 완료")
         print("=" * 60)
 
-        # =========================================
-        # 🔧 LangGraph 반환 처리
-        # =========================================
-        if isinstance(result_state, dict):
-            # 🔥 이 경우는 거의 발생하지 않지만 대비용
-            print("   🔍 [DEBUG] result_state는 dict 타입")
-            result_dict = {
-                "conv_id": conv_id,
-                "id": id,
-                "analysis_id": result_state.get("meta", {}).get("analysis_id"),
-                "analysis_result": result_state.get("analysis_result"),
-                "validated": result_state.get("validated", False),
-            }
-
-        else:
-            # 🔧 최신 구조에서는 항상 AnalysisState 객체가 넘어옴
-            print("   🔍 [DEBUG] result_state는 AnalysisState 객체")
-
-            result_dict = {
-                "conv_id": conv_id,
-                "id": id,
-                "analysis_id": result_state.meta.get("analysis_id"),
-                "analysis_result": result_state.analysis_result,
-                "validated": result_state.validated,
-            }
+        # ---------------------------------------------------------
+        # 🔵 NEW — LangGraph State → API Response 변환
+        # ---------------------------------------------------------
+        result_dict = {
+            "conv_id": conv_id,
+            "id": id,
+            "analysis_id": result_state.meta.get("analysis_id"),
+            "summary": result_state.summary,
+            "style_analysis": result_state.style_analysis,
+            "statistics": result_state.statistics,
+            "temperature_score": result_state.temperature_score,
+            "validated": result_state.validated,
+        }
 
         return result_dict
 
@@ -100,31 +107,33 @@ def run_analysis(conv_id: str = None, id: int = None, conversation_df: pd.DataFr
         db.close()
 
 
-# =========================================
-# ✅ 단독 실행 지원
-# =========================================
+
+# ============================================================
+# 🧪 단독 실행용 main() 함수
+# ============================================================
 def main():
     """
-    단독 실행 시 Analysis 단위 테스트
-    Cleaner 없이 단독 실행하려면 샘플 데이터 필요
+    Cleaner 없이 단독 테스트가 가능한 모드
     """
     print("\n" + "=" * 60)
     print("🧪 [Analysis 단독 실행 모드]")
     print("=" * 60)
 
-    # =========================================
-    # 샘플 테스트 데이터 생성
-    # =========================================
+    # ---------------------------------------
+    # 🔧 샘플 텍스트 DF 생성
+    # ---------------------------------------
     sample_df = pd.DataFrame([
-        {"speaker": 1, "text": "오늘 하루 어땠어?", "timestamp": "2025-11-04 18:10:00"},
-        {"speaker": 2, "text": "그냥 평범했어. 회사 일 많았어.", "timestamp": "2025-11-04 18:11:10"},
-        {"speaker": 1, "text": "요즘 피곤해 보이네. 괜찮아?", "timestamp": "2025-11-04 18:12:00"},
-        {"speaker": 2, "text": "응, 괜찮아. 이번 주만 지나면 나아질 거야.", "timestamp": "2025-11-04 18:13:00"},
+        {"speaker": 1, "text": "오늘 하루 어땠어?"},
+        {"speaker": 2, "text": "응, 그냥 평범했어."},
+        {"speaker": 1, "text": "좀 피곤해 보이네?"},
     ])
 
-    # =========================================
-    # conv_id만 DB에서 가져옴
-    # =========================================
+    # audio_features는 빈 리스트로 테스트
+    sample_audio = []
+
+    # ---------------------------------------
+    # 🔧 DB에서 가장 최근 conv_id 가져오기
+    # ---------------------------------------
     db = SessionLocal()
     try:
         from sqlalchemy import text
@@ -135,20 +144,21 @@ def main():
             raise ValueError("❌ conversation 테이블에 데이터가 없습니다!")
 
         conv_id = str(row[0])
-        id = 1   # 🔧 테스트 시 분석 대상 speaker는 직접 지정 (예: 1번 화자)
+        id = 1
 
         print(f"✅ 자동 선택된 대화: conv_id={conv_id}, 분석대상ID={id}")
 
     finally:
         db.close()
 
-    # =========================================
-    # Analysis 실행
-    # =========================================
+    # ---------------------------------------
+    # 🔧 Analysis 실행
+    # ---------------------------------------
     result = run_analysis(
         conv_id=conv_id,
         id=id,
-        conversation_df=sample_df
+        conversation_df=sample_df,
+        audio_features=sample_audio
     )
 
     print("\n📊 [실행 결과]")
@@ -156,6 +166,7 @@ def main():
     pprint.pprint(result)
 
     return result
+
 
 
 if __name__ == "__main__":
