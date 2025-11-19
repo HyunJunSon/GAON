@@ -18,6 +18,7 @@ class SpeakerMappingResponse(BaseModel):
     message: str
     analysis_started: bool = False  # 분석이 시작되었는지 여부
     can_proceed: bool = True  # 사용자가 다음 단계로 진행할 수 있는지 여부
+    redirect_to: str = "analysis"  # 프론트엔드 리다이렉트 경로
 
 
 class SpeakerSegmentWithMapping(BaseModel):

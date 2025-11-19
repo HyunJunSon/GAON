@@ -51,6 +51,21 @@ def run_cleaner(conv_id: str = None, id: int = None):
             id = id or row[1]
             
             print(f"✅ 자동 선택된 대화: conv_id={conv_id}, id={id}")
+        else:
+            # ✅ conv_id가 지정된 경우 → 해당 대화의 id 조회
+            if not id:
+                print(f"⚠️ id 없음 → conv_id={conv_id}로 id 조회")
+                result = db.execute(
+                    text("SELECT id FROM conversation WHERE conv_id = :conv_id;"),
+                    {"conv_id": conv_id}
+                )
+                row = result.fetchone()
+                
+                if not row:
+                    raise ValueError(f"❌ conv_id={conv_id}에 해당하는 대화가 없습니다!")
+                
+                id = row[0]
+                print(f"✅ 조회된 id: {id}")
 
         # ✅ CleanerGraph 실행
         cg = CleanerGraph(verbose=True)

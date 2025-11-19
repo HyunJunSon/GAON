@@ -26,6 +26,7 @@ class FileUploadResponse(BaseModel):
     status: str  # processing_status -> status로 변경
     message: str
     gcs_file_path: Optional[str] = None
+    redirect_to: str = "conversation"  # 프론트엔드 리다이렉트 경로
 
 
 class ConversationAnalysisResponse(BaseModel):

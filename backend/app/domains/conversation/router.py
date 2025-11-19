@@ -56,7 +56,8 @@ async def upload_conversation_file(
             conversation_id=str(conversation.conv_id),
             file_id=db_file.id,
             status=db_file.processing_status,
-            gcs_file_path=db_file.gcs_file_path
+            gcs_file_path=db_file.gcs_file_path,
+            redirect_to="mapping" if db_file.processing_status == "speaker_mapping_required" else "analysis"
         )
     except HTTPException as e:
         logger.warning(f"파일 업로드 실패 (HTTP): user_id={current_user.id}, error={e.detail}")

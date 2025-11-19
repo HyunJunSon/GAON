@@ -93,7 +93,7 @@ class FileProcessor:
         return chunks
 
     def upload_to_gcs(self, file_content: bytes, user_id: int, original_filename: str) -> str:
-        """GCS에 파일 업로드 (폴더는 자동 생성됨)"""
+        """GCS에 파일 업로드 (속도 최적화 적용)"""
         try:
             # 고유한 파일 경로 생성
             file_id = str(uuid.uuid4())
@@ -116,7 +116,19 @@ class FileProcessor:
             }
             content_type = content_type_map.get(file_extension, 'application/octet-stream')
             
-            blob.upload_from_string(file_content, content_type=content_type)
+            # 🚀 속도 최적화 설정
+            # 1. 청크 크기 최적화 (256KB - 8MB 권장, 기본값보다 큰 값)
+            blob.chunk_size = 1024 * 1024 * 2  # 2MB chunks (기본값 대비 향상)
+            
+            # 2. 큰 파일의 경우 resumable upload 활성화 (자동)
+            # 3. 압축 가능한 텍스트 파일의 경우 gzip 압축
+            if file_extension in ['txt', 'json', 'csv']:
+                import gzip
+                compressed_content = gzip.compress(file_content)
+                blob.content_encoding = 'gzip'
+                blob.upload_from_string(compressed_content, content_type=content_type)
+            else:
+                blob.upload_from_string(file_content, content_type=content_type)
             
             return gcs_path
         except Exception as e:
