@@ -2,7 +2,7 @@ name: Deploy GAON Application
 
 on:
   push:
-    branches: [ "main", "develop", "hotfix/fix-code" ]
+    branches: [ "main", "develop", "hotfix/fix-code", "fix/server-error" ]
 
 env:
   REGISTRY: asia-northeast3-docker.pkg.dev
@@ -99,7 +99,7 @@ jobs:
 
   deploy:
     needs: [check-changes, build-backend, build-frontend]
-    if: always() && (needs.build-backend.result == 'success' || needs.build-backend.result == 'skipped') && (needs.build-frontend.result == 'success' || needs.build-frontend.result == 'skipped') && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/develop' || github.ref == 'refs/heads/hotfix/fix-code')
+    if: always() && (needs.build-backend.result == 'success' || needs.build-backend.result == 'skipped') && (needs.build-frontend.result == 'success' || needs.build-frontend.result == 'skipped') && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/develop' || github.ref == 'refs/heads/hotfix/fix-code' || github.ref == 'refs/heads/fix/server-error')
     runs-on: self-hosted
     
     steps:
@@ -186,15 +186,7 @@ jobs:
           # 새로 시작
           docker-compose -f docker-compose.prod.yml up -d || rollback
           echo "⏳ Waiting for services to start..."
-          sleep 30
-          
-          # 컨테이너 상태 확인
-          echo "📋 Checking container status..."
-          docker ps | grep gaon
-          
-          # 백엔드 로그 확인
-          echo "📝 Backend logs:"
-          docker logs gaon-backend --tail 20
+          sleep 20
           
           # DB 연결 확인
           echo "🗄️ Checking database connection..."
@@ -207,17 +199,6 @@ jobs:
             sleep 2
           done
           
-          # 백엔드 헬스체크 (더 오래 기다리기)
-          echo "🏥 Checking backend health..."
-          for i in {1..60}; do
-            if curl -f http://localhost:8000/health; then
-              echo "✅ Backend is ready!"
-              break
-            fi
-            echo "⏳ Waiting for backend... ($i/60)"
-            sleep 3
-          done
-          
           # DB 마이그레이션 적용 (마이그레이션 변경사항이 있을 때)
           if [ "${{ needs.check-changes.outputs.migration_changed }}" == "true" ]; then
             echo "🔄 Applying database migrations..."
@@ -225,8 +206,11 @@ jobs:
             echo "✅ Database migrations applied successfully!"
           fi
           
-          # 헬스체크는 이미 위에서 수행됨
-          echo "✅ All services are ready!"
+          # 헬스체크
+          if ! curl -f http://localhost:8000/health; then
+            echo "❌ Backend health check failed!"
+            rollback
+          fi
           
           # 정리
           docker image prune -f
