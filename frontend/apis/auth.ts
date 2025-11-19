@@ -22,18 +22,10 @@ export async function login(payload: { email: string; password: string }) {
   const formData = new FormData();
   formData.append('username', payload.email); // OAuth2에서는 username 필드 사용
   formData.append('password', payload.password);
-  
-  const response = await fetch('/api/auth/login', {
+  return apiFetch<LoginResponse>('/api/auth/login', {
     method: 'POST',
-    body: formData,
-  });
-  
-  if (!response.ok) {
-    const error = await response.json();
-    throw new Error(error.detail || 'Login failed');
-  }
-  
-  return response.json() as Promise<LoginResponse>;
+    body: formData
+  })
 }
 
 export async function signup(payload: {
