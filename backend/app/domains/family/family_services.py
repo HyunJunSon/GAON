@@ -4,6 +4,9 @@ from app.domains.family import family_crud as crud, family_schemas as schemas
 from app.domains.family.family_models import FamilyMember
 from app.domains.auth.user_models import User
 from typing import List
+import logging
+
+logger = logging.getLogger(__name__)
 
 
 def create_family(db: Session, user: User, family_data: schemas.FamilyCreate) -> schemas.FamilyInfo:
@@ -232,8 +235,10 @@ def add_my_family_member(db: Session, user: User, member_data: schemas.SimpleMem
         # 기본 가족이 없으면 생성
         default_family = create_family(db, user, schemas.FamilyCreate(name=f"{user.name}의 가족"))
         family_id = default_family.id
+        family_name = default_family.name
     else:
         family_id = families.families[0].id
+        family_name = families.families[0].name
     
     # 초대할 사용자 확인
     target_user = crud.get_user_by_email(db, member_data.email)
@@ -258,7 +263,30 @@ def add_my_family_member(db: Session, user: User, member_data: schemas.SimpleMem
         status="pending"  # 초대 상태
     )
     
-    # TODO: 여기서 WebSocket 알림 전송 (다음 단계에서 구현)
+    # WebSocket 알림 전송 (백그라운드 태스크로 처리)
+    from app.domains.conversation.websocket import send_family_invite_notification
+    
+    # 백그라운드에서 알림 전송
+    import asyncio
+    from concurrent.futures import ThreadPoolExecutor
+    
+    def send_notification():
+        try:
+            loop = asyncio.new_event_loop()
+            asyncio.set_event_loop(loop)
+            loop.run_until_complete(send_family_invite_notification(
+                user_email=target_user.email,
+                inviter_name=user.name,
+                family_name=family_name,
+                member_id=db_member.id
+            ))
+            loop.close()
+        except Exception as e:
+            logger.warning(f"초대 알림 전송 실패: {e}")
+    
+    # 별도 스레드에서 실행
+    executor = ThreadPoolExecutor(max_workers=1)
+    executor.submit(send_notification)
     
     return schemas.FamilyMemberSimple(
         id=str(db_member.id),
