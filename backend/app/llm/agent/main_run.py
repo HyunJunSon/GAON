@@ -25,6 +25,8 @@ os.environ["USE_TEST_DB"] = "false"
 from app.llm.agent.Cleaner.run_cleaner import run_cleaner
 from app.llm.agent.Analysis.run_analysis import run_analysis
 from app.llm.agent.QA.run_qa import run_qa
+from app.llm.agent.Feedback.run_feedback import run_feedback
+
 
 # ----------------------------------------
 # 메인 실행 로직
@@ -32,6 +34,10 @@ from app.llm.agent.QA.run_qa import run_qa
 def main():
     print("\n🚀 [GAON MAIN PIPELINE] 실행 시작")
     print("=" * 60)
+
+    # 🔒 고정 실행용 conv_id / user_id
+    #FIXED_CONV_ID = "a7c215d8-cf9c-4715-8c84-e6655b3e3445"
+    #FIXED_USER_ID = 9  # 혹시 필요하면
 
     # =========================================
     # 1️⃣ Cleaner 실행
@@ -41,6 +47,8 @@ def main():
     # 🔧 수정: sample 파라미터 제거
     # run_cleaner()는 자동으로 최근 대화 조회
     cleaner_result = run_cleaner()
+
+    #cleaner_result = run_cleaner(conv_id=FIXED_CONV_ID, id=FIXED_USER_ID)
     
     print("\n📊 [Cleaner 결과]")
     print("-" * 60)
@@ -108,6 +116,25 @@ def main():
     print(f"\n✅ QA 완료: confidence={qa_result.get('confidence', 0):.2f}")
 
     # =========================================
+    # 4️⃣ Feedback 실행
+    # =========================================
+    print("\n[4️⃣ FEEDBACK] 조언 생성 단계 시작")
+
+    feedback_result = run_feedback(
+        conv_id=conv_id,
+        id=id,
+        conversation_df=cleaned_df,
+        analysis_id=analysis_result["analysis_id"],
+    )
+
+    print("\n📊 [Feedback 결과]")
+    print("-" * 60)
+    pprint(feedback_result)
+
+    print(f"\n✅ Feedback 완료: analysis_id={feedback_result.get('analysis_id')}")
+
+
+    # =========================================
     # ✅ 최종 완료
     # =========================================
     print("\n" + "=" * 60)
@@ -122,16 +149,18 @@ def main():
     print(f"   말하기 점수: {analysis_result.get('analysis_result', {}).get('score', 0):.2f}")
     print(f"   신뢰도 점수: {qa_result.get('confidence', 0):.2f}")
     print(f"   QA 상태: {qa_result.get('status', 'unknown')}")
-    
+    print(f"   피드백 요약: { (feedback_result.get('feedback') or '')[:80] }...")
+
     return {
         "conv_id": conv_id,
         "id": id,
         "analysis_id": analysis_result.get("analysis_id"),
         "score": analysis_result.get("analysis_result", {}).get("score", 0),
         "confidence": qa_result.get("confidence", 0),
-        "status": "completed"
+        "status": "completed",
+        "feedback": feedback_result.get("feedback"),
     }
-
 
 if __name__ == "__main__":
     main()
+    

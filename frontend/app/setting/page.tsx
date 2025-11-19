@@ -27,7 +27,7 @@ export default function SettingPage() {
     clearError();
     try {
       const res = await addMutation.mutateAsync({ email: form.email });
-      if (res.ok) {
+      if (res) {
         reset({ email: '' });
       } else {
         setServerError('가족 구성원 추가에 실패했습니다.');

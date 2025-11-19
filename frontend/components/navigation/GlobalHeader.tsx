@@ -36,7 +36,7 @@ export default function GlobalHeader() {
   };
 
   return (
-    <header className="sticky top-0 z-30 shrink-0 border-b border-orange-100 bg-white/95 backdrop-blur supports-[backdrop-filter]:bg-white/80 shadow-sm">
+    <header className="sticky top-0 z-30 shrink-0 border-b border-orange-100 bg-white/95 backdrop-blur supports-backdrop-filter:bg-white/80 shadow-sm">
       <div className="mx-4 flex h-14 items-center justify-between">
         <div className="flex items-center gap-2">
           <span className="text-xl font-bold bg-gradient-to-r from-orange-500 to-red-500 bg-clip-text text-transparent">GAON</span>

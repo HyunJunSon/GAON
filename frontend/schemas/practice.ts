@@ -1,5 +1,5 @@
 // schemas/practice.ts
-export type PracticeMode = 'new' | 'replay';
+export type PracticeMode = 'chat' | 'voice';
 
 export type PracticeParticipant = {
   id: string;
@@ -10,11 +10,12 @@ export type PracticeParticipant = {
 export type StartPracticeReq = {
   conversationId: string;
   mode: PracticeMode;
-  participantIds: string[];
 };
 
 export type StartPracticeRes = {
   sessionId: string;
+  mode: PracticeMode;
+  conversationId: string;
 };
 
 export type FinishPracticeReq = {
@@ -29,9 +30,23 @@ export type FinishPracticeRes = {
 
 export type PracticeResult = {
   sessionId: string;
+  conversationId: string;
+  mode: 'chat' | 'voice';
   score: number;
   strengths: string[];
   improvements: string[];
+  checkpoints: {
+    id: string;
+    title: string;
+    achieved: boolean;
+    description: string;
+  }[];
   summary: string;
   createdAt: string;
+};
+
+export type PracticeChatMessage = {
+  role: 'user' | 'assistant';
+  content: string;
+  createdAt: string; // ISO 문자열 (Date.toISOString())
 };
