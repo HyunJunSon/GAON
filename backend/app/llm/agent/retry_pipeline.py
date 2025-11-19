@@ -106,9 +106,9 @@ class RetryableAgentPipeline:
                     elif step_name == "analysis":
                         result = step_func(conv_id=conv_id, **kwargs)
                     elif step_name == "qa":
-                        result = step_func(**kwargs)
+                        result = step_func(conv_id=conv_id, **kwargs)
                     elif step_name == "feedback":                             # ✅ feedback 분기
-                        result = step_func(**kwargs)    
+                        result = step_func(conv_id=conv_id, **kwargs)    
                 else:
                     # 테스트용 단계는 직접 실행
                     result = step_func()
@@ -188,8 +188,7 @@ class RetryableAgentPipeline:
                 "qa", run_qa, conv_id,
                 analysis_result=analysis_result.result["analysis_result"],
                 conversation_df=cleaned_df,
-                id=user_id,
-                conv_id=conv_id
+                id=user_id
             )
 
             if not qa_result.success:
@@ -199,10 +198,9 @@ class RetryableAgentPipeline:
             analysis_id = analysis_result.result.get("analysis_id")
             feedback_result = await self._execute_step_with_retry(
                 "feedback", run_feedback, conv_id,
-                conv_id=conv_id,
                 id=user_id,
                 conversation_df=cleaned_df,
-                analysis_id=analysis_id,
+                analysis_id=analysis_id
             )
     
             if not feedback_result.success:

@@ -100,14 +100,34 @@ class RawInspector:
 class ConversationCleaner:
     """LLM을 사용해 문장 정제 및 노이즈 제거"""
     verbose: bool = False
+    _cache: dict = None  # 캐시 저장소
+    
+    def __post_init__(self):
+        if self._cache is None:
+            self._cache = {}
 
     def clean(self, df: Any, state=None) -> Any:
         if pd is not None and isinstance(df, pd.DataFrame):
             out = df.copy()
             llm = ChatOpenAI(model="gpt-4o-mini", api_key=settings.openai_api_key)
 
-            cleaned = []
-            for text in out["text"]:
+            # 🚀 병렬 처리 + 캐싱으로 속도 최적화
+            from concurrent.futures import ThreadPoolExecutor
+            import hashlib
+            
+            def get_cache_key(text):
+                """텍스트의 해시값으로 캐시 키 생성"""
+                return hashlib.md5(text.encode()).hexdigest()
+            
+            def clean_single_text(text):
+                """단일 텍스트 정제 (캐싱 적용)"""
+                # 캐시 확인
+                cache_key = get_cache_key(text)
+                if cache_key in self._cache:
+                    if self.verbose:
+                        print(f"💾 [캐시 사용] {text}")
+                    return self._cache[cache_key]
+                
                 prompt = f"다음 문장에서 철자 오류나 이상한 기호를 자연스럽게 수정해줘:\n{text}"
                 if self.verbose:
                     print(f"🪶 [Cleaner LLM 입력] {text}")
@@ -118,12 +138,21 @@ class ConversationCleaner:
                         if hasattr(response, "content")
                         else str(response)
                     )
-                    cleaned.append(cleaned_text)
+                    # 캐시에 저장
+                    self._cache[cache_key] = cleaned_text
                     if self.verbose:
                         print(f"✅ [Cleaner LLM 결과] {cleaned_text}")
+                    return cleaned_text
                 except Exception as e:
-                    cleaned.append(text)
-                    print(f"⚠️ LLM 호출 실패: {e}")
+                    if self.verbose:
+                        print(f"⚠️ LLM 호출 실패: {e}")
+                    return text
+
+            # 병렬 처리 (최대 5개 동시 처리) + 캐싱
+            texts = out["text"].tolist()
+            with ThreadPoolExecutor(max_workers=5) as executor:
+                cleaned = list(executor.map(clean_single_text, texts))
+            
             out["text"] = cleaned
             return out
         return df

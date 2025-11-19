@@ -396,7 +396,8 @@ async def update_speaker_mapping(
             user_mapping=request.user_mapping,
             message="화자 매핑이 성공적으로 설정되었습니다.",
             analysis_started=True,  # 분석이 백그라운드에서 시작됨
-            can_proceed=True  # 사용자는 바로 다음 단계로 진행 가능
+            can_proceed=True,  # 사용자는 바로 다음 단계로 진행 가능
+            redirect_to="analysis"  # 분석 탭으로 리다이렉트
         )
         
     except HTTPException:
@@ -491,7 +492,17 @@ async def get_speaker_mapping(
                     "start_time": format_time(start_time),
                     "end_time": format_time(end_time),
                     "duration": round(end_time - start_time, 2),
-                    "text": segment.get("text")
+                    "text": segment.get("text"),
+                    "display_text": f"💬 {segment.get('text')}",  # 이모지와 함께 표시
+                    "text_style": {
+                        "fontSize": "16px",
+                        "fontWeight": "600", 
+                        "color": "#2563eb",
+                        "backgroundColor": "#f0f9ff",
+                        "padding": "8px 12px",
+                        "borderRadius": "8px",
+                        "border": "1px solid #bfdbfe"
+                    }
                 })
         
         return {
