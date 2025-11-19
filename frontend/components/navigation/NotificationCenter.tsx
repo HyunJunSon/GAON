@@ -81,7 +81,7 @@ export default function NotificationCenter() {
 
       {/* 드롭다운 */}
       {isOpen && (
-        <div className="absolute right-0 mt-2 w-80 bg-white rounded-lg shadow-lg border border-gray-200 z-50">
+        <div className="absolute right-0 mt-2 w-80 max-w-[calc(100vw-2rem)] bg-white rounded-lg shadow-lg border border-gray-200 z-50 sm:w-80">
           
           {/* 헤더 */}
           <div className="flex items-center justify-between p-4 border-b border-gray-200">
@@ -122,15 +122,15 @@ export default function NotificationCenter() {
                     {/* 내용 */}
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center justify-between">
-                        <p className="text-sm font-medium text-gray-900 truncate">
+                        <p className="text-sm font-medium text-gray-900 truncate pr-2">
                           {notification.title}
                         </p>
                         {!notification.isRead && (
-                          <div className="w-2 h-2 bg-blue-500 rounded-full flex-shrink-0 ml-2"></div>
+                          <div className="w-2 h-2 bg-blue-500 rounded-full flex-shrink-0"></div>
                         )}
                       </div>
                       
-                      <p className="text-sm text-gray-600 mt-1 line-clamp-2">
+                      <p className="text-sm text-gray-600 mt-1 break-words">
                         {notification.message}
                       </p>
                       
@@ -144,7 +144,7 @@ export default function NotificationCenter() {
                             e.stopPropagation();
                             removeNotification(notification.id);
                           }}
-                          className="text-xs text-gray-400 hover:text-gray-600"
+                          className="text-xs text-gray-400 hover:text-gray-600 ml-2"
                         >
                           삭제
                         </button>
