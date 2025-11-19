@@ -1,0 +1,12 @@
+version: "3.8"
+
+services:
+  nginx-dev:
+    image: nginx:alpine
+    container_name: gaon-nginx-dev
+    volumes:
+      - ./nginx.dev.conf:/etc/nginx/nginx.conf:ro
+    ports:
+      - "80:80"
+    extra_hosts:
+      - "host.docker.internal:host-gateway"

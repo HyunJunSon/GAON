@@ -1,6 +1,5 @@
 import { apiFetch } from './client';
 
-// 백엔드 스펙에 맞춘 타입 정의
 export type User = {
   id: number;
   email: string;
@@ -18,22 +17,15 @@ export type SignupResponse = {
 };
 
 export async function login(payload: { email: string; password: string }) {
-  // OAuth2PasswordRequestForm 형식으로 전송
   const formData = new FormData();
-  formData.append('username', payload.email); // OAuth2에서는 username 필드 사용
+  formData.append('username', payload.email);
   formData.append('password', payload.password);
   
-  const response = await fetch('http://localhost:8000/api/auth/login', {
+  return apiFetch<LoginResponse>('/api/auth/login', {
     method: 'POST',
     body: formData,
+    auth: false,
   });
-  
-  if (!response.ok) {
-    const error = await response.json();
-    throw new Error(error.detail || 'Login failed');
-  }
-  
-  return response.json() as Promise<LoginResponse>;
 }
 
 export async function signup(payload: {
@@ -43,7 +35,7 @@ export async function signup(payload: {
   confirmPassword: string;
   termsAgreed: boolean;
 }) {
-  return apiFetch<SignupResponse>('http://localhost:8000/api/auth/signup', {
+  return apiFetch<SignupResponse>('/api/auth/signup', {
     method: 'POST',
     json: payload,
     auth: false,
@@ -51,5 +43,5 @@ export async function signup(payload: {
 }
 
 export async function getMe() {
-  return apiFetch<User>('http://localhost:8000/api/auth/me', { method: 'GET' });
+  return apiFetch<User>('/api/auth/me', { method: 'GET' });
 }
