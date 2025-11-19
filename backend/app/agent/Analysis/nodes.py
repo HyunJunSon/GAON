@@ -11,6 +11,8 @@ from collections import Counter
 
 from sqlalchemy.orm import Session
 from langchain_openai import ChatOpenAI
+from dotenv import load_dotenv
+load_dotenv()
 
 # -------------------------------
 # 형태소 분석기 (Kiwi)

@@ -11,6 +11,8 @@ from app.core.database import SessionLocal
 from app.agent.crud import get_conversation_file_by_conv_id
 from app.agent.Cleaner.graph_cleaner import CleanerGraph
 from app.agent.Analysis.graph_analysis import AnalysisGraph
+from dotenv import load_dotenv
+load_dotenv()
 
 
 # ============================================
@@ -99,7 +101,7 @@ def run_cleaner_analysis(conv_id: str, user_id: int):
     analysis_state = analysis.run(
         db=db,
         conversation_df=cleaned_df,
-        audio_features=cleaner_state.audio_features,
+        audio_features=cleaner_state.get("audio_features"),
         id=user_id,
         conv_id=conv_id
     )
