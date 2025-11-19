@@ -8,10 +8,13 @@ from typing import List, Optional
 # Family CRUD
 def create_family(db: Session, name: str, owner_id: int, description: str = None) -> Family:
     """새로운 가족/그룹을 생성합니다."""
+    from datetime import datetime
+    
     db_family = Family(
         name=name,
         description=description,
-        owner_id=owner_id
+        owner_id=owner_id,
+        create_date=datetime.now()  # 명시적으로 설정
     )
     db.add(db_family)
     db.commit()
@@ -64,13 +67,14 @@ def delete_family(db: Session, family_id: int) -> bool:
 
 
 # FamilyMember CRUD
-def add_family_member(db: Session, family_id: int, user_id: int, nickname: str = None, role: str = "member") -> FamilyMember:
+def add_family_member(db: Session, family_id: int, user_id: int, nickname: str = None, role: str = "member", status: str = "active") -> FamilyMember:
     """가족/그룹에 구성원을 추가합니다."""
     db_member = FamilyMember(
         family_id=family_id,
         user_id=user_id,
         nickname=nickname,
-        role=role
+        role=role,
+        status=status
     )
     db.add(db_member)
     db.commit()
