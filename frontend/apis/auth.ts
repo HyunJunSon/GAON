@@ -22,10 +22,18 @@ export async function login(payload: { email: string; password: string }) {
   const formData = new FormData();
   formData.append('username', payload.email); // OAuth2에서는 username 필드 사용
   formData.append('password', payload.password);
-  return apiFetch<LoginResponse>('/api/auth/login', {
+  
+  const response = await fetch('http://localhost:8000/api/auth/login', {
     method: 'POST',
-    body: formData
-  })
+    body: formData,
+  });
+  
+  if (!response.ok) {
+    const error = await response.json();
+    throw new Error(error.detail || 'Login failed');
+  }
+  
+  return response.json() as Promise<LoginResponse>;
 }
 
 export async function signup(payload: {
@@ -35,18 +43,13 @@ export async function signup(payload: {
   confirmPassword: string;
   termsAgreed: boolean;
 }) {
-  return apiFetch<SignupResponse>('/api/auth/signup', {
+  return apiFetch<SignupResponse>('http://localhost:8000/api/auth/signup', {
     method: 'POST',
     json: payload,
+    auth: false,
   });
 }
 
 export async function getMe() {
-  return apiFetch<User>('/api/auth/me', { method: 'GET' });
-}
-
-export async function logout() {
-  return apiFetch<{ message: string }>('/api/auth/logout', {
-    method: 'POST',
-  });
+  return apiFetch<User>('http://localhost:8000/api/auth/me', { method: 'GET' });
 }

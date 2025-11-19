@@ -46,15 +46,6 @@ async def login_for_access_token(
     return auth_service.login_for_access_token(db=db, form_data=form_data)
 
 
-@router.post("/logout")
-async def logout(token: str = Depends(security.oauth2_scheme)):
-    """
-    현재 사용자를 로그아웃 처리합니다. (토큰을 블랙리스트에 추가)
-    """
-    # auth_service의 함수를 호출하여 로그아웃 로직 수행
-    return auth_service.logout(token=token)
-
-
 @router.get("/me", response_model=schemas.User)
 async def read_users_me(current_user: schemas.User = Depends(security.get_current_user)):
     """
