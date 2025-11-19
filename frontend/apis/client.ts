@@ -2,11 +2,11 @@ import { authStorage } from "@/utils/authStorage";
 
 /**
  * 공통 fetch 래퍼
- * - BASE_URL + path 결합
+ * - 환경변수 기반 URL 처리
  * - JSON 응답/에러 정규화
- * - (추후) 인증 토큰/401 처리 추가 가능
+ * - 인증 토큰/401 처리
  */
-const BASE_URL = process.env.NEXT_PUBLIC_API_URL?.replace(/\/$/, '') || '';
+const BASE_URL = process.env.NEXT_PUBLIC_API_URL || '';
 
 type FetchOptions = RequestInit & { json?: unknown, auth?: boolean };
 
@@ -34,31 +34,26 @@ export async function apiFetch<T>(
     ...options,
     headers,
     body: options.json !== undefined ? JSON.stringify(options.json) : options.body,
-    // 필요시 credentials: 'include' 등 정책 추가
   })
 
   if (res.status === 401) {
-    // 만료/무효 → 세션 초기화 및 로그인으로
     authStorage.clear()
     if (typeof window !== "undefined") window.location.href = "/login"
     throw new Error('Unauthorized')
   }
   
-  // 2xx 외 에러 처리
   if (!res.ok) {
     let message = `HTTP ${res.status}`;
     try {
       const data = await res.json();
-      message = data?.message || message;
+      message = data?.message || data?.detail || message;
     } catch {}
     throw new Error(message);
   }
   
-  // JSON 응답 파싱
   try {
     return (await res.json()) as T;
   } catch {
-    // 빈 응답 등
     return undefined as T;
   }
 }
