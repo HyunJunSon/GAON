@@ -11,6 +11,7 @@ class Family(Base):
     id = Column(Integer, primary_key=True)
     name = Column(String(100), nullable=False)  # 그룹 이름 (예: "우리 가족", "친구들")
     description = Column(Text, nullable=True)   # 그룹 설명
+    create_date = Column(DateTime, nullable=False, server_default=func.now())  # 기존 컬럼 유지
     owner_id = Column(Integer, ForeignKey('users.id'), nullable=False)  # 그룹 생성자/관리자
     is_active = Column(Boolean, default=True)   # 활성 상태
     created_at = Column(DateTime, server_default=func.now())
