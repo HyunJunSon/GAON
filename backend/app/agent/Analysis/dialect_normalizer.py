@@ -5,20 +5,15 @@
 from dataclasses import dataclass
 import numpy as np
 import pandas as pd
-from typing import Dict, List, Any
+from typing import Dict, Any
 
 
 @dataclass
 class DialectProsodyNormalizer:
     """
     GAON Prosody Normalizer
-    - observed_slope 계산
-    - dialect likelihood (지역 방언 확률)
-    - emotional deviation (감정 편차)
-    - variation (turn-level 변화량)
     """
 
-    # 🔵 방언별 baseline 구간 (기존 연구 기반)
     BASELINES = {
         "seoul": (-10, 0),
         "gyeongsang": (-30, -20),
@@ -26,21 +21,14 @@ class DialectProsodyNormalizer:
         "jeolla": (-5, 5),
     }
 
+    # 🔥 threshold: baseline과의 최소 거리가 이 이상이면 방언이 아님
+    THRESHOLD = 20  # 기본값 (pitch_std 기준)
+
     def _softmax(self, x):
-        """수치 안정성 softmax"""
         e = np.exp(x - np.max(x))
         return e / e.sum()
 
     def normalize(self, merged_df: pd.DataFrame) -> Dict[str, Any]:
-        """
-        최종 반환:
-        {
-            "turn_prosody": [... turn-level prosody 결과 ...],
-            "dialect_likelihood": {... 지역별 확률 ...},
-            "baseline_region": "...",
-            "baseline_slope_mean": float
-        }
-        """
 
         results = []
         slopes = []
@@ -64,8 +52,7 @@ class DialectProsodyNormalizer:
                 slopes.append(None)
                 continue
 
-            # 🔵 핵심 Feature: F0semitone variability
-            observed = feats.get("F0semitoneFrom27.5Hz_sma3nz_stddevNorm", None)
+            observed = feats.get("pitch_std", None)  # 수정됨
             slopes.append(observed)
 
             results.append({
@@ -75,7 +62,7 @@ class DialectProsodyNormalizer:
             })
 
         # =========================================
-        # 2) dialect likelihood 계산 (연구 기반)
+        # 2) dialect likelihood 계산
         # =========================================
         valid_slopes = [s for s in slopes if s is not None]
         mean_obs = np.mean(valid_slopes) if valid_slopes else 0
@@ -85,20 +72,33 @@ class DialectProsodyNormalizer:
             center = (lo + hi) / 2
             distances[region] = abs(mean_obs - center)
 
-        neg_dist = np.array([-d for d in distances.values()])
-        probs = self._softmax(neg_dist)
+        # 가장 가까운 baseline
+        min_region = min(distances, key=distances.get)
+        min_dist = distances[min_region]
 
-        dialect_likelihood = {
-            region: float(prob)
-            for region, prob in zip(self.BASELINES.keys(), probs)
-        }
+        # ================================
+        # 🔥 핵심 변경: baseline 밖이면 서울 표준어로 강제 처리
+        # ================================
+        if min_dist > self.THRESHOLD:
+            baseline_region = "seoul_standard"
+            baseline_mean = -5  # 표준어 중심
+            dialect_likelihood = {"seoul_standard": 1.0}
 
-        # 🔥 가장 가능성 높은 지역
-        baseline_region = max(dialect_likelihood, key=dialect_likelihood.get)
-        baseline_mean = np.mean(self.BASELINES[baseline_region])
+        else:
+            # 기존 방식 유지
+            neg = np.array([-d for d in distances.values()])
+            probs = self._softmax(neg)
+
+            dialect_likelihood = {
+                region: float(prob)
+                for region, prob in zip(self.BASELINES.keys(), probs)
+            }
+
+            baseline_region = min_region
+            baseline_mean = np.mean(self.BASELINES[baseline_region])
 
         # =========================================
-        # 3) turn-level 감정 deviation, variation 계산
+        # 3) 감정 deviation 계산
         # =========================================
         prev_slope = None
         for r in results:

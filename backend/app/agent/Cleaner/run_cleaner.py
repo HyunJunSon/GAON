@@ -1,11 +1,6 @@
 # ===============================================================
-# app/agent/Cleaner/run_cleaner.py 
+# app/agent/Cleaner/run_cleaner.py  (FIXED VERSION)
 # ===============================================================
-
-"""
-✅ Cleaner 모듈 실행 진입점 (DB 연동)
-Cleaner 최종 output = merged_df + file_type + audio_features 포함
-"""
 
 from app.agent.Cleaner.graph_cleaner import CleanerGraph
 from app.core.database import SessionLocal
@@ -14,15 +9,6 @@ import traceback
 
 
 def run_cleaner(conv_id: str = None):
-    """
-    ✅ Cleaner 모듈 실행 함수
-    - DB에서 conversation_file.raw_content 불러오기
-    - turn/token 검사
-    - text/audio 분리
-    - audio면 음성 요소 추출
-    - 최종 merged_df 생성
-    """
-
     print("\n🚀 [Cleaner] 실행 시작")
     print("=" * 60)
 
@@ -30,26 +16,25 @@ def run_cleaner(conv_id: str = None):
 
     try:
         # ======================================================
-        # 🔧 conv_id 없으면 최근 conversation 자동 조회
+        # conv_id 미입력 → 최신 대화 자동 선택
         # ======================================================
         if not conv_id:
             print("⚠️ conv_id 없음 → 최근 대화 자동 조회")
             result = db.execute(
                 text("SELECT conv_id FROM conversation ORDER BY create_date DESC LIMIT 1;")
-            )
-            row = result.fetchone()
+            ).fetchone()
 
-            if not row:
+            if not result:
                 raise ValueError("❌ conversation 테이블에 데이터가 없습니다!")
 
-            conv_id = str(row[0])
-            print(f"✅ 자동 선택된 대화: conv_id={conv_id}")
+            conv_id = str(result[0])
+            print(f"✅ 자동 선택된 conv_id={conv_id}")
 
         # ======================================================
-        # 🔧 CleanerGraph 실행
+        # CleanerGraph 실행
         # ======================================================
         cg = CleanerGraph(verbose=True)
-        state = cg.run(
+        cleaner_result = cg.run(
             db=db,
             conv_id=conv_id,
         )
@@ -58,35 +43,11 @@ def run_cleaner(conv_id: str = None):
         print("=" * 60)
 
         # ======================================================
-        # 🔧 반환 값 구성
-        # ======================================================
-        # LangGraph 결과는 AddableValuesDict (dict 계열) 이므로, dict 처럼 다룬다
-        if hasattr(state, "keys"):  # AddableValuesDict 또는 dict
-            state_dict = dict(state)
-        else:
-            # 혹시나 CleanerState 인스턴스가 그대로 온 경우 fallback
-            state_dict = {
-                "file_type": getattr(state, "file_type", None),
-                "raw_df": getattr(state, "raw_df", None),
-                "inspected_df": getattr(state, "inspected_df", None),
-                "merged_df": getattr(state, "merged_df", None),
-                "audio_features": getattr(state, "audio_features", None),
-                "validated": getattr(state, "validated", False),
-                "issues": getattr(state, "issues", []),
-            }
-
-        # ======================================================
-        # 🔧 반환 값 구성
+        # cleaner_result dict 반환 그대로 활용
         # ======================================================
         return {
             "conv_id": conv_id,
-            "file_type": state_dict.get("file_type"),
-            "raw_df": state_dict.get("raw_df"),
-            "inspected_df": state_dict.get("inspected_df"),
-            "merged_df": state_dict.get("merged_df"),
-            "audio_features": state_dict.get("audio_features"),
-            "validated": state_dict.get("validated", False),
-            "issues": state_dict.get("issues", []),
+            "cleaner_output": cleaner_result,
         }
 
     except Exception as e:
@@ -98,13 +59,11 @@ def run_cleaner(conv_id: str = None):
         db.close()
 
 
+
 # ===============================================================
-# 단독 실행 지원
+# 단독 실행
 # ===============================================================
 def main():
-    """
-    TO-BE 구조 기준 Cleaner 단독 실행 테스트
-    """
     print("\n" + "=" * 60)
     print("🧪 [Cleaner 단독 실행 모드]")
     print("=" * 60)
@@ -114,19 +73,30 @@ def main():
     print("\n📊 [실행 결과]")
     print("-" * 60)
     print(f"conv_id: {result['conv_id']}")
-    print(f"file_type: {result['file_type']}")
-    print(f"validated: {result['validated']}")
-    print(f"issues: {result['issues']}")
 
-    if result["merged_df"] is not None:
-        print("\n🔍 merged_df 미리보기:")
-        print(result["merged_df"].head(5))
+    issues = result["cleaner_output"].get("issues") or []
+    print(f"issues: {issues}")
+
+    # =======================================================
+    # 🔥 speaker_segments 출력 시 None 방어 필수
+    # =======================================================
+    print("\n🔍 speaker_segments (features 포함) 예시:")
+    segments = result["cleaner_output"].get("speaker_segments") or []
+    if len(segments) == 0:
+        print("⚠️ speaker_segments가 비어있거나 None입니다.")
     else:
-        print("merged_df is None")
+        for seg in segments[:3]:
+            print(seg)
+
+    # =======================================================
+    # user info도 None 방어
+    # =======================================================
+    print("\n🧑 user info:")
+    print("gender:", result["cleaner_output"].get("user_gender"))
+    print("age:", result["cleaner_output"].get("user_age"))
 
     return result
 
 
 if __name__ == "__main__":
     main()
-
