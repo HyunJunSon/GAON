@@ -34,10 +34,10 @@ export function middleware(req: NextRequest) {
     response = NextResponse.next();
   }
 
-  // CSP 헤더 추가 (오디오 녹음을 위해)
+  // CSP 헤더 추가 (localhost:8000 API 호출 허용)
   response.headers.set(
     'Content-Security-Policy',
-    "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval'; style-src 'self' 'unsafe-inline'; font-src 'self' data:; media-src 'self' blob: data: mediastream:; connect-src 'self' https://146.56.43.80:8443; img-src 'self' data: blob:; object-src 'none';"
+    "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval'; style-src 'self' 'unsafe-inline'; font-src 'self' data:; media-src 'self' blob: data: mediastream:; connect-src 'self' http://localhost:8000 https://146.56.43.80:8443; img-src 'self' data: blob:; object-src 'none';"
   );
 
   return response;
