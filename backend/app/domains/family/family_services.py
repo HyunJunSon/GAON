@@ -225,7 +225,7 @@ def get_my_family_members(db: Session, user: User) -> schemas.SimpleFamilyRespon
 
 
 def add_my_family_member(db: Session, user: User, member_data: schemas.SimpleMemberAdd) -> schemas.FamilyMemberSimple:
-    """현재 사용자의 기본 가족에 구성원 추가"""
+    """현재 사용자의 기본 가족에 구성원 추가 (알림 기반 초대)"""
     families = get_user_families(db, user)
     if not families.families:
         # 기본 가족이 없으면 생성
@@ -234,11 +234,25 @@ def add_my_family_member(db: Session, user: User, member_data: schemas.SimpleMem
     else:
         family_id = families.families[0].id
     
-    # 구성원 추가
+    # 초대할 사용자 확인
+    target_user = crud.get_user_by_email(db, member_data.email)
+    if not target_user:
+        raise HTTPException(status_code=404, detail="해당 이메일을 가진 사용자가 존재하지 않습니다.")
+    
+    # 이미 구성원인지 확인
+    existing_member = crud.get_family_member(db, family_id, target_user.id)
+    if existing_member:
+        raise HTTPException(status_code=400, detail="이미 가족 구성원입니다.")
+    
+    # 일단 바로 추가 (나중에 초대 승인 시스템으로 개선)
+    # TODO: 여기서 알림을 보내고 승인 대기 상태로 만들 수 있음
     added_member = add_family_member(
         db, user, family_id, 
         schemas.FamilyMemberAdd(email=member_data.email)
     )
+    
+    # 알림 데이터 생성 (프론트엔드에서 처리)
+    # WebSocket이나 다른 방식으로 실시간 알림 전송 가능
     
     return schemas.FamilyMemberSimple(
         id=str(added_member.id),

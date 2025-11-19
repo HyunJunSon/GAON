@@ -31,6 +31,7 @@ class FamilyMember(Base):
     user_id = Column(Integer, ForeignKey('users.id'), nullable=False)
     nickname = Column(String(50), nullable=True)  # 그룹 내 별명 (예: "엄마", "아빠", "형")
     role = Column(String(20), default="member")   # 역할 (owner, admin, member)
+    status = Column(String(20), default="active")  # 상태 (pending, active, declined)
     joined_at = Column(DateTime, server_default=func.now())
     
     # Relationships
