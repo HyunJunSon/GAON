@@ -97,9 +97,12 @@ class RetryableAgentPipeline:
                 logger.info(f"{step_name} 실행 시작 (시도 {attempt}/{self.config.max_retries})")
                 
                 # 단계 실행
-                if step_name in ["cleaner", "analysis", "qa"]:
+                if step_name in ["cleaner", "analysis", "qa", "feedback"]:
                     if step_name == "cleaner":
-                        result = step_func()
+                        if conv_id:
+                            result = step_func(conv_id=conv_id)
+                        else:
+                            result = step_func()
                     elif step_name == "analysis":
                         result = step_func(conv_id=conv_id, **kwargs)
                     elif step_name == "qa":
@@ -193,11 +196,13 @@ class RetryableAgentPipeline:
                 raise Exception(f"QA 단계 실패: {qa_result.error}")
 
             # 4단계: Feedback ✅ 여기 추가
+            analysis_id = analysis_result.result.get("analysis_id")
             feedback_result = await self._execute_step_with_retry(
                 "feedback", run_feedback, conv_id,
                 conv_id=conv_id,
                 id=user_id,
                 conversation_df=cleaned_df,
+                analysis_id=analysis_id,
             )
     
             if not feedback_result.success:
