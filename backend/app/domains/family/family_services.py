@@ -194,3 +194,55 @@ def get_conversation_speakers(db: Session, conversation_id: str) -> schemas.Conv
             ) for speaker in speakers
         ]
     )
+
+
+# 프론트엔드용 간단한 API 함수들
+def get_my_family_members(db: Session, user: User) -> schemas.SimpleFamilyResponse:
+    """현재 사용자의 기본 가족 구성원 조회"""
+    families = get_user_families(db, user)
+    if not families.families:
+        # 기본 가족이 없으면 생성
+        default_family = create_family(db, user, schemas.FamilyCreate(name=f"{user.name}의 가족"))
+        return schemas.SimpleFamilyResponse(members=[
+            schemas.FamilyMemberSimple(
+                id=str(member.id),
+                name=member.user.name,
+                email=member.user.email,
+                joinedAt=member.joined_at.isoformat() if member.joined_at else None
+            ) for member in default_family.members
+        ])
+    
+    # 첫 번째 가족의 구성원 반환
+    first_family = families.families[0]
+    return schemas.SimpleFamilyResponse(members=[
+        schemas.FamilyMemberSimple(
+            id=str(member.id),
+            name=member.user.name,
+            email=member.user.email,
+            joinedAt=member.joined_at.isoformat() if member.joined_at else None
+        ) for member in first_family.members
+    ])
+
+
+def add_my_family_member(db: Session, user: User, member_data: schemas.SimpleMemberAdd) -> schemas.FamilyMemberSimple:
+    """현재 사용자의 기본 가족에 구성원 추가"""
+    families = get_user_families(db, user)
+    if not families.families:
+        # 기본 가족이 없으면 생성
+        default_family = create_family(db, user, schemas.FamilyCreate(name=f"{user.name}의 가족"))
+        family_id = default_family.id
+    else:
+        family_id = families.families[0].id
+    
+    # 구성원 추가
+    added_member = add_family_member(
+        db, user, family_id, 
+        schemas.FamilyMemberAdd(email=member_data.email)
+    )
+    
+    return schemas.FamilyMemberSimple(
+        id=str(added_member.id),
+        name=added_member.user.name,
+        email=added_member.user.email,
+        joinedAt=added_member.joined_at.isoformat() if added_member.joined_at else None
+    )

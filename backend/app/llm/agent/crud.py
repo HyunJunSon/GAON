@@ -15,6 +15,7 @@
 7. save_analysis_result()        - Analysis: 분석 결과 저장 (INSERT) 
 8. update_analysis_result()      - QA: 분석 결과 업데이트 (UPDATE)
 9. get_analysis_by_conv_id()     - 분석 결과 조회
+10. save_feedback()              - Feedback: 피드백 저장
 """
 
 from sqlalchemy.orm import Session
@@ -458,3 +459,50 @@ def get_analysis_by_conv_id(db: Session, conv_id: str) -> Optional[Dict[str, Any
         }
     return None
 
+# =========================================
+# 4️⃣ Feedback 관련 CRUD
+# =========================================
+from typing import Optional, Dict, Any
+from sqlalchemy.orm import Session
+from sqlalchemy import text
+
+def save_feedback(
+    db: Session,
+    analysis_id: str,
+    feedback: str,
+) -> Optional[Dict[str, Any]]:
+    """
+    ✅ 특정 analysis_id에 대한 feedback 저장 (UPDATE)
+
+    Returns:
+        업데이트된 레코드의 핵심 정보 (Dict) 또는 None
+    """
+    query = text("""
+        UPDATE analysis_result
+        SET 
+            feedback   = :feedback,
+            updated_at = NOW()
+        WHERE analysis_id = :analysis_id
+        RETURNING analysis_id, id, conv_id, summary, score, confidence_score, feedback
+    """)
+
+    result = db.execute(query, {
+        "analysis_id": analysis_id,
+        "feedback": feedback,
+    })
+    db.commit()
+
+    row = result.fetchone()
+    if not row:
+        print(f"   ⚠️ analysis_id={analysis_id} 에 해당하는 레코드가 없습니다.")
+        return None
+
+    return {
+        "analysis_id": str(row[0]),
+        "id": int(row[1]),
+        "conv_id": row[2],
+        "summary": row[3],
+        "score": row[4],
+        "confidence_score": row[5],
+        "feedback": row[6],
+    }

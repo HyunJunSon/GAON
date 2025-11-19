@@ -12,11 +12,12 @@ from dataclasses import dataclass
 from datetime import datetime, timedelta
 
 from langchain.globals import set_llm_cache
-from langchain.cache import InMemoryCache
+from langchain_community.cache import InMemoryCache
 
 from .Cleaner.run_cleaner import run_cleaner
 from .Analysis.run_analysis import run_analysis
 from .QA.run_qa import run_qa
+from .Feedback.run_feedback import run_feedback
 
 logger = logging.getLogger(__name__)
 
@@ -103,6 +104,8 @@ class RetryableAgentPipeline:
                         result = step_func(conv_id=conv_id, **kwargs)
                     elif step_name == "qa":
                         result = step_func(**kwargs)
+                    elif step_name == "feedback":                             # ✅ feedback 분기
+                        result = step_func(**kwargs)    
                 else:
                     # 테스트용 단계는 직접 실행
                     result = step_func()
@@ -185,9 +188,20 @@ class RetryableAgentPipeline:
                 id=user_id,
                 conv_id=conv_id
             )
-            
+
             if not qa_result.success:
                 raise Exception(f"QA 단계 실패: {qa_result.error}")
+
+            # 4단계: Feedback ✅ 여기 추가
+            feedback_result = await self._execute_step_with_retry(
+                "feedback", run_feedback, conv_id,
+                conv_id=conv_id,
+                id=user_id,
+                conversation_df=cleaned_df,
+            )
+    
+            if not feedback_result.success:
+                raise Exception(f"Feedback 단계 실패: {feedback_result.error}")
             
             # 전체 실행 시간
             total_time = (datetime.now() - pipeline_start).total_seconds()
@@ -200,6 +214,8 @@ class RetryableAgentPipeline:
                 "analysis_id": analysis_result.result.get("analysis_id"),
                 "score": analysis_result.result.get("analysis_result", {}).get("score", 0),
                 "confidence": qa_result.result.get("confidence", 0),
+                "feedback_json": feedback_result.result.get("advice_text") 
+                                or feedback_result.result.get("feedback"),
                 "execution_time": total_time,
                 "step_results": {
                     "cleaner": {
@@ -219,10 +235,15 @@ class RetryableAgentPipeline:
                         "attempt": qa_result.attempt,
                         "cached": qa_result.cached,
                         "execution_time": qa_result.execution_time
-                    }
-                }
+                    },
+                    "feedback": {
+                        "success": feedback_result.success,
+                        "attempt": feedback_result.attempt,
+                        "cached": feedback_result.cached,
+                        "execution_time": feedback_result.execution_time
+                    },
+                },
             }
-            
             logger.info(f"파이프라인 완료: {total_time:.2f}초")
             return final_result
             

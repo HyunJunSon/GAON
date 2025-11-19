@@ -85,3 +85,40 @@ def get_conversation_speakers(
 ):
     """대화의 화자 매핑을 조회합니다."""
     return family_services.get_conversation_speakers(db=db, conversation_id=conversation_id)
+
+
+# 프론트엔드용 간단한 API
+@router.get("/members", response_model=family_schemas.SimpleFamilyResponse)
+def get_my_family_members(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """현재 사용자의 기본 가족 구성원 조회"""
+    return family_services.get_my_family_members(db=db, user=current_user)
+
+
+@router.post("/members", response_model=family_schemas.FamilyMemberSimple)
+def add_my_family_member(
+    member_data: family_schemas.SimpleMemberAdd,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """현재 사용자의 기본 가족에 구성원 추가"""
+    return family_services.add_my_family_member(db=db, user=current_user, member_data=member_data)
+
+
+@router.delete("/members/{member_id}")
+def remove_my_family_member(
+    member_id: str,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """현재 사용자의 기본 가족에서 구성원 제거"""
+    families = family_services.get_user_families(db, current_user)
+    if families.families:
+        family_services.remove_family_member(
+            db=db, user=current_user, 
+            family_id=families.families[0].id, 
+            member_id=int(member_id)
+        )
+    return {"ok": True}

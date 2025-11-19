@@ -7,7 +7,7 @@ from .domains.conversation.router import router as conversation_router
 from .domains.conversation.audio_router import router as audio_router
 from .domains.family.family_router import router as family_router
 from .domains.conversation.websocket import websocket_endpoint
-
+from .domains.practice.router import router as practice_router
 # 모든 모델 import (SQLAlchemy 관계 설정을 위해 필요)
 from .domains.auth.user_models import User
 from .domains.conversation.models import Conversation
@@ -41,6 +41,7 @@ app.include_router(auth_router)
 app.include_router(conversation_router)
 app.include_router(audio_router)
 app.include_router(family_router)
+app.include_router(practice_router)
 
 # WebSocket 라우트
 @app.websocket("/ws/analysis/{conversation_id}")
