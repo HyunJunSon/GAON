@@ -1,20 +1,44 @@
+// app/api/practice/session/route.ts
 import { NextResponse } from 'next/server';
-import { store } from '../_store';
+
+type PracticeMode = 'chat' | 'voice';
+
+type StartPracticeReq = {
+  conversationId: string;
+  mode: PracticeMode;
+};
+
+type StartPracticeRes = {
+  sessionId: string;
+  mode: PracticeMode;
+  conversationId: string;
+};
 
 export async function POST(req: Request) {
-  const body = await req.json().catch(() => null) as
-    | { conversationId?: string; mode?: 'chat'|'voice'|'hybrid'; participantIds?: string[] }
-    | null;
+  const body = (await req.json()) as StartPracticeReq;
 
-  if (!body?.conversationId || !body?.mode || !Array.isArray(body.participantIds) || body.participantIds.length === 0) {
-    return NextResponse.json({ message: 'INVALID_INPUT' }, { status: 400 });
+  if (!body.conversationId) {
+    return NextResponse.json(
+      { message: 'conversationId가 필요합니다.' },
+      { status: 400 }
+    );
   }
 
-  const s = store.createSession({
-    conversationId: body.conversationId,
-    mode: body.mode,
-    participantIds: body.participantIds,
-  });
+  if (body.mode !== 'chat' && body.mode !== 'voice') {
+    return NextResponse.json(
+      { message: 'mode는 chat 또는 voice여야 합니다.' },
+      { status: 400 }
+    );
+  }
 
-  return NextResponse.json({ sessionId: s.id }, { status: 200 });
+  // 목업용 sessionId 생성 (나중에 FastAPI로 대체 예정)
+  const sessionId = `sess_${Date.now().toString(36)}`;
+
+  const res: StartPracticeRes = {
+    sessionId,
+    mode: body.mode,
+    conversationId: body.conversationId,
+  };
+
+  return NextResponse.json(res);
 }

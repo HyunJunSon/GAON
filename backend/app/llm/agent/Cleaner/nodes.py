@@ -14,7 +14,7 @@ except Exception:
 
 # ✅ DB 연동 추가
 from sqlalchemy.orm import Session
-from app.agent.crud import (
+from app.llm.agent.crud import (
     get_conversation_by_id,
     get_conversation_by_pk,
     conversation_to_dataframe,

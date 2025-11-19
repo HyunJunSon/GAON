@@ -26,29 +26,14 @@ const ACCEPT_EXT = ['.txt', '.pdf', '.docx', '.epub', '.md'];
 const MAX_MB = 10; // 백엔드 설정과 동일
 
 export default function ConversationPage() {
-  const [activeTab, setActiveTab] = useState<'text' | 'audio'>('text');
-  const [file, setFile] = useState<File | null>(null);
+  const [activeTab, setActiveTab] = useState<'text' | 'audio'>('audio');
   const [showSpeakerModal, setShowSpeakerModal] = useState(false);
   const [currentConversationId, setCurrentConversationId] = useState<string | null>(null);
   const [modalStatus, setModalStatus] = useState<'uploading' | 'processing' | 'ready'>('uploading');
-  const { mutate, isPending } = useStartAnalysis();
   const { serverError, handleError, clearError } = useServerError();
   const { showNotification } = useGlobalNotification();
   useGlobalWebSocket(currentConversationId || undefined); // WebSocket 연결
   const router = useRouter();
-
-  const handleSelect = (files: File[]) => {
-    clearError();
-    setFile(files[0] ?? null);
-  };
-
-  const onStart = () => {
-    if (!file) return;
-    mutate(
-      { file, lang: 'ko' },
-      { onError: handleError }
-    );
-  };
 
   const handleRecordingComplete = async (blob: Blob) => {
     clearError();
@@ -140,21 +125,6 @@ export default function ConversationPage() {
         <div className="bg-white rounded-2xl shadow-lg border border-orange-100 overflow-hidden">
           <nav className="flex">
             <button
-              onClick={() => setActiveTab('text')}
-              className={`flex-1 py-4 px-6 font-medium text-center transition-all duration-200 ${
-                activeTab === 'text'
-                  ? 'bg-gradient-to-r from-orange-500 to-red-500 text-white'
-                  : 'text-gray-600 hover:text-orange-600 hover:bg-orange-50'
-              }`}
-            >
-              <div className="flex items-center justify-center gap-2">
-                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                </svg>
-                파일 업로드
-              </div>
-            </button>
-            <button
               onClick={() => setActiveTab('audio')}
               className={`flex-1 py-4 px-6 font-medium text-center transition-all duration-200 ${
                 activeTab === 'audio'
@@ -179,53 +149,6 @@ export default function ConversationPage() {
 
           {/* 탭 컨텐츠 */}
           <div className="p-8">
-            {activeTab === 'text' && (
-              <section className="space-y-6">
-                <div className="text-center">
-                  <h2 className="text-xl font-semibold text-gray-800 mb-2">대화 파일 업로드</h2>
-                  <p className="text-gray-600">
-                    텍스트 파일(.txt, .md), 문서 파일(.pdf, .docx, .epub)을 업로드하여 대화 분석을 시작합니다.
-                  </p>
-                </div>
-
-                <div className="max-w-2xl mx-auto space-y-6">
-                  <FileDropzone
-                    acceptExt={ACCEPT_EXT}
-                    acceptMime={ACCEPT_MIME}
-                    maxMB={MAX_MB}
-                    multiple={false}
-                    onFileSelect={handleSelect}
-                    onError={(msg) => handleError(new Error(msg))}
-                    placeholder="여기로 파일을 드래그하거나 클릭하여 선택하세요"
-                  />
-
-                  <div className="bg-orange-50 border border-orange-200 rounded-lg px-4 py-3 text-center">
-                    {file ? (
-                      <div className="text-gray-700">
-                        <span className="font-medium text-orange-700">선택된 파일:</span> {file.name}
-                        <span className="text-sm text-gray-500 ml-2">
-                          ({(file.size / 1024 / 1024).toFixed(2)} MB)
-                        </span>
-                      </div>
-                    ) : (
-                      <span className="text-gray-500">선택된 파일 없음</span>
-                    )}
-                  </div>
-
-                  <div className="text-center">
-                    <button
-                      type="button"
-                      onClick={onStart}
-                      disabled={!file || isPending}
-                      className="bg-gradient-to-r from-orange-500 to-red-500 text-white px-8 py-3 rounded-lg font-medium hover:from-orange-600 hover:to-red-600 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200 shadow-md hover:shadow-lg"
-                    >
-                      {isPending ? '분석 시작 중…' : '분석 시작'}
-                    </button>
-                  </div>
-                </div>
-              </section>
-            )}
-
             {activeTab === 'audio' && (
               <section className="space-y-6">
                 <div className="text-center">
