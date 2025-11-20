@@ -35,7 +35,7 @@ export function useRemoveFamily() {
       const prev = qc.getQueryData<GetFamilyRes>(qk.family.list);
       if (prev) {
         qc.setQueryData<GetFamilyRes>(qk.family.list, {
-          members: prev.members.filter(m => m.id !== memberId),
+          members: prev.members.filter(m => String(m.id) !== String(memberId)),
         });
       }
       return { prev };
@@ -44,6 +44,11 @@ export function useRemoveFamily() {
     onError: (_err, _vars, ctx) => {
       // 롤백
       if (ctx?.prev) qc.setQueryData(qk.family.list, ctx.prev);
+    },
+
+    onSuccess: () => {
+      // 성공 시 즉시 갱신
+      qc.invalidateQueries({ queryKey: qk.family.list });
     },
 
     onSettled: () => {
