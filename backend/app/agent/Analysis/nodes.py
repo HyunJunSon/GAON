@@ -342,9 +342,18 @@ class SummaryBuilder:
 📌 작성 규칙:
 - 첫 문장은 {user_name}님의 전체 말하기 핵심 특징을 요약
 - 대화 full_context에서 드러난 감정적/맥락적 특징을 문장으로 풀어서 반드시 반영
-- 텍스트 통계의 mattr 점수 해석 반영
+- 텍스트 통계의 mattr의 정의와 점수에 대한 해석 반영 (Moving-Average Type-Token Ratio (MATTR)
+    if len(words) < window:
+        return len(set(words)) / len(words) if words else 0
+
+    scores = []
+    for i in range(len(words) - window + 1):
+        win = words[i:i + window]
+        scores.append(len(set(win)) / window)
+
+    return sum(scores) / len(scores))
 - tone, emotion, prosody, 상호작용 특징, 위험 요소를 요소 그대로 작성하는 것이 아닌, 전문가가 풀어서 해설하듯이 자연스럽게 서술
-- 분석 결과에 대한 근거릃 해석해서 서술
+- 분석 결과에 대한 근거를 해석해서 서술
 - 하나의 자연스러운 문단으로 작성
 """
 
