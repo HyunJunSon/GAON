@@ -21,7 +21,15 @@ export default function SignupPage() {
   
   const onSubmit = async (data: SignupInput) => {
     mutate(
-      { name: data.name, email: data.email, password: data.password, confirmPassword: data.confirmPassword , termsAgreed: data.termsAgreed },
+      { 
+        name: data.name, 
+        email: data.email, 
+        birthdate: data.birthdate,
+        gender: data.gender,
+        password: data.password, 
+        confirmPassword: data.confirmPassword, 
+        termsAgreed: data.termsAgreed 
+      },
       {
         onSuccess: () => {
           clearError();
@@ -133,6 +141,36 @@ export default function SignupPage() {
               />
               {errors.email && (
                 <p className="mt-2 text-sm text-red-600">{errors.email.message}</p>
+              )}
+            </div>
+
+            <div>
+              <label htmlFor="birthdate" className="block mb-2 text-sm font-medium text-gray-700">생년월일</label>
+              <input
+                id="birthdate"
+                type="date"
+                className="w-full rounded-lg border border-gray-300 px-4 py-3 focus:ring-2 focus:ring-orange-500 focus:border-orange-500 transition-colors"
+                {...register('birthdate')}
+              />
+              {errors.birthdate && (
+                <p className="mt-2 text-sm text-red-600">{errors.birthdate.message}</p>
+              )}
+            </div>
+
+            <div>
+              <label htmlFor="gender" className="block mb-2 text-sm font-medium text-gray-700">성별</label>
+              <select
+                id="gender"
+                className="w-full rounded-lg border border-gray-300 px-4 py-3 focus:ring-2 focus:ring-orange-500 focus:border-orange-500 transition-colors"
+                {...register('gender')}
+              >
+                <option value="">선택하세요</option>
+                <option value="Male">남성</option>
+                <option value="Female">여성</option>
+                <option value="Other">기타</option>
+              </select>
+              {errors.gender && (
+                <p className="mt-2 text-sm text-red-600">{errors.gender.message}</p>
               )}
             </div>
 

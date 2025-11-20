@@ -10,18 +10,26 @@ pwd_context = CryptContext(schemes=["argon2"], deprecated="auto")
 
 
 def create_user(db: Session, user_create: UserCreate):
+    from datetime import date
+    
     auth_logger.info(f"DB에 사용자 생성 시작: {user_create.email}")
+    
+    # 생년월일로 나이 계산
+    age = (date.today() - user_create.birthdate).days // 365
+    
     db_user = User(
         name=user_create.name,
         password=pwd_context.hash(user_create.password),
         email=user_create.email,
+        age=age,
+        gender=user_create.gender,
         create_date=datetime.now(),
         terms_agreed=user_create.termsAgreed,
     )
     db.add(db_user)
     db.commit()
     db.refresh(db_user)
-    auth_logger.info(f"DB에 사용자 생성 완료: { user_create.email }")
+    auth_logger.info(f"DB에 사용자 생성 완료: {user_create.email}")
     return db_user
 
 

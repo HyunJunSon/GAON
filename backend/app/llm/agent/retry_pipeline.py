@@ -18,7 +18,7 @@ from app.llm.agent.Feedback.run_feedback import run_feedback
 logger = logging.getLogger(__name__)
 
 
-def extract_speaker_info_from_file(file_row: Dict[str, Any]) -> Dict[str, Any]:
+def extract_speaker_info_from_file(file_row: Dict[str, Any], db) -> Dict[str, Any]:
     """
     conversation_file에서 speaker_segments와 매핑 정보 추출
     
@@ -31,6 +31,8 @@ def extract_speaker_info_from_file(file_row: Dict[str, Any]) -> Dict[str, Any]:
             "user_name": str
         }
     """
+    from sqlalchemy import text
+    
     speaker_segments = file_row.get("speaker_segments", [])
     speaker_mapping_raw = file_row.get("speaker_mapping", {})
     
@@ -51,7 +53,19 @@ def extract_speaker_info_from_file(file_row: Dict[str, Any]) -> Dict[str, Any]:
     if user_ids_map:
         first_speaker = list(user_ids_map.keys())[0]
         user_name = speaker_names.get(first_speaker, "사용자")
-        # gender, age는 별도 조회 필요 (현재는 기본값 사용)
+        user_id = user_ids_map.get(first_speaker)
+        
+        # DB에서 실제 user 정보 조회 (text SQL 사용)
+        if user_id:
+            result = db.execute(
+                text("SELECT name, age, gender FROM users WHERE id = :user_id"),
+                {"user_id": user_id}
+            ).fetchone()
+            
+            if result:
+                user_name = result[0] or user_name
+                user_age = result[1] or 0
+                user_gender = result[2] or "unknown"
     
     return {
         "speaker_segments": speaker_segments,
@@ -96,7 +110,7 @@ async def run_agent_pipeline_with_retry(conv_id: str) -> Dict[str, Any]:
         logger.info(f"📁 파일 타입: {file_row['file_type']}")
         
         # speaker 정보 추출
-        speaker_info = extract_speaker_info_from_file(file_row)
+        speaker_info = extract_speaker_info_from_file(file_row, db)
         speaker_segments = speaker_info["speaker_segments"]
         speaker_mapping = speaker_info["speaker_mapping"]
         user_gender = speaker_info["user_gender"]
