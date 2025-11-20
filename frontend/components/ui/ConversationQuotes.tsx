@@ -48,9 +48,11 @@ export default function ConversationQuotes() {
   }, []);
 
   return (
-    <div className="text-center py-4">
-      <div className="text-sm text-gray-600 italic transition-all duration-500 ease-in-out">
-        💬 "{currentQuote}"
+    <div className="text-center py-6">
+      <div className="text-base font-medium text-gray-800 transition-all duration-500 ease-in-out px-4">
+        <span className="inline-block bg-gradient-to-r from-orange-600 to-red-600 bg-clip-text text-transparent drop-shadow-sm">
+          💬 "{currentQuote}"
+        </span>
       </div>
     </div>
   );
