@@ -13,6 +13,7 @@ from app.core.database import SessionLocal
 from app.agent.crud import get_conversation_file_by_conv_id
 from app.llm.agent.Cleaner.graph_cleaner import CleanerGraph
 from app.llm.agent.Analysis.graph_analysis import AnalysisGraph
+from app.llm.agent.Feedback.run_feedback import run_feedback
 
 logger = logging.getLogger(__name__)
 
@@ -147,7 +148,29 @@ async def run_agent_pipeline_with_retry(conv_id: str) -> Dict[str, Any]:
         logger.info("✅ Analysis 완료")
         
         # -------------------------------------------------
-        # 4. 결과 반환
+        # 4. Feedback 실행 (RAG 기반 조언)
+        # -------------------------------------------------
+        logger.info("💡 Feedback 실행 시작")
+        
+        # AnalysisState에서 결과 추출
+        analysis_result = analysis_state.get('analysis_result', {})
+        meta = analysis_state.get('meta', {})
+        analysis_id = meta.get("analysis_id")
+        conversation_df = analysis_state.get('conversation_df')
+        
+        feedback_result = run_feedback(
+            conv_id=conv_id,
+            id=user_id,
+            conversation_df=conversation_df,
+            analysis_id=analysis_id,
+            db=db,
+            verbose=True
+        )
+        
+        logger.info("✅ Feedback 완료")
+        
+        # -------------------------------------------------
+        # 5. 결과 반환
         # -------------------------------------------------
         total_time = (datetime.now() - pipeline_start).total_seconds()
         
@@ -159,12 +182,13 @@ async def run_agent_pipeline_with_retry(conv_id: str) -> Dict[str, Any]:
             "status": "completed",
             "conv_id": conv_id,
             "user_id": user_id,
-            "analysis_id": meta.get("analysis_id"),
+            "analysis_id": analysis_id,
             "score": analysis_result.get("score", 0),
             "confidence": 0.95,
             "summary": analysis_result.get("summary"),
             "statistics": analysis_result.get("statistics"),
             "style_analysis": analysis_result.get("style"),
+            "feedback": feedback_result.get("advice_text") or feedback_result.get("feedback"),
             "validated": True,
             "execution_time": total_time,
         }
