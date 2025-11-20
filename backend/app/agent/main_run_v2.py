@@ -44,27 +44,56 @@ def run_cleaner_analysis(conv_id: str):
     speaker_mapping = cleaner_output["speaker_mapping"]
     user_gender = cleaner_output["user_gender"]
     user_age = cleaner_output["user_age"]
+
+    # ⭐ Cleaner가 반환하는 값 추가로 수집
+    user_name = cleaner_output.get("user_name")
+    user_id_from_cleaner = cleaner_output.get("user_id")
+
     issues = cleaner_output["issues"]
+    print("\n===== DEBUG BEFORE ANALYSIS — speaker_segments =====")
+    for seg in speaker_segments[:10]:
+        print(seg)
+    print("====================================================")
+
 
     print("\n==================== CLEANER OUTPUT ====================")
     print("🟦 speaker_segments:", len(speaker_segments))
     print("🟦 speaker_mapping:", speaker_mapping)
     print("🟦 user_gender:", user_gender)
     print("🟦 user_age:", user_age)
+    print("🟦 user_name:", user_name)
     print("🟦 issues:", issues)
     print("========================================================")
 
     # -------------------------------------------------
-    # 3. Analysis용 user_id 결정
+    # ⭐ 3. Analysis용 user_id & label 결정
     # -------------------------------------------------
     user_ids_map = speaker_mapping.get("user_ids", {})
 
     if not user_ids_map:
         raise RuntimeError("❌ Cleaner 결과에 user_ids mapping이 없습니다.")
 
-    # 일반적으로 SPEAKER_0A가 사용자
-    user_id = list(user_ids_map.values())[0]
+    # SPEAKER_xxx 중 실제 user가 누구인지 (항상 하나)
+    user_speaker_label = list(user_ids_map.keys())[0]      # 예: "SPEAKER_0A"
+    user_id = list(user_ids_map.values())[0]               # 예: 9
+
+    # 나머지 SPEAKER_xxx 는 상대방
+    speaker_names = speaker_mapping.get("speaker_names", {})
+    other_speakers = [
+        spk for spk in speaker_names.keys()
+        if spk != user_speaker_label
+    ]
+
+    # 예: SPEAKER_0B
+    other_speaker_label = other_speakers[0] if other_speakers else None
+
+    # 예: "친구"
+    other_display_name = speaker_names.get(other_speaker_label, "상대방")
+
     print(f"\n👤 분석 대상 user_id={user_id}")
+    print(f"⭐ user_speaker_label={user_speaker_label}")
+    print(f"⭐ other_speaker_label={other_speaker_label}")
+    print(f"⭐ other_display_name={other_display_name}")
 
     # -------------------------------------------------
     # 4. Analysis 실행
@@ -79,6 +108,14 @@ def run_cleaner_analysis(conv_id: str):
         user_id=user_id,
         user_gender=user_gender,
         user_age=user_age,
+
+        # ⭐ Cleaner에서 받은 값 전달
+        user_name=user_name,
+
+        # ⭐ 추가된 3개 인자
+        user_speaker_label=user_speaker_label,
+        other_speaker_label=other_speaker_label,
+        other_display_name=other_display_name,
     )
 
     # -------------------------------------------------
@@ -86,14 +123,14 @@ def run_cleaner_analysis(conv_id: str):
     # -------------------------------------------------
     print("\n📊 [ANALYSIS RESULT]")
     result = {
-        "analysis_id": analysis_state.meta.get("analysis_id"),
+        "analysis_id": analysis_state.get("analysis_id"),
         "conv_id": conv_id,
         "user_id": user_id,
-        "summary": analysis_state.summary,
-        "statistics": analysis_state.statistics,
-        "style_analysis": analysis_state.style_analysis,
-        "temperature_score": analysis_state.temperature_score,
-        "validated": analysis_state.validated,
+        "summary": analysis_state.get("summary"),
+        "statistics": analysis_state.get("statistics"),
+        "style_analysis": analysis_state.get("style_analysis"),
+        "temperature_score": analysis_state.get("temperature_score"),
+        "validated": analysis_state.get("validated", True),
     }
 
     print(result)

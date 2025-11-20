@@ -1,19 +1,10 @@
-# =========================================
-# app/agent/Analysis/dialect_normalizer.py
-# =========================================
-
 from dataclasses import dataclass
 import numpy as np
-import pandas as pd
-from typing import Dict, Any
+from typing import Dict, Any, List
 
 
 @dataclass
 class DialectProsodyNormalizer:
-    """
-    GAON Prosody Normalizer
-    """
-
     BASELINES = {
         "seoul": (-10, 0),
         "gyeongsang": (-30, -20),
@@ -21,49 +12,30 @@ class DialectProsodyNormalizer:
         "jeolla": (-5, 5),
     }
 
-    # 🔥 threshold: baseline과의 최소 거리가 이 이상이면 방언이 아님
-    THRESHOLD = 20  # 기본값 (pitch_std 기준)
+    THRESHOLD = 20
 
     def _softmax(self, x):
         e = np.exp(x - np.max(x))
         return e / e.sum()
 
-    def normalize(self, merged_df: pd.DataFrame) -> Dict[str, Any]:
+    def normalize(self, speaker_segments: List[Dict[str, Any]]) -> Dict[str, Any]:
 
         results = []
         slopes = []
 
-        # =========================================
-        # 1) turn-level slope 추출
-        # =========================================
-        for idx, row in merged_df.iterrows():
-            feats = row.get("audio_features")
+        # 1) turn-level slope
+        for idx, seg in enumerate(speaker_segments):
+            pitch_std = seg.get("pitch_std")
 
-            if feats is None:
-                results.append({
-                    "turn_index": idx,
-                    "speaker": row["speaker"],
-                    "observed_slope": None,
-                    "baseline_slope": None,
-                    "emotional_deviation": None,
-                    "variation": None,
-                    "emotion_category": "none",
-                })
-                slopes.append(None)
-                continue
-
-            observed = feats.get("pitch_std", None)  # 수정됨
-            slopes.append(observed)
+            slopes.append(pitch_std)
 
             results.append({
                 "turn_index": idx,
-                "speaker": row["speaker"],
-                "observed_slope": observed,
+                "speaker": seg.get("speaker"),
+                "observed_slope": pitch_std,
             })
 
-        # =========================================
-        # 2) dialect likelihood 계산
-        # =========================================
+        # 2) baseline 계산
         valid_slopes = [s for s in slopes if s is not None]
         mean_obs = np.mean(valid_slopes) if valid_slopes else 0
 
@@ -72,20 +44,14 @@ class DialectProsodyNormalizer:
             center = (lo + hi) / 2
             distances[region] = abs(mean_obs - center)
 
-        # 가장 가까운 baseline
         min_region = min(distances, key=distances.get)
         min_dist = distances[min_region]
 
-        # ================================
-        # 🔥 핵심 변경: baseline 밖이면 서울 표준어로 강제 처리
-        # ================================
         if min_dist > self.THRESHOLD:
             baseline_region = "seoul_standard"
-            baseline_mean = -5  # 표준어 중심
+            baseline_mean = -5
             dialect_likelihood = {"seoul_standard": 1.0}
-
         else:
-            # 기존 방식 유지
             neg = np.array([-d for d in distances.values()])
             probs = self._softmax(neg)
 
@@ -95,14 +61,12 @@ class DialectProsodyNormalizer:
             }
 
             baseline_region = min_region
-            baseline_mean = np.mean(self.BASELINES[baseline_region])
+            baseline_mean = np.mean(self.BASELINES[min_region])
 
-        # =========================================
-        # 3) 감정 deviation 계산
-        # =========================================
+        # 3) 감정 deviation
         prev_slope = None
         for r in results:
-            slope = r.get("observed_slope")
+            slope = r["observed_slope"]
 
             if slope is None:
                 r.update({
@@ -118,11 +82,7 @@ class DialectProsodyNormalizer:
             dev = slope - baseline_mean
             r["emotional_deviation"] = dev
 
-            if prev_slope is None:
-                r["variation"] = 0
-            else:
-                r["variation"] = abs(slope - prev_slope)
-
+            r["variation"] = 0 if prev_slope is None else abs(slope - prev_slope)
             prev_slope = slope
 
             abs_dev = abs(dev)
