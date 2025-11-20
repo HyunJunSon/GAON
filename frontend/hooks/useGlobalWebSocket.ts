@@ -1,5 +1,6 @@
 import { useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
+import { useQueryClient } from '@tanstack/react-query';
 import { useNotificationStore } from '@/lib/notificationStore';
 
 interface GlobalWebSocketManager {
@@ -56,6 +57,7 @@ const globalWsManager: GlobalWebSocketManager = {
 
 export function useGlobalWebSocket(conversationId?: string) {
   const router = useRouter();
+  const queryClient = useQueryClient();
   const { addNotification } = useNotificationStore();
   const wsRef = useRef<WebSocket | null>(null);
 
@@ -81,6 +83,10 @@ export function useGlobalWebSocket(conversationId?: string) {
             const message = JSON.parse(event.data);
             
             if (message.type === 'analysis_complete') {
+              // React Query 캐시 무효화하여 자동 새로고침
+              queryClient.invalidateQueries({ queryKey: ['conversations'] });
+              queryClient.invalidateQueries({ queryKey: ['analysis', message.conversationId] });
+              
               // 분석 완료 알림
               addNotification({
                 type: 'success',
