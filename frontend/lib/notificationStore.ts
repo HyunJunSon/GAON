@@ -11,6 +11,11 @@ export type Notification = {
   link?: string;
   isRead: boolean;
   createdAt: Date;
+  // 가족 초대 관련 필드
+  inviteId?: number;
+  inviterName?: string;
+  familyName?: string;
+  actionType?: 'family_invite';
 };
 
 type NotificationStore = {

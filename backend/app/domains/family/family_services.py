@@ -1,8 +1,12 @@
 from fastapi import HTTPException
 from sqlalchemy.orm import Session
 from app.domains.family import family_crud as crud, family_schemas as schemas
+from app.domains.family.family_models import FamilyMember
 from app.domains.auth.user_models import User
 from typing import List
+import logging
+
+logger = logging.getLogger(__name__)
 
 
 def create_family(db: Session, user: User, family_data: schemas.FamilyCreate) -> schemas.FamilyInfo:
@@ -225,24 +229,93 @@ def get_my_family_members(db: Session, user: User) -> schemas.SimpleFamilyRespon
 
 
 def add_my_family_member(db: Session, user: User, member_data: schemas.SimpleMemberAdd) -> schemas.FamilyMemberSimple:
-    """현재 사용자의 기본 가족에 구성원 추가"""
+    """현재 사용자의 기본 가족에 구성원 초대 (pending 상태로 추가)"""
     families = get_user_families(db, user)
     if not families.families:
         # 기본 가족이 없으면 생성
         default_family = create_family(db, user, schemas.FamilyCreate(name=f"{user.name}의 가족"))
         family_id = default_family.id
+        family_name = default_family.name
     else:
         family_id = families.families[0].id
+        family_name = families.families[0].name
     
-    # 구성원 추가
-    added_member = add_family_member(
-        db, user, family_id, 
-        schemas.FamilyMemberAdd(email=member_data.email)
+    # 초대할 사용자 확인
+    target_user = crud.get_user_by_email(db, member_data.email)
+    if not target_user:
+        raise HTTPException(status_code=404, detail="해당 이메일을 가진 사용자가 존재하지 않습니다.")
+    
+    # 이미 구성원인지 확인
+    existing_member = crud.get_family_member(db, family_id, target_user.id)
+    if existing_member:
+        if existing_member.status == "pending":
+            raise HTTPException(status_code=400, detail="이미 초대가 진행 중입니다.")
+        elif existing_member.status == "active":
+            raise HTTPException(status_code=400, detail="이미 가족 구성원입니다.")
+    
+    # pending 상태로 구성원 추가 (초대)
+    db_member = crud.add_family_member(
+        db=db,
+        family_id=family_id,
+        user_id=target_user.id,
+        nickname=None,
+        role="member",
+        status="pending"  # 초대 상태
     )
+    
+    # WebSocket 알림 전송 (백그라운드 태스크로 처리)
+    from app.domains.conversation.websocket import send_family_invite_notification
+    
+    # 백그라운드에서 알림 전송
+    import asyncio
+    from concurrent.futures import ThreadPoolExecutor
+    
+    def send_notification():
+        try:
+            loop = asyncio.new_event_loop()
+            asyncio.set_event_loop(loop)
+            loop.run_until_complete(send_family_invite_notification(
+                user_email=target_user.email,
+                inviter_name=user.name,
+                family_name=family_name,
+                member_id=db_member.id
+            ))
+            loop.close()
+        except Exception as e:
+            logger.warning(f"초대 알림 전송 실패: {e}")
+    
+    # 별도 스레드에서 실행
+    executor = ThreadPoolExecutor(max_workers=1)
+    executor.submit(send_notification)
     
     return schemas.FamilyMemberSimple(
-        id=str(added_member.id),
-        name=added_member.user.name,
-        email=added_member.user.email,
-        joinedAt=added_member.joined_at.isoformat() if added_member.joined_at else None
+        id=str(db_member.id),
+        name=target_user.name,
+        email=target_user.email,
+        joinedAt=db_member.joined_at.isoformat() if db_member.joined_at else None
     )
+
+
+def respond_to_invite(db: Session, user: User, member_id: int, accept: bool):
+    """초대 응답 처리 (수락/거절)"""
+    # 해당 초대가 현재 사용자에게 온 것인지 확인
+    member = db.query(FamilyMember).filter(
+        FamilyMember.id == member_id,
+        FamilyMember.user_id == user.id,
+        FamilyMember.status == "pending"
+    ).first()
+    
+    if not member:
+        raise HTTPException(status_code=404, detail="해당 초대를 찾을 수 없습니다.")
+    
+    if accept:
+        member.status = "active"
+        message = "가족 초대를 수락했습니다."
+    else:
+        member.status = "declined"
+        message = "가족 초대를 거절했습니다."
+    
+    db.commit()
+    db.refresh(member)
+    
+    return {"message": message, "status": member.status}

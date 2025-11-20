@@ -6,6 +6,7 @@ import { useNotificationStore } from '@/lib/notificationStore';
 
 export default function NotificationCenter() {
   const [isOpen, setIsOpen] = useState(false);
+  const [loadingInvites, setLoadingInvites] = useState<Set<string>>(new Set());
   const dropdownRef = useRef<HTMLDivElement>(null);
   const router = useRouter();
   
@@ -35,6 +36,29 @@ export default function NotificationCenter() {
     if (notification.link) {
       router.push(notification.link);
       setIsOpen(false);
+    }
+  };
+
+  const handleInviteAction = async (notificationId: string, inviteId: number, action: 'accept' | 'decline') => {
+    setLoadingInvites(prev => new Set(prev).add(notificationId));
+    
+    try {
+      const response = await fetch(`/api/family/invites/${inviteId}/${action}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' }
+      });
+
+      if (response.ok) {
+        removeNotification(notificationId);
+      }
+    } catch (error) {
+      console.error('초대 처리 실패:', error);
+    } finally {
+      setLoadingInvites(prev => {
+        const newSet = new Set(prev);
+        newSet.delete(notificationId);
+        return newSet;
+      });
     }
   };
 
@@ -107,8 +131,7 @@ export default function NotificationCenter() {
               notifications.map((notification) => (
                 <div
                   key={notification.id}
-                  onClick={() => handleNotificationClick(notification)}
-                  className={`p-4 border-b border-gray-100 cursor-pointer hover:bg-gray-50 transition-colors ${
+                  className={`p-4 border-b border-gray-100 ${
                     !notification.isRead ? 'bg-blue-50' : ''
                   }`}
                 >
@@ -116,7 +139,7 @@ export default function NotificationCenter() {
                     
                     {/* 아이콘 */}
                     <div className="flex-shrink-0 text-lg">
-                      {getNotificationIcon(notification.type)}
+                      {notification.actionType === 'family_invite' ? '👨‍👩‍👧‍👦' : getNotificationIcon(notification.type)}
                     </div>
                     
                     {/* 내용 */}
@@ -133,6 +156,26 @@ export default function NotificationCenter() {
                       <p className="text-sm text-gray-600 mt-1 break-words">
                         {notification.message}
                       </p>
+                      
+                      {/* 가족 초대 액션 버튼 */}
+                      {notification.actionType === 'family_invite' && notification.inviteId && (
+                        <div className="flex space-x-2 mt-3">
+                          <button
+                            onClick={() => handleInviteAction(notification.id, notification.inviteId!, 'accept')}
+                            disabled={loadingInvites.has(notification.id)}
+                            className="px-3 py-1 bg-blue-500 text-white text-xs rounded hover:bg-blue-600 disabled:opacity-50"
+                          >
+                            {loadingInvites.has(notification.id) ? '처리중...' : '수락'}
+                          </button>
+                          <button
+                            onClick={() => handleInviteAction(notification.id, notification.inviteId!, 'decline')}
+                            disabled={loadingInvites.has(notification.id)}
+                            className="px-3 py-1 bg-gray-500 text-white text-xs rounded hover:bg-gray-600 disabled:opacity-50"
+                          >
+                            거절
+                          </button>
+                        </div>
+                      )}
                       
                       <div className="flex items-center justify-between mt-2">
                         <span className="text-xs text-gray-500">
