@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useLogout } from "@/hooks/useAuth";
+import GaonLogo from "@/components/ui/GaonLogo";
 
 export default function HomePage() {
   const { mutate, isPending } = useLogout();
@@ -256,11 +257,11 @@ export default function HomePage() {
       </div>
 
       {/* 로그아웃 버튼 */}
-      <div className="text-center pt-8 border-t border-orange-100">
+      <div className="text-center pt-8 border-t border-gray-200">
         <button
           onClick={() => mutate()}
           disabled={isPending}
-          className="px-6 py-3 rounded-xl border border-gray-200 bg-white text-gray-700 hover:bg-gray-50 transition-all duration-200 shadow-sm hover:shadow-md disabled:opacity-50 flex items-center gap-2 mx-auto"
+          className="px-6 py-3 bg-gradient-to-r from-gray-100 to-gray-200 hover:from-gray-200 hover:to-gray-300 text-gray-700 rounded-xl transition-all duration-200 shadow-sm hover:shadow-md disabled:opacity-50 flex items-center gap-2 mx-auto"
         >
           <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />

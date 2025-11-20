@@ -1,17 +1,32 @@
 'use client';
 
 import { useState } from 'react';
+import Link from 'next/link';
+import { useStartAnalysis } from '@/hooks/useAnalysis';
 import { useServerError } from '@/hooks/useServerError';
 import { useGlobalNotification } from '@/hooks/useGlobalNotification';
 import { useGlobalWebSocket } from '@/hooks/useGlobalWebSocket';
 import { analysisHistoryStorage } from '@/utils/analysisHistoryStorage';
 import ErrorAlert from '@/components/ui/ErrorAlert';
+import FileDropzone from '@/components/upload/FileDropzone';
 import AudioRecorder from '@/components/upload/AudioRecorder';
 import SpeakerMappingModal from '@/components/upload/SpeakerMappingModal';
 import { uploadAudio, getConversationId } from '@/apis/analysis';
 import { useRouter } from 'next/navigation';
 
+// 백엔드와 동기화된 파일 타입 설정
+const ACCEPT_MIME = [
+  'text/plain',
+  'application/pdf', 
+  'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+  'application/epub+zip',
+  'text/markdown'
+];
+const ACCEPT_EXT = ['.txt', '.pdf', '.docx', '.epub', '.md'];
+const MAX_MB = 10; // 백엔드 설정과 동일
+
 export default function ConversationPage() {
+  const [activeTab, setActiveTab] = useState<'text' | 'audio'>('audio');
   const [showSpeakerModal, setShowSpeakerModal] = useState(false);
   const [currentConversationId, setCurrentConversationId] = useState<string | null>(null);
   const [modalStatus, setModalStatus] = useState<'uploading' | 'processing' | 'ready'>('uploading');
@@ -119,34 +134,56 @@ export default function ConversationPage() {
         </div>
       </header>
 
-      {/* 음성 녹음 섹션 */}
-      <section className="rounded-2xl border border-orange-100 bg-white p-8 shadow-lg">
-        <div className="flex items-center gap-3 mb-6">
-          <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-orange-500/20 to-red-500/20 flex items-center justify-center text-orange-600">
-            <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 01-3-3V5a3 3 0 116 0v6a3 3 0 01-3 3z" />
-            </svg>
-          </div>
-          <div>
-            <h2 className="text-xl font-semibold text-gray-900">음성 녹음</h2>
-            <p className="text-sm text-gray-500">실시간 음성 녹음으로 대화 분석을 시작합니다.</p>
+      {/* 탭 네비게이션 */}
+      <div className="max-w-4xl mx-auto">
+        <div className="bg-white rounded-2xl shadow-lg border border-orange-100 overflow-hidden">
+          <nav className="flex">
+            <button
+              onClick={() => setActiveTab('audio')}
+              className={`flex-1 py-4 px-6 font-medium text-center transition-all duration-200 ${
+                activeTab === 'audio'
+                  ? 'bg-gradient-to-r from-orange-500 to-red-500 text-white'
+                  : 'text-gray-600 hover:text-orange-600 hover:bg-orange-50'
+              }`}
+            >
+              <div className="flex items-center justify-center gap-2">
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 01-3-3V5a3 3 0 116 0v6a3 3 0 01-3 3z" />
+                </svg>
+                음성 녹음
+              </div>
+            </button>
+          </nav>
+
+          {serverError && (
+            <div className="p-6 border-t border-orange-100">
+              <ErrorAlert message={serverError} />
+            </div>
+          )}
+
+          {/* 탭 컨텐츠 */}
+          <div className="p-8">
+            {activeTab === 'audio' && (
+              <section className="space-y-6">
+                <div className="text-center">
+                  <h2 className="text-xl font-semibold text-gray-800 mb-2">음성 녹음</h2>
+                  <p className="text-gray-600">
+                    실시간 음성 녹음으로 대화 분석을 시작합니다.
+                  </p>
+                </div>
+
+                <div className="max-w-2xl mx-auto">
+                  <AudioRecorder
+                    onRecordingComplete={handleRecordingComplete}
+                    onError={handleError}
+                    maxDurationMinutes={10}
+                  />
+                </div>
+              </section>
+            )}
           </div>
         </div>
-
-        {serverError && (
-          <div className="mb-6">
-            <ErrorAlert message={serverError} />
-          </div>
-        )}
-
-        <div className="max-w-2xl mx-auto">
-          <AudioRecorder
-            onRecordingComplete={handleRecordingComplete}
-            onError={handleError}
-            maxDurationMinutes={10}
-          />
-        </div>
-      </section>
+      </div>
       
       {/* 화자 맵핑 모달 */}
       <SpeakerMappingModal

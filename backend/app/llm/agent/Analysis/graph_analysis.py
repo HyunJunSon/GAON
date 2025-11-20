@@ -28,6 +28,15 @@ class AnalysisState:
     id: Optional[int] = None
     conv_id: Optional[str] = None
 
+    # ⭐ 새로 추가된 필드
+    speaker_segments: List[Dict[str, Any]] = field(default_factory=list)
+    user_gender: str = "unknown"
+    user_age: int = 0
+    user_name: Optional[str] = None
+    user_speaker_label: str = "SPEAKER_0A"
+    other_speaker_label: str = "SPEAKER_0B"
+    other_display_name: str = "상대방"
+
     # 분석 결과
     family_info: Optional[Dict[str, Any]] = None
     relations: Optional[List[Dict[str, Any]]] = None
@@ -151,9 +160,14 @@ class AnalysisGraph:
             print(f"   👤 분석 대상 사용자: {state.id}")
 
         result = self.analyzer.analyze(
-            conversation_df=state.conversation_df,
-            relations=state.relations,
-            id=state.id  # ✅ int형 id 그대로 사용 (crud.py에서 int speaker 반환)
+            speaker_segments=state.speaker_segments,
+            user_id=state.id,
+            user_gender=state.user_gender,
+            user_age=state.user_age,
+            user_name=state.user_name,
+            user_speaker_label=state.user_speaker_label,
+            other_speaker_label=state.other_speaker_label,
+            other_display_name=state.other_display_name
         )
 
         state.analysis_result = result
@@ -176,7 +190,20 @@ class AnalysisGraph:
     # =====================================
     # ✅ 실행 메서드 (DB 세션 주입)
     # =====================================
-    def run(self, db: Session, conversation_df: pd.DataFrame, id: int, conv_id: str):
+    def run(
+        self, 
+        db: Session, 
+        conv_id: str,
+        speaker_segments: List[Dict[str, Any]],
+        user_id: int,
+        user_gender: str = "unknown",
+        user_age: int = 0,
+        user_name: str = None,
+        user_speaker_label: str = "SPEAKER_0A",
+        other_speaker_label: str = "SPEAKER_0B",
+        other_display_name: str = "상대방",
+        conversation_df: pd.DataFrame = None  # 하위 호환성
+    ):
         """
         ✅ Analysis 파이프라인 실행 (DB 연동)
         """
@@ -184,11 +211,23 @@ class AnalysisGraph:
             print("\n🚀 [AnalysisGraph] 실행 시작\n" + "=" * 60)
 
         # ✅ 초기 상태 생성
+        # conversation_df가 없으면 speaker_segments로 생성
+        if conversation_df is None and speaker_segments:
+            import pandas as pd
+            conversation_df = pd.DataFrame(speaker_segments)
+        
         state = AnalysisState(
             db=db,
             conversation_df=conversation_df,
-            id=id,
+            id=user_id,
             conv_id=conv_id,
+            speaker_segments=speaker_segments,
+            user_gender=user_gender,
+            user_age=user_age,
+            user_name=user_name,
+            user_speaker_label=user_speaker_label,
+            other_speaker_label=other_speaker_label,
+            other_display_name=other_display_name,
             verbose=self.verbose,
         )
 

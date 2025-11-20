@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useLogout } from "@/hooks/useAuth";
+import GaonLogo from "@/components/ui/GaonLogo";
 
 export default function HomePage() {
   const { mutate, isPending } = useLogout();
@@ -206,21 +207,23 @@ export default function HomePage() {
           </svg>
         </div>
         
+        <h1 className="text-4xl font-bold text-gray-800 mb-3 font-medium tracking-tight">대화에 온도를 더하다</h1>
+        <p className="text-gray-600 text-lg">AI 기반 대화 분석으로 인간관계에 따뜻함을 더하는 서비스</p>
       </div>
 
       {/* 주요 기능 카드 */}
       <div className="grid md:grid-cols-2 gap-6">
         <Link href="/conversation" className="group">
-          <div className="rounded-2xl border border-orange-100 bg-white p-8 shadow-lg transition-all duration-300 hover:shadow-xl hover:border-orange-200 hover:-translate-y-1">
+          <div className="bg-white rounded-2xl border border-gray-200 p-8 hover:shadow-xl transition-all duration-300 hover:border-orange-200 hover:-translate-y-1">
             <div className="flex items-start gap-4 mb-6">
-              <div className="w-14 h-14 rounded-xl bg-gradient-to-br from-orange-500/20 to-red-500/20 flex items-center justify-center text-orange-600 group-hover:scale-110 transition-transform duration-300">
-                <svg className="w-7 h-7" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <div className="w-14 h-14 bg-gradient-to-br from-orange-100 to-red-100 rounded-xl flex items-center justify-center group-hover:scale-110 transition-transform duration-300">
+                <svg className="w-7 h-7 text-orange-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
                 </svg>
               </div>
               <div className="flex-1">
-                <h3 className="text-xl font-semibold text-gray-900 group-hover:text-orange-600 transition-colors mb-2">대화 분석</h3>
-                <p className="text-gray-600 leading-relaxed text-sm">음성 대화를 분석하여 관계의 온도를 측정해보세요</p>
+                <h3 className="text-xl font-bold text-gray-800 group-hover:text-orange-600 transition-colors mb-2">대화 분석</h3>
+                <p className="text-gray-600 leading-relaxed">음성 대화를 분석하여 관계의 온도를 측정해보세요</p>
               </div>
             </div>
             <div className="flex items-center text-orange-600 font-semibold group-hover:gap-3 transition-all duration-300">
@@ -233,16 +236,16 @@ export default function HomePage() {
         </Link>
 
         <Link href="/analysis" className="group">
-          <div className="rounded-2xl border border-orange-100 bg-white p-8 shadow-lg transition-all duration-300 hover:shadow-xl hover:border-orange-200 hover:-translate-y-1">
+          <div className="bg-white rounded-2xl border border-gray-200 p-8 hover:shadow-xl transition-all duration-300 hover:border-orange-200 hover:-translate-y-1">
             <div className="flex items-start gap-4 mb-6">
-              <div className="w-14 h-14 rounded-xl bg-gradient-to-br from-orange-500/20 to-red-500/20 flex items-center justify-center text-orange-600 group-hover:scale-110 transition-transform duration-300">
-                <svg className="w-7 h-7" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <div className="w-14 h-14 bg-gradient-to-br from-orange-100 to-red-100 rounded-xl flex items-center justify-center group-hover:scale-110 transition-transform duration-300">
+                <svg className="w-7 h-7 text-orange-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
                 </svg>
               </div>
               <div className="flex-1">
-                <h3 className="text-xl font-semibold text-gray-900 group-hover:text-orange-600 transition-colors mb-2">분석 결과</h3>
-                <p className="text-gray-600 leading-relaxed text-sm">이전 대화 분석 결과를 확인하고 인사이트를 얻어보세요</p>
+                <h3 className="text-xl font-bold text-gray-800 group-hover:text-orange-600 transition-colors mb-2">분석 결과</h3>
+                <p className="text-gray-600 leading-relaxed">이전 대화 분석 결과를 확인하고 인사이트를 얻어보세요</p>
               </div>
             </div>
             <div className="flex items-center text-orange-600 font-semibold group-hover:gap-3 transition-all duration-300">
@@ -256,11 +259,11 @@ export default function HomePage() {
       </div>
 
       {/* 로그아웃 버튼 */}
-      <div className="text-center pt-8 border-t border-orange-100">
+      <div className="text-center pt-8 border-t border-gray-200">
         <button
           onClick={() => mutate()}
           disabled={isPending}
-          className="px-6 py-3 rounded-xl border border-gray-200 bg-white text-gray-700 hover:bg-gray-50 transition-all duration-200 shadow-sm hover:shadow-md disabled:opacity-50 flex items-center gap-2 mx-auto"
+          className="px-6 py-3 bg-gradient-to-r from-gray-100 to-gray-200 hover:from-gray-200 hover:to-gray-300 text-gray-700 rounded-xl transition-all duration-200 shadow-sm hover:shadow-md disabled:opacity-50 flex items-center gap-2 mx-auto"
         >
           <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
