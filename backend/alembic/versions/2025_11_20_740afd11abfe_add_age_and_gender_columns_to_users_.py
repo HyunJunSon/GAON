@@ -17,8 +17,17 @@ depends_on = None
 
 
 def upgrade() -> None:
-    op.add_column('users', sa.Column('age', sa.Integer(), nullable=True))
-    op.add_column('users', sa.Column('gender', sa.String(), nullable=True))
+    from sqlalchemy import inspect
+    conn = op.get_bind()
+    inspector = inspect(conn)
+    
+    columns = [col['name'] for col in inspector.get_columns('users')]
+    
+    if 'age' not in columns:
+        op.add_column('users', sa.Column('age', sa.Integer(), nullable=True))
+    
+    if 'gender' not in columns:
+        op.add_column('users', sa.Column('gender', sa.String(), nullable=True))
 
 
 def downgrade() -> None:
