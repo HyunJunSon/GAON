@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useLogout } from "@/hooks/useAuth";
+import GaonLogo from "@/components/ui/GaonLogo";
 
 export default function HomePage() {
   const { mutate, isPending } = useLogout();

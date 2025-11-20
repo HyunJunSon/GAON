@@ -35,6 +35,13 @@ class CleanerState:
     context: Optional[str] = None
     id: Optional[str] = None             #  user_ids: List[str] = field(default_factory=list)  # 전체 참여자
 
+    # ⭐ 새로 추가된 필드
+    speaker_segments: List[Dict[str, Any]] = field(default_factory=list)
+    speaker_mapping: Dict[str, Any] = field(default_factory=dict)
+    user_gender: str = "unknown"
+    user_age: int = 0
+    user_name: Optional[str] = None
+
     # 검증 상태
     validated: bool = False
     saved: bool = False

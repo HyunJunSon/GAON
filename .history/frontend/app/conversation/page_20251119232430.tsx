@@ -1,6 +1,8 @@
 'use client';
 
 import { useState } from 'react';
+import Link from 'next/link';
+import { useStartAnalysis } from '@/hooks/useAnalysis';
 import { useServerError } from '@/hooks/useServerError';
 import { useGlobalNotification } from '@/hooks/useGlobalNotification';
 import { useGlobalWebSocket } from '@/hooks/useGlobalWebSocket';
@@ -10,6 +12,17 @@ import AudioRecorder from '@/components/upload/AudioRecorder';
 import SpeakerMappingModal from '@/components/upload/SpeakerMappingModal';
 import { uploadAudio, getConversationId } from '@/apis/analysis';
 import { useRouter } from 'next/navigation';
+
+// 백엔드와 동기화된 파일 타입 설정
+const ACCEPT_MIME = [
+  'text/plain',
+  'application/pdf', 
+  'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+  'application/epub+zip',
+  'text/markdown'
+];
+const ACCEPT_EXT = ['.txt', '.pdf', '.docx', '.epub', '.md'];
+const MAX_MB = 10; // 백엔드 설정과 동일
 
 export default function ConversationPage() {
   const [showSpeakerModal, setShowSpeakerModal] = useState(false);

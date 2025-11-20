@@ -148,11 +148,65 @@ class Analyzer:
         prosody_norm = normalizer.normalize(speaker_segments)
 
         # ----------------------------------
-        # 4) Surrogate (간단한 맥락 힌트)
+        # 4) Surrogate (감정 흐름 + 반응성)
         # ----------------------------------
+# (1) 감정 흐름 분석: prosody_norm의 slope 기반
+        slopes = [
+            t.get("observed_slope")
+            for t in prosody_norm.get("turn_prosody", [])
+            if t.get("observed_slope") is not None
+        ]
+
+        if slopes:
+            avg_slope = sum(slopes) / len(slopes)
+            if avg_slope > 5:
+                emotion_trajectory = "rising (감정 상승)"
+            elif avg_slope < -5:
+                emotion_trajectory = "falling (감정 하강)"
+            else:
+                emotion_trajectory = "stable (안정적)"
+        else:
+            emotion_trajectory = "unknown"
+
+        # (2) 반응성 분석: 발화 간 텀(시간), 발화 길이 기반
+        from numpy import mean
+
+        durations = []
+        for seg in speaker_segments:
+            start = seg.get("start")
+            end = seg.get("end")
+            if start is not None and end is not None:
+                durations.append(end - start)
+
+        if durations:
+            avg_len = mean(durations)
+            if avg_len > 5:
+                responsiveness = "slow"
+            elif avg_len < 1.5:
+                responsiveness = "fast"
+            else:
+                responsiveness = "moderate"
+        else:
+            responsiveness = "unknown"
+
+        # (3) 발화 비율 기반 주도성
+        user_count = len(user_df)
+        other_count = len(other_df)
+        dominance_ratio = user_count / (user_count + other_count + 1e-6)
+
+        if dominance_ratio > 0.65:
+            dominance = "high"
+        elif dominance_ratio < 0.35:
+            dominance = "low"
+        else:
+            dominance = "balanced"
+
+        # 최종 Surrogate 구성
         surrogate = {
-            "relationship_pattern": "neutral",
-            "emotional_trajectory_hint": "stable",
+            "emotion_trajectory": emotion_trajectory,
+            "responsiveness": responsiveness,
+            "dominance": dominance,
+            "relationship_pattern": "neutral",  # 기본값 유지
         }
 
         # ----------------------------------
