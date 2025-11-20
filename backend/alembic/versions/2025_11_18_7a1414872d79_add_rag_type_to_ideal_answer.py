@@ -17,8 +17,17 @@ depends_on = None
 
 
 def upgrade() -> None:
-    # Add rag_type column to ideal_answer table
-    op.add_column('ideal_answer', sa.Column('rag_type', sa.String(50), nullable=True))
+    # Add rag_type column to ideal_answer table (if not exists)
+    from sqlalchemy import inspect
+    conn = op.get_bind()
+    inspector = inspect(conn)
+    
+    # ideal_answer 테이블이 존재하는지 확인
+    if 'ideal_answer' in inspector.get_table_names():
+        columns = [col['name'] for col in inspector.get_columns('ideal_answer')]
+        
+        if 'rag_type' not in columns:
+            op.add_column('ideal_answer', sa.Column('rag_type', sa.String(50), nullable=True))
 
 
 def downgrade() -> None:

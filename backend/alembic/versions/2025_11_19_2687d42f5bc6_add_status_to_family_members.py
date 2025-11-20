@@ -17,8 +17,15 @@ depends_on = None
 
 
 def upgrade() -> None:
-    # family_members 테이블에 status 컬럼 추가
-    op.add_column('family_members', sa.Column('status', sa.String(length=20), nullable=False, server_default='active'))
+    # family_members 테이블에 status 컬럼 추가 (존재하지 않을 경우에만)
+    from sqlalchemy import inspect
+    conn = op.get_bind()
+    inspector = inspect(conn)
+    
+    columns = [col['name'] for col in inspector.get_columns('family_members')]
+    
+    if 'status' not in columns:
+        op.add_column('family_members', sa.Column('status', sa.String(length=20), nullable=False, server_default='active'))
 
 
 def downgrade() -> None:
