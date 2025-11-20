@@ -1,4 +1,5 @@
 import re
+from datetime import date
 from pydantic import BaseModel, field_validator, EmailStr
 from pydantic_core.core_schema import FieldValidationInfo
 from ...utils.logger import auth_logger
@@ -8,6 +9,8 @@ class UserCreate(BaseModel):
     password: str
     confirmPassword: str
     email: EmailStr
+    birthdate: date
+    gender: str
     termsAgreed: bool
 
     @field_validator('name')
@@ -64,6 +67,41 @@ class UserCreate(BaseModel):
             raise ValueError('올바른 이메일 형식이 아닙니다.')
         
         auth_logger.debug(f"이메일 유효성 검사 통과: {v}")
+        return v
+
+    @field_validator('birthdate')
+    def validate_birthdate(cls, v):
+        if not v:
+            auth_logger.warning("생년월일이 빈 값입니다.")
+            raise ValueError('생년월일은 필수입니다.')
+        
+        # 미래 날짜 체크
+        if v > date.today():
+            auth_logger.warning(f"생년월일이 미래 날짜입니다: {v}")
+            raise ValueError('생년월일은 미래 날짜일 수 없습니다.')
+        
+        # 나이 계산 (0~150세 범위 체크)
+        age = (date.today() - v).days // 365
+        if age < 0 or age > 150:
+            auth_logger.warning(f"유효하지 않은 나이입니다: {age}")
+            raise ValueError('유효하지 않은 생년월일입니다.')
+        
+        auth_logger.debug(f"생년월일 유효성 검사 통과: {v}")
+        return v
+
+    @field_validator('gender')
+    def validate_gender(cls, v):
+        if not v or not v.strip():
+            auth_logger.warning("성별이 빈 값입니다.")
+            raise ValueError('성별은 필수입니다.')
+        
+        # Male, Female, Other 중 하나
+        valid_genders = ['Male', 'Female', 'Other']
+        if v not in valid_genders:
+            auth_logger.warning(f"유효하지 않은 성별입니다: {v}")
+            raise ValueError(f'성별은 {", ".join(valid_genders)} 중 하나여야 합니다.')
+        
+        auth_logger.debug(f"성별 유효성 검사 통과: {v}")
         return v
 
     @field_validator('termsAgreed')

@@ -23,6 +23,8 @@ export const SignupSchema = z
     // 성명 규칙 : 공백 제거 후 최소 1자, 최대 20자
     name: z.string().trim().min(1, '성명을 입력해 주세요.').max(20, '성명은 최대 20자까지 가능합니다.'),
     email: z.email('올바른 이메일 형식이 아닙니다.'),
+    birthdate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, '생년월일은 YYYY-MM-DD 형식이어야 합니다.'),
+    gender: z.enum(['Male', 'Female', 'Other'], { message: '성별을 선택해 주세요.' }),
     password: z.string().regex(PASSWORD_REGEX, '비밀번호는 8~16자이며 영문, 숫자, 특수문자를 각각 1자 이상 포함해야 합니다.'),
     confirmPassword: z.string(),
     termsAgreed: z.boolean().refine((v) => v === true, { message: '이용약관에 동의해야 합니다.' })
