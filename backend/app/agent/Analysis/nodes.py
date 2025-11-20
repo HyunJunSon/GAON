@@ -354,7 +354,7 @@ class SummaryBuilder:
     return sum(scores) / len(scores))
 - tone, emotion, prosody, 상호작용 특징, 위험 요소를 요소 그대로 작성하는 것이 아닌, 전문가가 풀어서 해설하듯이 자연스럽게 서술
 - 분석 결과에 대한 근거를 해석해서 서술
-- 하나의 자연스러운 문단으로 작성
+- 하나의 자연스러운 문단으로 작성하되, 평가한다는 문장이나 단언하는 표현은 지양
 """
 
         resp = llm.invoke(prompt)
