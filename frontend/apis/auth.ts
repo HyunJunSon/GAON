@@ -31,6 +31,8 @@ export async function login(payload: { email: string; password: string }) {
 export async function signup(payload: {
   name: string;
   email: string;
+  birthdate: string;
+  gender: string;
   password: string;
   confirmPassword: string;
   termsAgreed: boolean;
