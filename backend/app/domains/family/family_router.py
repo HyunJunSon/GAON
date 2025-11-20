@@ -36,28 +36,32 @@ def remove_my_family_member(
 ):
     """현재 사용자의 기본 가족에서 구성원 제거"""
     import logging
+    from app.domains.family.family_models import FamilyMember
     logger = logging.getLogger(__name__)
     
     logger.info(f"🗑️ 가족 구성원 삭제 요청: member_id={member_id}, user={current_user.email}")
     
     try:
-        families = family_services.get_user_families(db, current_user)
-        if not families.families:
-            logger.warning(f"⚠️ 가족이 없음: user={current_user.email}")
-            raise HTTPException(status_code=404, detail="가족이 없습니다.")
-        
-        family_id = families.families[0].id
         member_id_int = int(member_id)
         
-        logger.info(f"🗑️ 삭제 시도: family_id={family_id}, member_id={member_id_int}")
+        # member_id가 속한 가족 찾기
+        member = db.query(FamilyMember).filter(FamilyMember.id == member_id_int).first()
+        if not member:
+            logger.warning(f"⚠️ 구성원을 찾을 수 없음: member_id={member_id_int}")
+            raise HTTPException(status_code=404, detail="해당 구성원을 찾을 수 없습니다.")
+        
+        family_id = member.family_id
+        user_id = member.user_id
+        
+        logger.info(f"🗑️ 삭제 시도: family_id={family_id}, user_id={user_id}")
         
         family_services.remove_family_member(
             db=db, user=current_user, 
             family_id=family_id, 
-            member_id=member_id_int
+            member_id=user_id
         )
         
-        logger.info(f"✅ 삭제 완료: member_id={member_id_int}")
+        logger.info(f"✅ 삭제 완료: member_id={member_id_int}, user_id={user_id}")
         return {"ok": True}
         
     except ValueError as e:
