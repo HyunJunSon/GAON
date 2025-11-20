@@ -103,10 +103,21 @@ export default function ResultsSummaryPage() {
     ]
   };
 
-  const fb: FeedbackJson =
-    feedback && feedback !== ""
-      ? (feedback as unknown as FeedbackJson)
-      : dummyFeedback;
+  const fb: FeedbackJson = (() => {
+    if (!feedback || feedback === "") return dummyFeedback;
+    
+    try {
+      // feedback이 문자열이면 JSON 파싱
+      if (typeof feedback === 'string') {
+        return JSON.parse(feedback);
+      }
+      // 이미 객체면 그대로 사용
+      return feedback as FeedbackJson;
+    } catch (e) {
+      console.error('Feedback 파싱 실패:', e);
+      return dummyFeedback;
+    }
+  })();
 
   return (
     <main className="mx-auto max-w-4xl p-6">
@@ -127,7 +138,7 @@ export default function ResultsSummaryPage() {
               <div className="flex items-center justify-center gap-8">
                 {score != null && (
                   <div className="text-center">
-                    <div className="text-4xl font-bold">{(score * 100).toFixed(0)}</div>
+                    <div className="text-4xl font-bold">{Math.round(score)}</div>
                     <div className="text-orange-100">말하기 점수</div>
                   </div>
                 )}

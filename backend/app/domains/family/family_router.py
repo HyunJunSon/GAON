@@ -35,14 +35,37 @@ def remove_my_family_member(
     current_user: User = Depends(get_current_user),
 ):
     """현재 사용자의 기본 가족에서 구성원 제거"""
-    families = family_services.get_user_families(db, current_user)
-    if families.families:
+    import logging
+    logger = logging.getLogger(__name__)
+    
+    logger.info(f"🗑️ 가족 구성원 삭제 요청: member_id={member_id}, user={current_user.email}")
+    
+    try:
+        families = family_services.get_user_families(db, current_user)
+        if not families.families:
+            logger.warning(f"⚠️ 가족이 없음: user={current_user.email}")
+            raise HTTPException(status_code=404, detail="가족이 없습니다.")
+        
+        family_id = families.families[0].id
+        member_id_int = int(member_id)
+        
+        logger.info(f"🗑️ 삭제 시도: family_id={family_id}, member_id={member_id_int}")
+        
         family_services.remove_family_member(
             db=db, user=current_user, 
-            family_id=families.families[0].id, 
-            member_id=int(member_id)
+            family_id=family_id, 
+            member_id=member_id_int
         )
-    return {"ok": True}
+        
+        logger.info(f"✅ 삭제 완료: member_id={member_id_int}")
+        return {"ok": True}
+        
+    except ValueError as e:
+        logger.error(f"❌ member_id 변환 실패: {member_id}")
+        raise HTTPException(status_code=400, detail="잘못된 member_id 형식입니다.")
+    except Exception as e:
+        logger.error(f"❌ 삭제 실패: {str(e)}")
+        raise
 
 
 # 초대 응답 API
