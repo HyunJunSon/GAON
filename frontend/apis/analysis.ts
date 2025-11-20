@@ -132,3 +132,19 @@ export async function getSpeakerMapping(conversationId: string) {
     method: 'GET',
   });
 }
+
+/** 사용자의 모든 분석 목록 조회 */
+export type AnalysisListItem = {
+  conversationId: string;
+  title: string;
+  summary?: string;
+  score?: number;
+  createdAt: string;
+  status: 'ready' | 'processing' | 'failed';
+};
+
+export async function fetchAnalysisList() {
+  return apiFetch<AnalysisListItem[]>('/api/analysis', {
+    method: 'GET',
+  });
+}

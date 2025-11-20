@@ -67,6 +67,54 @@ async def upload_conversation_file(
         raise HTTPException(status_code=500, detail=f"서버 오류: {str(e)}")
 
 
+@router.get("/analysis", response_model=List[dict])
+def get_user_analysis_list(
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """현재 사용자의 최신 분석 결과 3개 조회"""
+    from sqlalchemy import text
+    
+    logger.info(f"분석 목록 조회: user_id={current_user.id}")
+    
+    try:
+        # 사용자의 최신 분석 결과 3개 조회
+        query = text("""
+            SELECT 
+                ar.conv_id,
+                ar.summary,
+                ar.score,
+                ar.create_date,
+                c.title
+            FROM analysis_result ar
+            JOIN user_conversations uc ON ar.conv_id = uc.conv_id
+            LEFT JOIN conversation c ON ar.conv_id = c.conv_id
+            WHERE uc.user_id = :user_id
+            ORDER BY ar.create_date DESC
+            LIMIT 3
+        """)
+        
+        result = db.execute(query, {"user_id": current_user.id}).fetchall()
+        
+        analysis_list = []
+        for row in result:
+            analysis_list.append({
+                "conversationId": str(row[0]),
+                "summary": row[1],
+                "score": row[2],
+                "createdAt": row[3].isoformat() if row[3] else None,
+                "title": row[4] or f"분석 {str(row[0])[:8]}",
+                "status": "ready"
+            })
+        
+        logger.info(f"분석 목록 조회 성공: user_id={current_user.id}, count={len(analysis_list)}")
+        return analysis_list
+        
+    except Exception as e:
+        logger.error(f"분석 목록 조회 실패: user_id={current_user.id}, error={str(e)}")
+        raise HTTPException(status_code=500, detail=f"서버 오류: {str(e)}")
+
+
 @router.get("/analysis/{conversation_id}", response_model=ConversationAnalysisResponse)
 def get_conversation_analysis(
     conversation_id: UUID,
