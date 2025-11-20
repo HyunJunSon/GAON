@@ -14,12 +14,29 @@ import { useUserWebSocket } from '@/hooks/useUserWebSocket';
 function GlobalNotificationProvider({ children }: PropsWithChildren) {
   const [userEmail, setUserEmail] = useState<string>();
   
-  // 사용자 이메일 가져오기
+  // 사용자 이메일 가져오기 (토큰으로 /me API 호출)
   useEffect(() => {
-    const email = localStorage.getItem('userEmail');
-    if (email) {
-      setUserEmail(email);
-    }
+    const fetchUserEmail = async () => {
+      try {
+        const token = localStorage.getItem('authToken');
+        if (!token) return;
+        
+        const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'}/api/auth/me`, {
+          headers: {
+            'Authorization': `Bearer ${token}`
+          }
+        });
+        
+        if (response.ok) {
+          const user = await response.json();
+          setUserEmail(user.email);
+        }
+      } catch (error) {
+        console.error('사용자 정보 가져오기 실패:', error);
+      }
+    };
+    
+    fetchUserEmail();
   }, []);
   
   // 전역 알림 시스템 활성화

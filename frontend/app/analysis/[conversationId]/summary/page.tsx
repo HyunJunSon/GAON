@@ -256,27 +256,31 @@ export default function ResultsSummaryPage() {
             </div>
 
             {/* 체크리스트 */}
-            <div className="bg-gray-50 rounded-lg p-4 border border-gray-100">
-              <h4 className="text-base font-semibold text-gray-900 mb-3">체크리스트</h4>
-              <ul className="space-y-2 text-sm">
-                {parseChecklist(fb.checklist).map((item, idx) => (
-                  <li key={idx} className="flex items-start gap-2">
-                    <input type="checkbox" className="mt-0.5 h-4 w-4 rounded border-gray-300" />
-                    <span className="text-gray-700 leading-relaxed">{item}</span>
-                  </li>
-                ))}
-              </ul>
-            </div>
+            {fb.checklist && parseChecklist(fb.checklist).length > 0 && (
+              <div className="bg-gray-50 rounded-lg p-4 border border-gray-100">
+                <h4 className="text-base font-semibold text-gray-900 mb-3">체크리스트</h4>
+                <ul className="space-y-2 text-sm">
+                  {parseChecklist(fb.checklist).map((item, idx) => (
+                    <li key={idx} className="flex items-start gap-2">
+                      <input type="checkbox" className="mt-0.5 h-4 w-4 rounded border-gray-300" />
+                      <span className="text-gray-700 leading-relaxed">{item}</span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
 
             {/* 출처 */}
-            <div className="bg-gray-50 rounded-lg p-4 border border-gray-100">
-              <h4 className="text-base font-semibold text-gray-900 mb-2">참고한 책 / 출처</h4>
-              <ul className="list-disc pl-5 text-xs text-gray-700 space-y-1">
-                {fb.sources.map((src, idx) => (
-                  <li key={idx}>{src}</li>
-                ))}
-              </ul>
-            </div>
+            {fb.sources && fb.sources.length > 0 && (
+              <div className="bg-gray-50 rounded-lg p-4 border border-gray-100">
+                <h4 className="text-base font-semibold text-gray-900 mb-2">참고한 책 / 출처</h4>
+                <ul className="list-disc pl-5 text-xs text-gray-700 space-y-1">
+                  {fb.sources.map((src, idx) => (
+                    <li key={idx}>{src}</li>
+                  ))}
+                </ul>
+              </div>
+            )}
           </section>
         )}
       </div>

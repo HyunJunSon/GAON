@@ -184,7 +184,7 @@ async def run_agent_pipeline_with_retry(conv_id: str) -> Dict[str, Any]:
         logger.info("✅ Feedback 완료")
         
         # -------------------------------------------------
-        # 5. 결과 반환
+        # 5. 결과 반환 및 WebSocket 알림
         # -------------------------------------------------
         total_time = (datetime.now() - pipeline_start).total_seconds()
         
@@ -206,6 +206,14 @@ async def run_agent_pipeline_with_retry(conv_id: str) -> Dict[str, Any]:
             "validated": True,
             "execution_time": total_time,
         }
+        
+        # WebSocket으로 분석 완료 알림 전송
+        try:
+            from app.domains.conversation.websocket import notify_analysis_complete
+            await notify_analysis_complete(conv_id, result)
+            logger.info("📡 WebSocket 알림 전송 완료")
+        except Exception as e:
+            logger.warning(f"📡 WebSocket 알림 전송 실패: {e}")
         
         logger.info(f"🎉 파이프라인 완료: {total_time:.2f}초")
         return result

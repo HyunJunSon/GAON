@@ -64,7 +64,7 @@ export default function ConversationPage() {
       });
     }
     
-    // 화자 매핑 완료 후 모달 닫고 홈으로 돌아가기
+    // 화자 매핑 완료 후 모달 닫기
     setShowSpeakerModal(false);
     setCurrentConversationId(null);
     setModalStatus('uploading');
@@ -79,6 +79,9 @@ export default function ConversationPage() {
         }
       }
     });
+    
+    // 분석 대기 페이지로 이동
+    router.push('/analysis');
   };
 
   const handleModalClose = () => {
