@@ -232,7 +232,7 @@ jobs:
         fi
         
         # 헬스체크
-        if ! curl -f https://xn--o39a190c.site/api/health; then
+        if ! curl -f http://localhost:8000/api/health; then
           echo "❌ Backend health check failed!"
           rollback
         fi
