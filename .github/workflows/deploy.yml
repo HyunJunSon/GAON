@@ -109,23 +109,30 @@ jobs:
       uses: google-github-actions/setup-gcloud@v2
 
     - name: Create deployment script
+      env:
+        REGISTRY: ${{ secrets.GCP_REGISTRY }}
+        PROJECT_ID: ${{ secrets.GCP_PROJECT_ID }}
+        REPOSITORY: ${{ secrets.GCP_REPOSITORY }}
+        DEPLOY_PATH: ${{ secrets.GCP_DEPLOY_PATH }}
+        MIGRATION_CHANGED: ${{ needs.check-changes.outputs.migration_changed }}
+        GCP_SA_KEY: ${{ secrets.GCP_SA_KEY }}
       run: |
         cat > deploy.sh << 'EOFSCRIPT'
         set -e
         
         # 환경변수 설정
-        export REGISTRY="REGISTRY_PLACEHOLDER"
-        export PROJECT_ID="PROJECT_ID_PLACEHOLDER"
-        export REPOSITORY="REPOSITORY_PLACEHOLDER"
+        export REGISTRY="${REGISTRY}"
+        export PROJECT_ID="${PROJECT_ID}"
+        export REPOSITORY="${REPOSITORY}"
         
-        cd DEPLOY_PATH_PLACEHOLDER
+        cd ${DEPLOY_PATH}
         
         # 로그 디렉토리 권한 설정
         sudo mkdir -p logs
         sudo chown -R 1000:1000 logs
         
         # GCP 인증
-        echo 'GCP_SA_KEY_PLACEHOLDER' > /tmp/gcp-key.json
+        echo "${GCP_SA_KEY}" > /tmp/gcp-key.json
         gcloud auth activate-service-account --key-file=/tmp/gcp-key.json
         gcloud auth configure-docker $REGISTRY
         rm /tmp/gcp-key.json
@@ -183,10 +190,10 @@ jobs:
         fi
         
         # GCP 서비스 계정 키 파일 확인 및 생성
-        if [ ! -f "DEPLOY_PATH_PLACEHOLDER/gcp_service_account_key.json" ]; then
+        if [ ! -f "${DEPLOY_PATH}/gcp_service_account_key.json" ]; then
           echo "🔑 Creating GCP service account key file..."
-          echo 'GCP_SA_KEY_PLACEHOLDER' > DEPLOY_PATH_PLACEHOLDER/gcp_service_account_key.json
-          chmod 600 DEPLOY_PATH_PLACEHOLDER/gcp_service_account_key.json
+          echo "${GCP_SA_KEY}" > ${DEPLOY_PATH}/gcp_service_account_key.json
+          chmod 600 ${DEPLOY_PATH}/gcp_service_account_key.json
         fi
         
         # 새로 시작
@@ -206,7 +213,7 @@ jobs:
         done
         
         # DB 마이그레이션 적용 (마이그레이션 변경사항이 있을 때)
-        if [ "MIGRATION_CHANGED_PLACEHOLDER" == "true" ]; then
+        if [ "${MIGRATION_CHANGED}" == "true" ]; then
           echo "🔄 Applying database migrations..."
           sudo docker exec -w /app gaon-backend alembic upgrade head || rollback
           echo "✅ Database migrations applied successfully!"
@@ -224,13 +231,18 @@ jobs:
         echo "✅ Deployment completed successfully!"
         EOFSCRIPT
         
-        # Replace placeholders
-        sed -i "s|REGISTRY_PLACEHOLDER|${{ secrets.GCP_REGISTRY }}|g" deploy.sh
-        sed -i "s|PROJECT_ID_PLACEHOLDER|${{ secrets.GCP_PROJECT_ID }}|g" deploy.sh
-        sed -i "s|REPOSITORY_PLACEHOLDER|${{ secrets.GCP_REPOSITORY }}|g" deploy.sh
-        sed -i "s|DEPLOY_PATH_PLACEHOLDER|${{ secrets.GCP_DEPLOY_PATH }}|g" deploy.sh
-        sed -i "s|MIGRATION_CHANGED_PLACEHOLDER|${{ needs.check-changes.outputs.migration_changed }}|g" deploy.sh
-        sed -i "s|GCP_SA_KEY_PLACEHOLDER|${{ secrets.GCP_SA_KEY }}|g" deploy.sh
+        # Export variables for script
+        export REGISTRY="$REGISTRY"
+        export PROJECT_ID="$PROJECT_ID"
+        export REPOSITORY="$REPOSITORY"
+        export DEPLOY_PATH="$DEPLOY_PATH"
+        export MIGRATION_CHANGED="$MIGRATION_CHANGED"
+        export GCP_SA_KEY="$GCP_SA_KEY"
+        
+        # Replace variables in script
+        envsubst < deploy.sh > deploy_final.sh
+        mv deploy_final.sh deploy.sh
+        chmod +x deploy.sh
 
     - name: Copy and execute deployment script
       run: |
