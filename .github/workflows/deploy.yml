@@ -126,7 +126,6 @@ jobs:
         REPOSITORY: ${{ secrets.GCP_REPOSITORY }}
         DEPLOY_PATH: ${{ secrets.GCP_DEPLOY_PATH }}
         MIGRATION_CHANGED: ${{ needs.check-changes.outputs.migration_changed }}
-        GCP_SA_KEY: ${{ secrets.GCP_SA_KEY }}
       run: |
         cat > deploy.sh << 'EOFSCRIPT'
         set -e
@@ -142,11 +141,9 @@ jobs:
         sudo mkdir -p logs
         sudo chown -R 1000:1000 logs
         
-        # GCP 인증
-        echo "${GCP_SA_KEY}" > /tmp/gcp-key.json
+        # GCP 인증 (키는 이미 /tmp/gcp-key.json에 복사됨)
         gcloud auth activate-service-account --key-file=/tmp/gcp-key.json
         gcloud auth configure-docker $REGISTRY
-        rm /tmp/gcp-key.json
         
         # 최신 이미지 pull
         sudo docker pull ${REGISTRY}/${PROJECT_ID}/${REPOSITORY}/backend:latest || echo "Backend 이미지 pull 실패, 로컬 이미지 사용"
@@ -203,8 +200,8 @@ jobs:
         # GCP 서비스 계정 키 파일 확인 및 생성
         if [ ! -f "${DEPLOY_PATH}/gcp_service_account_key.json" ]; then
           echo "🔑 Creating GCP service account key file..."
-          echo "${GCP_SA_KEY}" > ${DEPLOY_PATH}/gcp_service_account_key.json
-          chmod 600 ${DEPLOY_PATH}/gcp_service_account_key.json
+          sudo cp /tmp/gcp-key.json ${DEPLOY_PATH}/gcp_service_account_key.json
+          sudo chmod 600 ${DEPLOY_PATH}/gcp_service_account_key.json
         fi
         
         # 새로 시작
@@ -248,7 +245,6 @@ jobs:
         export REPOSITORY="$REPOSITORY"
         export DEPLOY_PATH="$DEPLOY_PATH"
         export MIGRATION_CHANGED="$MIGRATION_CHANGED"
-        export GCP_SA_KEY="$GCP_SA_KEY"
         
         # Replace variables in script
         envsubst < deploy.sh > deploy_final.sh
@@ -274,13 +270,23 @@ jobs:
 
     - name: Copy and execute deployment script
       run: |
+        # GCP 서비스 계정 키를 VM에 복사
+        echo '${{ secrets.GCP_SA_KEY }}' > /tmp/gcp-key.json
+        scp -i ~/.ssh/google_compute_engine \
+          -o StrictHostKeyChecking=no \
+          -o UserKnownHostsFile=/dev/null \
+          /tmp/gcp-key.json ubuntu@${{ steps.get-ip.outputs.vm_ip }}:/tmp/gcp-key.json
+        rm /tmp/gcp-key.json
+        
+        # 배포 스크립트 복사
         scp -i ~/.ssh/google_compute_engine \
           -o StrictHostKeyChecking=no \
           -o UserKnownHostsFile=/dev/null \
           deploy.sh ubuntu@${{ steps.get-ip.outputs.vm_ip }}:/tmp/deploy.sh
         
+        # 배포 실행
         ssh -i ~/.ssh/google_compute_engine \
           -o StrictHostKeyChecking=no \
           -o UserKnownHostsFile=/dev/null \
           ubuntu@${{ steps.get-ip.outputs.vm_ip }} \
-          "bash /tmp/deploy.sh && rm /tmp/deploy.sh"
+          "bash /tmp/deploy.sh && rm /tmp/deploy.sh /tmp/gcp-key.json"
