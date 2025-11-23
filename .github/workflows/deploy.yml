@@ -145,6 +145,10 @@ jobs:
         gcloud auth activate-service-account --key-file=/tmp/gcp-key.json
         gcloud auth configure-docker $REGISTRY
         
+        # sudo 환경에서도 gcloud 인증 사용하도록 설정
+        sudo -E gcloud auth activate-service-account --key-file=/tmp/gcp-key.json
+        sudo -E gcloud auth configure-docker $REGISTRY
+        
         # 최신 이미지 pull
         sudo docker pull ${REGISTRY}/${PROJECT_ID}/${REPOSITORY}/backend:latest || echo "Backend 이미지 pull 실패, 로컬 이미지 사용"
         sudo docker pull ${REGISTRY}/${PROJECT_ID}/${REPOSITORY}/frontend:latest || echo "Frontend 이미지 pull 실패, 로컬 이미지 사용"
@@ -167,9 +171,9 @@ jobs:
           if [ ! -z "$CURRENT_BACKEND" ] && [ ! -z "$CURRENT_FRONTEND" ]; then
             export BACKEND_IMAGE=$CURRENT_BACKEND
             export FRONTEND_IMAGE=$CURRENT_FRONTEND
-            sudo docker-compose -f docker-compose.prod.yml up -d --no-deps gaon-backend
-            sudo docker-compose -f docker-compose.prod.yml up -d --no-deps gaon-frontend
-            sudo docker-compose -f docker-compose.prod.yml up -d --no-deps gaon-nginx
+            sudo docker compose -f docker-compose.prod.yml up -d --no-deps gaon-backend
+            sudo docker compose -f docker-compose.prod.yml up -d --no-deps gaon-frontend
+            sudo docker compose -f docker-compose.prod.yml up -d --no-deps gaon-nginx
             echo "✅ Rollback completed!"
           fi
           exit 1
@@ -184,7 +188,7 @@ jobs:
         # 기존 컨테이너 강제 정리 (PostgreSQL 제외)
         echo "🧹 Cleaning up existing containers (preserving PostgreSQL)..."
         sudo docker rm -f gaon-backend gaon-frontend gaon-nginx 2>/dev/null || true
-        sudo docker-compose -f docker-compose.prod.yml down --remove-orphans || true
+        sudo docker compose -f docker-compose.prod.yml down --remove-orphans 2>/dev/null || true
         sudo docker system prune -f || true
         
         echo "⏳ Waiting for cleanup to complete..."
@@ -193,7 +197,7 @@ jobs:
         # PostgreSQL이 실행 중이 아니면 시작
         if ! sudo docker ps | grep -q gaon-postgres; then
           echo "🗄️ Starting PostgreSQL database..."
-          sudo docker-compose -f docker-compose-db.yml up -d
+          sudo docker compose -f docker-compose-db.yml up -d 2>/dev/null || echo "PostgreSQL already running or compose file not found"
           sleep 10
         fi
         
@@ -205,7 +209,7 @@ jobs:
         fi
         
         # 새로 시작
-        sudo docker-compose -f docker-compose.prod.yml up -d || rollback
+        sudo docker compose -f docker-compose.prod.yml up -d || rollback
         echo "⏳ Waiting for services to start..."
         sleep 20
         
