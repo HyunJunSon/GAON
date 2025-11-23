@@ -1,0 +1,134 @@
+name: Deploy GAON Application
+
+on:
+  push:
+    branches: [ "main", "develop" ]
+  pull_request:
+    branches: [ "main", "develop" ]
+    types: [closed]
+
+env:
+  REGISTRY: asia-northeast3-docker.pkg.dev
+  PROJECT_ID: gaon-477004
+  REPOSITORY: gaon-docker-hub
+  BACKEND_IMAGE: backend
+  FRONTEND_IMAGE: frontend
+
+jobs:
+  check-changes:
+    runs-on: ubuntu-latest
+    outputs:
+      backend_changed: ${{ steps.changes.outputs.backend_changed }}
+      frontend_changed: ${{ steps.changes.outputs.frontend_changed }}
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+    
+    - name: Check changed files
+      id: changes
+      run: |
+        if git rev-parse --verify HEAD~1 >/dev/null 2>&1; then
+          CHANGED_FILES=$(git diff --name-only HEAD~1 HEAD)
+        else
+          CHANGED_FILES=$(find backend frontend -type f 2>/dev/null || echo "all")
+        fi
+        
+        echo "backend_changed=$(echo "$CHANGED_FILES" | grep -q '^backend/' && echo 'true' || echo 'false')" >> $GITHUB_OUTPUT
+        echo "frontend_changed=$(echo "$CHANGED_FILES" | grep -q '^frontend/' && echo 'true' || echo 'false')" >> $GITHUB_OUTPUT
+
+  build-and-push:
+    needs: check-changes
+    if: github.event_name == 'push' || (github.event_name == 'pull_request' && github.event.pull_request.merged == true)
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+
+    - name: Authenticate to Google Cloud
+      uses: google-github-actions/auth@v2
+      with:
+        credentials_json: ${{ secrets.GCP_SA_KEY }}
+
+    - name: Set up Cloud SDK
+      uses: google-github-actions/setup-gcloud@v2
+
+    - name: Configure Docker for GCP
+      run: gcloud auth configure-docker ${{ env.REGISTRY }}
+
+    - name: Build and push backend image
+      if: needs.check-changes.outputs.backend_changed == 'true'
+      run: |
+        IMAGE_TAG=${{ env.REGISTRY }}/${{ env.PROJECT_ID }}/${{ env.REPOSITORY }}/${{ env.BACKEND_IMAGE }}
+        docker build -t ${IMAGE_TAG}:${{ github.sha }} -t ${IMAGE_TAG}:latest ./backend
+        docker push ${IMAGE_TAG}:${{ github.sha }}
+        docker push ${IMAGE_TAG}:latest
+
+    - name: Build and push frontend image
+      if: needs.check-changes.outputs.frontend_changed == 'true'
+      run: |
+        IMAGE_TAG=${{ env.REGISTRY }}/${{ env.PROJECT_ID }}/${{ env.REPOSITORY }}/${{ env.FRONTEND_IMAGE }}
+        docker build -t ${IMAGE_TAG}:${{ github.sha }} -t ${IMAGE_TAG}:latest ./frontend
+        docker push ${IMAGE_TAG}:${{ github.sha }}
+        docker push ${IMAGE_TAG}:latest
+
+  deploy:
+    needs: [check-changes, build-and-push]
+    if: always() && needs.build-and-push.result == 'success' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/develop')
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Authenticate to Google Cloud
+      uses: google-github-actions/auth@v2
+      with:
+        credentials_json: ${{ secrets.GCP_SA_KEY }}
+
+    - name: Set up Cloud SDK
+      uses: google-github-actions/setup-gcloud@v2
+
+    - name: Deploy to GCP VM
+      run: |
+        gcloud compute ssh gaon-backend-server \
+          --zone=asia-northeast3-a \
+          --command="
+            set -e
+            cd /home/hyunjunson/gaon
+            
+            # GCP 인증
+            echo '${{ secrets.GCP_SA_KEY }}' > /tmp/gcp-key.json
+            gcloud auth activate-service-account --key-file=/tmp/gcp-key.json
+            gcloud auth configure-docker ${{ env.REGISTRY }}
+            rm /tmp/gcp-key.json
+            
+            # 이미지 pull
+            sudo docker pull ${{ env.REGISTRY }}/${{ env.PROJECT_ID }}/${{ env.REPOSITORY }}/backend:latest || true
+            sudo docker pull ${{ env.REGISTRY }}/${{ env.PROJECT_ID }}/${{ env.REPOSITORY }}/frontend:latest || true
+            
+            # 컨테이너 재시작
+            if [ '${{ needs.check-changes.outputs.backend_changed }}' == 'true' ]; then
+              sudo docker stop gaon-backend || true
+              sudo docker rm gaon-backend || true
+              sudo docker run -d --name gaon-backend --network gaon_gaon_network \
+                -v /home/hyunjunson/gaon/logs:/app/logs \
+                -v /home/hyunjunson/gaon/gcp_service_account_key.json:/app/gcp_service_account_key.json:ro \
+                ${{ env.REGISTRY }}/${{ env.PROJECT_ID }}/${{ env.REPOSITORY }}/backend:latest
+            fi
+            
+            if [ '${{ needs.check-changes.outputs.frontend_changed }}' == 'true' ]; then
+              sudo docker stop gaon-frontend || true
+              sudo docker rm gaon-frontend || true
+              sudo docker run -d --name gaon-frontend --network gaon_gaon_network \
+                ${{ env.REGISTRY }}/${{ env.PROJECT_ID }}/${{ env.REPOSITORY }}/frontend:latest
+            fi
+            
+            # Nginx 재시작
+            sudo docker restart gaon-nginx
+            
+            # 헬스체크
+            sleep 10
+            curl -f https://xn--o39a190c.site/api/health || exit 1
+            
+            echo '✅ Deployment completed!'
+          "
