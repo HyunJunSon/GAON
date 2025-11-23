@@ -8,9 +8,9 @@ on:
     types: [closed]
 
 env:
-  REGISTRY: asia-northeast3-docker.pkg.dev
+  REGISTRY: ${{ secrets.GCP_REGISTRY }}
   PROJECT_ID: ${{ secrets.GCP_PROJECT_ID }}
-  REPOSITORY: gaon-docker-hub
+  REPOSITORY: ${{ secrets.GCP_REPOSITORY }}
   BACKEND_IMAGE: backend
   FRONTEND_IMAGE: frontend
 
@@ -90,37 +90,37 @@ jobs:
 
     - name: Deploy to GCP VM
       run: |
-        gcloud compute ssh gaon-backend-server \
-          --zone=asia-northeast3-a \
+        gcloud compute ssh ${{ secrets.GCP_VM_NAME }} \
+          --zone=${{ secrets.GCP_ZONE }} \
           --command="
             set -e
-            cd /home/hyunjunson/gaon
+            cd ${{ secrets.GCP_DEPLOY_PATH }}
             
             # GCP 인증
             echo '${{ secrets.GCP_SA_KEY }}' > /tmp/gcp-key.json
             gcloud auth activate-service-account --key-file=/tmp/gcp-key.json
-            gcloud auth configure-docker ${{ env.REGISTRY }}
+            gcloud auth configure-docker ${{ secrets.GCP_REGISTRY }}
             rm /tmp/gcp-key.json
             
             # 이미지 pull
-            sudo docker pull ${{ env.REGISTRY }}/${{ env.PROJECT_ID }}/${{ env.REPOSITORY }}/backend:latest || true
-            sudo docker pull ${{ env.REGISTRY }}/${{ env.PROJECT_ID }}/${{ env.REPOSITORY }}/frontend:latest || true
+            sudo docker pull ${{ secrets.GCP_REGISTRY }}/${{ secrets.GCP_PROJECT_ID }}/${{ secrets.GCP_REPOSITORY }}/backend:latest || true
+            sudo docker pull ${{ secrets.GCP_REGISTRY }}/${{ secrets.GCP_PROJECT_ID }}/${{ secrets.GCP_REPOSITORY }}/frontend:latest || true
             
             # 컨테이너 재시작
             if [ '${{ needs.check-changes.outputs.backend_changed }}' == 'true' ]; then
               sudo docker stop gaon-backend || true
               sudo docker rm gaon-backend || true
-              sudo docker run -d --name gaon-backend --network gaon_gaon_network \
-                -v /home/hyunjunson/gaon/logs:/app/logs \
-                -v /home/hyunjunson/gaon/gcp_service_account_key.json:/app/gcp_service_account_key.json:ro \
-                ${{ env.REGISTRY }}/${{ env.PROJECT_ID }}/${{ env.REPOSITORY }}/backend:latest
+              sudo docker run -d --name gaon-backend --network ${{ secrets.GCP_NETWORK }} \
+                -v ${{ secrets.GCP_DEPLOY_PATH }}/logs:/app/logs \
+                -v ${{ secrets.GCP_DEPLOY_PATH }}/gcp_service_account_key.json:/app/gcp_service_account_key.json:ro \
+                ${{ secrets.GCP_REGISTRY }}/${{ secrets.GCP_PROJECT_ID }}/${{ secrets.GCP_REPOSITORY }}/backend:latest
             fi
             
             if [ '${{ needs.check-changes.outputs.frontend_changed }}' == 'true' ]; then
               sudo docker stop gaon-frontend || true
               sudo docker rm gaon-frontend || true
-              sudo docker run -d --name gaon-frontend --network gaon_gaon_network \
-                ${{ env.REGISTRY }}/${{ env.PROJECT_ID }}/${{ env.REPOSITORY }}/frontend:latest
+              sudo docker run -d --name gaon-frontend --network ${{ secrets.GCP_NETWORK }} \
+                ${{ secrets.GCP_REGISTRY }}/${{ secrets.GCP_PROJECT_ID }}/${{ secrets.GCP_REPOSITORY }}/frontend:latest
             fi
             
             # Nginx 재시작
