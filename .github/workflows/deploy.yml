@@ -108,6 +108,12 @@ jobs:
     - name: Set up Cloud SDK
       uses: google-github-actions/setup-gcloud@v2
 
+    - name: Setup SSH for GCP
+      run: |
+        mkdir -p ~/.ssh
+        ssh-keygen -t rsa -f ~/.ssh/google_compute_engine -N "" -q
+        gcloud compute config-ssh --quiet
+
     - name: Create deployment script
       env:
         REGISTRY: ${{ secrets.GCP_REGISTRY }}
