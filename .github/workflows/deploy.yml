@@ -111,14 +111,13 @@ jobs:
     - name: Setup SSH key from secrets
       run: |
         mkdir -p ~/.ssh
-        echo "${{ secrets.GCP_SSH_KEY }}" > ~/.ssh/google_compute_engine
+        echo "${{ secrets.GCP_SSH_KEY_BASE64 }}" | base64 -d > ~/.ssh/google_compute_engine
         chmod 600 ~/.ssh/google_compute_engine
-        echo "${{ secrets.GCP_SSH_PUB_KEY }}" > ~/.ssh/google_compute_engine.pub
-        chmod 644 ~/.ssh/google_compute_engine.pub
         
         # Verify key format
         head -1 ~/.ssh/google_compute_engine
-        ssh-keygen -y -f ~/.ssh/google_compute_engine > /dev/null || echo "Key validation failed"
+        ssh-keygen -y -f ~/.ssh/google_compute_engine > ~/.ssh/google_compute_engine.pub || echo "Key validation failed"
+        chmod 644 ~/.ssh/google_compute_engine.pub
 
     - name: Create deployment script
       env:
