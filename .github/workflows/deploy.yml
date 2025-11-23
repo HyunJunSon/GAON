@@ -260,13 +260,24 @@ jobs:
         VM_NAME: ${{ secrets.GCP_VM_NAME }}
         ZONE: ${{ secrets.GCP_ZONE }}
 
+    - name: Get VM external IP
+      id: get-ip
+      run: |
+        VM_IP=$(gcloud compute instances describe ${{ secrets.GCP_VM_NAME }} \
+          --zone=${{ secrets.GCP_ZONE }} \
+          --format='get(networkInterfaces[0].accessConfigs[0].natIP)')
+        echo "vm_ip=$VM_IP" >> $GITHUB_OUTPUT
+        echo "VM IP: $VM_IP"
+
     - name: Copy and execute deployment script
       run: |
-        gcloud compute scp deploy.sh "${{ secrets.GCP_VM_NAME }}":/tmp/deploy.sh \
-          --zone="${{ secrets.GCP_ZONE }}" \
-          --tunnel-through-iap \
-          --strict-host-key-checking=no
-        gcloud compute ssh "${{ secrets.GCP_VM_NAME }}" \
-          --zone="${{ secrets.GCP_ZONE }}" \
-          --tunnel-through-iap \
-          --command="bash /tmp/deploy.sh && rm /tmp/deploy.sh"
+        scp -i ~/.ssh/google_compute_engine \
+          -o StrictHostKeyChecking=no \
+          -o UserKnownHostsFile=/dev/null \
+          deploy.sh hyunjunson@${{ steps.get-ip.outputs.vm_ip }}:/tmp/deploy.sh
+        
+        ssh -i ~/.ssh/google_compute_engine \
+          -o StrictHostKeyChecking=no \
+          -o UserKnownHostsFile=/dev/null \
+          hyunjunson@${{ steps.get-ip.outputs.vm_ip }} \
+          "bash /tmp/deploy.sh && rm /tmp/deploy.sh"
