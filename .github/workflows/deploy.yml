@@ -3,9 +3,6 @@ name: Deploy GAON Application
 on:
   push:
     branches: [ "main", "develop" ]
-  pull_request:
-    branches: [ "main", "develop" ]
-    types: [closed]
 
 env:
   REGISTRY: ${{ secrets.GCP_REGISTRY }}
@@ -20,6 +17,7 @@ jobs:
     outputs:
       backend_changed: ${{ steps.changes.outputs.backend_changed }}
       frontend_changed: ${{ steps.changes.outputs.frontend_changed }}
+      migration_changed: ${{ steps.changes.outputs.migration_changed }}
     steps:
     - name: Checkout repository
       uses: actions/checkout@v4
@@ -29,18 +27,22 @@ jobs:
     - name: Check changed files
       id: changes
       run: |
-        if git rev-parse --verify HEAD~1 >/dev/null 2>&1; then
-          CHANGED_FILES=$(git diff --name-only HEAD~1 HEAD)
+        if git rev-parse --verify HEAD~2 >/dev/null 2>&1; then
+          CHANGED_FILES=$(git diff --name-only HEAD~2 HEAD)
         else
-          CHANGED_FILES=$(find backend frontend -type f 2>/dev/null || echo "all")
+          echo "HEAD~2 not available, treating all files as changed"
+          CHANGED_FILES=$(find . -name "*.py" -o -name "*.js" -o -name "*.ts" -o -name "*.tsx" -o -name "*.json" -o -name "Dockerfile*" | grep -E "(backend/|frontend/)" | head -10)
         fi
         
         echo "backend_changed=$(echo "$CHANGED_FILES" | grep -q '^backend/' && echo 'true' || echo 'false')" >> $GITHUB_OUTPUT
         echo "frontend_changed=$(echo "$CHANGED_FILES" | grep -q '^frontend/' && echo 'true' || echo 'false')" >> $GITHUB_OUTPUT
+        echo "migration_changed=$(echo "$CHANGED_FILES" | grep -q '^backend/alembic/versions/' && echo 'true' || echo 'false')" >> $GITHUB_OUTPUT
+        
+        echo "Changed files: $CHANGED_FILES"
 
-  build-and-push:
+  build-backend:
     needs: check-changes
-    if: github.event_name == 'push' || (github.event_name == 'pull_request' && github.event.pull_request.merged == true)
+    if: needs.check-changes.outputs.backend_changed == 'true'
     runs-on: ubuntu-latest
     
     steps:
@@ -56,27 +58,45 @@ jobs:
       uses: google-github-actions/setup-gcloud@v2
 
     - name: Configure Docker for GCP
-      run: gcloud auth configure-docker ${{ env.REGISTRY }}
+      run: gcloud auth configure-docker ${{ secrets.GCP_REGISTRY }}
 
     - name: Build and push backend image
-      if: needs.check-changes.outputs.backend_changed == 'true'
       run: |
-        IMAGE_TAG=${{ env.REGISTRY }}/${{ env.PROJECT_ID }}/${{ env.REPOSITORY }}/${{ env.BACKEND_IMAGE }}
+        IMAGE_TAG=${{ secrets.GCP_REGISTRY }}/${{ secrets.GCP_PROJECT_ID }}/${{ secrets.GCP_REPOSITORY }}/${{ env.BACKEND_IMAGE }}
         docker build -t ${IMAGE_TAG}:${{ github.sha }} -t ${IMAGE_TAG}:latest ./backend
         docker push ${IMAGE_TAG}:${{ github.sha }}
         docker push ${IMAGE_TAG}:latest
 
+  build-frontend:
+    needs: check-changes
+    if: needs.check-changes.outputs.frontend_changed == 'true'
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+
+    - name: Authenticate to Google Cloud
+      uses: google-github-actions/auth@v2
+      with:
+        credentials_json: ${{ secrets.GCP_SA_KEY }}
+
+    - name: Set up Cloud SDK
+      uses: google-github-actions/setup-gcloud@v2
+
+    - name: Configure Docker for GCP
+      run: gcloud auth configure-docker ${{ secrets.GCP_REGISTRY }}
+
     - name: Build and push frontend image
-      if: needs.check-changes.outputs.frontend_changed == 'true'
       run: |
-        IMAGE_TAG=${{ env.REGISTRY }}/${{ env.PROJECT_ID }}/${{ env.REPOSITORY }}/${{ env.FRONTEND_IMAGE }}
+        IMAGE_TAG=${{ secrets.GCP_REGISTRY }}/${{ secrets.GCP_PROJECT_ID }}/${{ secrets.GCP_REPOSITORY }}/${{ env.FRONTEND_IMAGE }}
         docker build -t ${IMAGE_TAG}:${{ github.sha }} -t ${IMAGE_TAG}:latest ./frontend
         docker push ${IMAGE_TAG}:${{ github.sha }}
         docker push ${IMAGE_TAG}:latest
 
   deploy:
-    needs: [check-changes, build-and-push]
-    if: always() && needs.build-and-push.result == 'success' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/develop')
+    needs: [check-changes, build-backend, build-frontend]
+    if: always() && (needs.build-backend.result == 'success' || needs.build-backend.result == 'skipped') && (needs.build-frontend.result == 'success' || needs.build-frontend.result == 'skipped') && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/develop')
     runs-on: ubuntu-latest
     
     steps:
@@ -94,41 +114,114 @@ jobs:
           --zone=${{ secrets.GCP_ZONE }} \
           --command="
             set -e
+            
+            # 환경변수 설정
+            export REGISTRY='${{ secrets.GCP_REGISTRY }}'
+            export PROJECT_ID='${{ secrets.GCP_PROJECT_ID }}'
+            export REPOSITORY='${{ secrets.GCP_REPOSITORY }}'
+            
             cd ${{ secrets.GCP_DEPLOY_PATH }}
+            
+            # 로그 디렉토리 권한 설정
+            sudo mkdir -p logs
+            sudo chown -R 1000:1000 logs
             
             # GCP 인증
             echo '${{ secrets.GCP_SA_KEY }}' > /tmp/gcp-key.json
             gcloud auth activate-service-account --key-file=/tmp/gcp-key.json
-            gcloud auth configure-docker ${{ secrets.GCP_REGISTRY }}
+            gcloud auth configure-docker \$REGISTRY
             rm /tmp/gcp-key.json
             
-            # 이미지 pull
-            sudo docker pull ${{ secrets.GCP_REGISTRY }}/${{ secrets.GCP_PROJECT_ID }}/${{ secrets.GCP_REPOSITORY }}/backend:latest || true
-            sudo docker pull ${{ secrets.GCP_REGISTRY }}/${{ secrets.GCP_PROJECT_ID }}/${{ secrets.GCP_REPOSITORY }}/frontend:latest || true
+            # 최신 이미지 pull
+            sudo docker pull \${REGISTRY}/\${PROJECT_ID}/\${REPOSITORY}/backend:latest || echo 'Backend 이미지 pull 실패, 로컬 이미지 사용'
+            sudo docker pull \${REGISTRY}/\${PROJECT_ID}/\${REPOSITORY}/frontend:latest || echo 'Frontend 이미지 pull 실패, 로컬 이미지 사용'
             
-            # 컨테이너 재시작
-            if [ '${{ needs.check-changes.outputs.backend_changed }}' == 'true' ]; then
-              sudo docker stop gaon-backend || true
-              sudo docker rm gaon-backend || true
-              sudo docker run -d --name gaon-backend --network ${{ secrets.GCP_NETWORK }} \
-                -v ${{ secrets.GCP_DEPLOY_PATH }}/logs:/app/logs \
-                -v ${{ secrets.GCP_DEPLOY_PATH }}/gcp_service_account_key.json:/app/gcp_service_account_key.json:ro \
-                ${{ secrets.GCP_REGISTRY }}/${{ secrets.GCP_PROJECT_ID }}/${{ secrets.GCP_REPOSITORY }}/backend:latest
+            # 간단한 이름으로 태그 생성
+            sudo docker tag \${REGISTRY}/\${PROJECT_ID}/\${REPOSITORY}/backend:latest gaon:back-server
+            sudo docker tag \${REGISTRY}/\${PROJECT_ID}/\${REPOSITORY}/frontend:latest gaon:front-server
+            
+            # 환경 변수 설정
+            export BACKEND_IMAGE=gaon:back-server
+            export FRONTEND_IMAGE=gaon:front-server
+            
+            # 현재 실행 중인 이미지 백업 (롤백용)
+            CURRENT_BACKEND=\$(sudo docker inspect gaon-backend --format='{{.Config.Image}}' 2>/dev/null || echo '')
+            CURRENT_FRONTEND=\$(sudo docker inspect gaon-frontend --format='{{.Config.Image}}' 2>/dev/null || echo '')
+            
+            # 롤백 함수
+            rollback() {
+              echo '🚨 Error detected! Rolling back...'
+              if [ ! -z \"\$CURRENT_BACKEND\" ] && [ ! -z \"\$CURRENT_FRONTEND\" ]; then
+                export BACKEND_IMAGE=\$CURRENT_BACKEND
+                export FRONTEND_IMAGE=\$CURRENT_FRONTEND
+                sudo docker-compose -f docker-compose.prod.yml up -d --no-deps gaon-backend
+                sudo docker-compose -f docker-compose.prod.yml up -d --no-deps gaon-frontend
+                sudo docker-compose -f docker-compose.prod.yml up -d --no-deps gaon-nginx
+                echo '✅ Rollback completed!'
+              fi
+              exit 1
+            }
+            
+            # 에러 시 롤백 실행
+            trap rollback ERR
+            
+            # 롤링 업데이트 (무중단 배포)
+            echo '🚀 Starting rolling update...'
+            
+            # 기존 컨테이너 강제 정리 (PostgreSQL 제외)
+            echo '🧹 Cleaning up existing containers (preserving PostgreSQL)...'
+            sudo docker rm -f gaon-backend gaon-frontend gaon-nginx 2>/dev/null || true
+            sudo docker-compose -f docker-compose.prod.yml down --remove-orphans || true
+            sudo docker system prune -f || true
+            
+            echo '⏳ Waiting for cleanup to complete...'
+            sleep 5
+            
+            # PostgreSQL이 실행 중이 아니면 시작
+            if ! sudo docker ps | grep -q gaon-postgres; then
+              echo '🗄️ Starting PostgreSQL database...'
+              sudo docker-compose -f docker-compose-db.yml up -d
+              sleep 10
             fi
             
-            if [ '${{ needs.check-changes.outputs.frontend_changed }}' == 'true' ]; then
-              sudo docker stop gaon-frontend || true
-              sudo docker rm gaon-frontend || true
-              sudo docker run -d --name gaon-frontend --network ${{ secrets.GCP_NETWORK }} \
-                ${{ secrets.GCP_REGISTRY }}/${{ secrets.GCP_PROJECT_ID }}/${{ secrets.GCP_REPOSITORY }}/frontend:latest
+            # GCP 서비스 계정 키 파일 확인 및 생성
+            if [ ! -f '${{ secrets.GCP_DEPLOY_PATH }}/gcp_service_account_key.json' ]; then
+              echo '🔑 Creating GCP service account key file...'
+              echo '${{ secrets.GCP_SA_KEY }}' > ${{ secrets.GCP_DEPLOY_PATH }}/gcp_service_account_key.json
+              chmod 600 ${{ secrets.GCP_DEPLOY_PATH }}/gcp_service_account_key.json
             fi
             
-            # Nginx 재시작
-            sudo docker restart gaon-nginx
+            # 새로 시작
+            sudo docker-compose -f docker-compose.prod.yml up -d || rollback
+            echo '⏳ Waiting for services to start...'
+            sleep 20
+            
+            # DB 연결 확인
+            echo '🗄️ Checking database connection...'
+            for i in {1..30}; do
+              if sudo docker exec gaon-postgres pg_isready -U gaon_admin -d gaon; then
+                echo '✅ Database is ready!'
+                break
+              fi
+              echo \"⏳ Waiting for database... (\$i/30)\"
+              sleep 2
+            done
+            
+            # DB 마이그레이션 적용 (마이그레이션 변경사항이 있을 때)
+            if [ '${{ needs.check-changes.outputs.migration_changed }}' == 'true' ]; then
+              echo '🔄 Applying database migrations...'
+              sudo docker exec -w /app gaon-backend alembic upgrade head || rollback
+              echo '✅ Database migrations applied successfully!'
+            fi
             
             # 헬스체크
-            sleep 10
-            curl -f https://xn--o39a190c.site/api/health || exit 1
+            if ! curl -f https://xn--o39a190c.site/api/health; then
+              echo '❌ Backend health check failed!'
+              rollback
+            fi
             
-            echo '✅ Deployment completed!'
+            # 정리
+            sudo docker image prune -f
+            
+            echo '✅ Deployment completed successfully!'
           "
