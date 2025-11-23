@@ -231,11 +231,20 @@ jobs:
           echo "✅ Database migrations applied successfully!"
         fi
         
-        # 헬스체크
-        if ! curl -f http://localhost:8000/api/health; then
-          echo "❌ Backend health check failed!"
-          rollback
-        fi
+        # 헬스체크 (재시도)
+        echo "🏥 Checking backend health..."
+        for i in {1..30}; do
+          if curl -f http://localhost:8000/api/health 2>/dev/null; then
+            echo "✅ Backend is healthy!"
+            break
+          fi
+          if [ $i -eq 30 ]; then
+            echo "❌ Backend health check failed after 30 attempts!"
+            rollback
+          fi
+          echo "⏳ Waiting for backend... ($i/30)"
+          sleep 2
+        done
         
         # 정리
         sudo docker image prune -f
