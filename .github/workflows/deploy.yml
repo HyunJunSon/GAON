@@ -108,120 +108,131 @@ jobs:
     - name: Set up Cloud SDK
       uses: google-github-actions/setup-gcloud@v2
 
-    - name: Deploy to GCP VM
+    - name: Create deployment script
       run: |
-        gcloud compute ssh ${{ secrets.GCP_VM_NAME }} \
-          --zone=${{ secrets.GCP_ZONE }} \
-          --command="
-            set -e
-            
-            # 환경변수 설정
-            export REGISTRY='${{ secrets.GCP_REGISTRY }}'
-            export PROJECT_ID='${{ secrets.GCP_PROJECT_ID }}'
-            export REPOSITORY='${{ secrets.GCP_REPOSITORY }}'
-            
-            cd ${{ secrets.GCP_DEPLOY_PATH }}
-            
-            # 로그 디렉토리 권한 설정
-            sudo mkdir -p logs
-            sudo chown -R 1000:1000 logs
-            
-            # GCP 인증
-            echo '${{ secrets.GCP_SA_KEY }}' > /tmp/gcp-key.json
-            gcloud auth activate-service-account --key-file=/tmp/gcp-key.json
-            gcloud auth configure-docker \$REGISTRY
-            rm /tmp/gcp-key.json
-            
-            # 최신 이미지 pull
-            sudo docker pull \${REGISTRY}/\${PROJECT_ID}/\${REPOSITORY}/backend:latest || echo 'Backend 이미지 pull 실패, 로컬 이미지 사용'
-            sudo docker pull \${REGISTRY}/\${PROJECT_ID}/\${REPOSITORY}/frontend:latest || echo 'Frontend 이미지 pull 실패, 로컬 이미지 사용'
-            
-            # 간단한 이름으로 태그 생성
-            sudo docker tag \${REGISTRY}/\${PROJECT_ID}/\${REPOSITORY}/backend:latest gaon:back-server
-            sudo docker tag \${REGISTRY}/\${PROJECT_ID}/\${REPOSITORY}/frontend:latest gaon:front-server
-            
-            # 환경 변수 설정
-            export BACKEND_IMAGE=gaon:back-server
-            export FRONTEND_IMAGE=gaon:front-server
-            
-            # 현재 실행 중인 이미지 백업 (롤백용)
-            CURRENT_BACKEND=\$(sudo docker inspect gaon-backend --format='{{.Config.Image}}' 2>/dev/null || echo '')
-            CURRENT_FRONTEND=\$(sudo docker inspect gaon-frontend --format='{{.Config.Image}}' 2>/dev/null || echo '')
-            
-            # 롤백 함수
-            rollback() {
-              echo '🚨 Error detected! Rolling back...'
-              if [ ! -z \"\$CURRENT_BACKEND\" ] && [ ! -z \"\$CURRENT_FRONTEND\" ]; then
-                export BACKEND_IMAGE=\$CURRENT_BACKEND
-                export FRONTEND_IMAGE=\$CURRENT_FRONTEND
-                sudo docker-compose -f docker-compose.prod.yml up -d --no-deps gaon-backend
-                sudo docker-compose -f docker-compose.prod.yml up -d --no-deps gaon-frontend
-                sudo docker-compose -f docker-compose.prod.yml up -d --no-deps gaon-nginx
-                echo '✅ Rollback completed!'
-              fi
-              exit 1
-            }
-            
-            # 에러 시 롤백 실행
-            trap rollback ERR
-            
-            # 롤링 업데이트 (무중단 배포)
-            echo '🚀 Starting rolling update...'
-            
-            # 기존 컨테이너 강제 정리 (PostgreSQL 제외)
-            echo '🧹 Cleaning up existing containers (preserving PostgreSQL)...'
-            sudo docker rm -f gaon-backend gaon-frontend gaon-nginx 2>/dev/null || true
-            sudo docker-compose -f docker-compose.prod.yml down --remove-orphans || true
-            sudo docker system prune -f || true
-            
-            echo '⏳ Waiting for cleanup to complete...'
-            sleep 5
-            
-            # PostgreSQL이 실행 중이 아니면 시작
-            if ! sudo docker ps | grep -q gaon-postgres; then
-              echo '🗄️ Starting PostgreSQL database...'
-              sudo docker-compose -f docker-compose-db.yml up -d
-              sleep 10
-            fi
-            
-            # GCP 서비스 계정 키 파일 확인 및 생성
-            if [ ! -f '${{ secrets.GCP_DEPLOY_PATH }}/gcp_service_account_key.json' ]; then
-              echo '🔑 Creating GCP service account key file...'
-              echo '${{ secrets.GCP_SA_KEY }}' > ${{ secrets.GCP_DEPLOY_PATH }}/gcp_service_account_key.json
-              chmod 600 ${{ secrets.GCP_DEPLOY_PATH }}/gcp_service_account_key.json
-            fi
-            
-            # 새로 시작
-            sudo docker-compose -f docker-compose.prod.yml up -d || rollback
-            echo '⏳ Waiting for services to start...'
-            sleep 20
-            
-            # DB 연결 확인
-            echo '🗄️ Checking database connection...'
-            for i in {1..30}; do
-              if sudo docker exec gaon-postgres pg_isready -U gaon_admin -d gaon; then
-                echo '✅ Database is ready!'
-                break
-              fi
-              echo \"⏳ Waiting for database... (\$i/30)\"
-              sleep 2
-            done
-            
-            # DB 마이그레이션 적용 (마이그레이션 변경사항이 있을 때)
-            if [ '${{ needs.check-changes.outputs.migration_changed }}' == 'true' ]; then
-              echo '🔄 Applying database migrations...'
-              sudo docker exec -w /app gaon-backend alembic upgrade head || rollback
-              echo '✅ Database migrations applied successfully!'
-            fi
-            
-            # 헬스체크
-            if ! curl -f https://xn--o39a190c.site/api/health; then
-              echo '❌ Backend health check failed!'
-              rollback
-            fi
-            
-            # 정리
-            sudo docker image prune -f
-            
-            echo '✅ Deployment completed successfully!'
-          "
+        cat > deploy.sh << 'EOFSCRIPT'
+        set -e
+        
+        # 환경변수 설정
+        export REGISTRY="REGISTRY_PLACEHOLDER"
+        export PROJECT_ID="PROJECT_ID_PLACEHOLDER"
+        export REPOSITORY="REPOSITORY_PLACEHOLDER"
+        
+        cd DEPLOY_PATH_PLACEHOLDER
+        
+        # 로그 디렉토리 권한 설정
+        sudo mkdir -p logs
+        sudo chown -R 1000:1000 logs
+        
+        # GCP 인증
+        echo 'GCP_SA_KEY_PLACEHOLDER' > /tmp/gcp-key.json
+        gcloud auth activate-service-account --key-file=/tmp/gcp-key.json
+        gcloud auth configure-docker $REGISTRY
+        rm /tmp/gcp-key.json
+        
+        # 최신 이미지 pull
+        sudo docker pull ${REGISTRY}/${PROJECT_ID}/${REPOSITORY}/backend:latest || echo "Backend 이미지 pull 실패, 로컬 이미지 사용"
+        sudo docker pull ${REGISTRY}/${PROJECT_ID}/${REPOSITORY}/frontend:latest || echo "Frontend 이미지 pull 실패, 로컬 이미지 사용"
+        
+        # 간단한 이름으로 태그 생성
+        sudo docker tag ${REGISTRY}/${PROJECT_ID}/${REPOSITORY}/backend:latest gaon:back-server
+        sudo docker tag ${REGISTRY}/${PROJECT_ID}/${REPOSITORY}/frontend:latest gaon:front-server
+        
+        # 환경 변수 설정
+        export BACKEND_IMAGE=gaon:back-server
+        export FRONTEND_IMAGE=gaon:front-server
+        
+        # 현재 실행 중인 이미지 백업 (롤백용)
+        CURRENT_BACKEND=$(sudo docker inspect gaon-backend --format='{{.Config.Image}}' 2>/dev/null || echo "")
+        CURRENT_FRONTEND=$(sudo docker inspect gaon-frontend --format='{{.Config.Image}}' 2>/dev/null || echo "")
+        
+        # 롤백 함수
+        rollback() {
+          echo "🚨 Error detected! Rolling back..."
+          if [ ! -z "$CURRENT_BACKEND" ] && [ ! -z "$CURRENT_FRONTEND" ]; then
+            export BACKEND_IMAGE=$CURRENT_BACKEND
+            export FRONTEND_IMAGE=$CURRENT_FRONTEND
+            sudo docker-compose -f docker-compose.prod.yml up -d --no-deps gaon-backend
+            sudo docker-compose -f docker-compose.prod.yml up -d --no-deps gaon-frontend
+            sudo docker-compose -f docker-compose.prod.yml up -d --no-deps gaon-nginx
+            echo "✅ Rollback completed!"
+          fi
+          exit 1
+        }
+        
+        # 에러 시 롤백 실행
+        trap rollback ERR
+        
+        # 롤링 업데이트 (무중단 배포)
+        echo "🚀 Starting rolling update..."
+        
+        # 기존 컨테이너 강제 정리 (PostgreSQL 제외)
+        echo "🧹 Cleaning up existing containers (preserving PostgreSQL)..."
+        sudo docker rm -f gaon-backend gaon-frontend gaon-nginx 2>/dev/null || true
+        sudo docker-compose -f docker-compose.prod.yml down --remove-orphans || true
+        sudo docker system prune -f || true
+        
+        echo "⏳ Waiting for cleanup to complete..."
+        sleep 5
+        
+        # PostgreSQL이 실행 중이 아니면 시작
+        if ! sudo docker ps | grep -q gaon-postgres; then
+          echo "🗄️ Starting PostgreSQL database..."
+          sudo docker-compose -f docker-compose-db.yml up -d
+          sleep 10
+        fi
+        
+        # GCP 서비스 계정 키 파일 확인 및 생성
+        if [ ! -f "DEPLOY_PATH_PLACEHOLDER/gcp_service_account_key.json" ]; then
+          echo "🔑 Creating GCP service account key file..."
+          echo 'GCP_SA_KEY_PLACEHOLDER' > DEPLOY_PATH_PLACEHOLDER/gcp_service_account_key.json
+          chmod 600 DEPLOY_PATH_PLACEHOLDER/gcp_service_account_key.json
+        fi
+        
+        # 새로 시작
+        sudo docker-compose -f docker-compose.prod.yml up -d || rollback
+        echo "⏳ Waiting for services to start..."
+        sleep 20
+        
+        # DB 연결 확인
+        echo "🗄️ Checking database connection..."
+        for i in {1..30}; do
+          if sudo docker exec gaon-postgres pg_isready -U gaon_admin -d gaon; then
+            echo "✅ Database is ready!"
+            break
+          fi
+          echo "⏳ Waiting for database... ($i/30)"
+          sleep 2
+        done
+        
+        # DB 마이그레이션 적용 (마이그레이션 변경사항이 있을 때)
+        if [ "MIGRATION_CHANGED_PLACEHOLDER" == "true" ]; then
+          echo "🔄 Applying database migrations..."
+          sudo docker exec -w /app gaon-backend alembic upgrade head || rollback
+          echo "✅ Database migrations applied successfully!"
+        fi
+        
+        # 헬스체크
+        if ! curl -f https://xn--o39a190c.site/api/health; then
+          echo "❌ Backend health check failed!"
+          rollback
+        fi
+        
+        # 정리
+        sudo docker image prune -f
+        
+        echo "✅ Deployment completed successfully!"
+        EOFSCRIPT
+        
+        # Replace placeholders
+        sed -i "s|REGISTRY_PLACEHOLDER|${{ secrets.GCP_REGISTRY }}|g" deploy.sh
+        sed -i "s|PROJECT_ID_PLACEHOLDER|${{ secrets.GCP_PROJECT_ID }}|g" deploy.sh
+        sed -i "s|REPOSITORY_PLACEHOLDER|${{ secrets.GCP_REPOSITORY }}|g" deploy.sh
+        sed -i "s|DEPLOY_PATH_PLACEHOLDER|${{ secrets.GCP_DEPLOY_PATH }}|g" deploy.sh
+        sed -i "s|MIGRATION_CHANGED_PLACEHOLDER|${{ needs.check-changes.outputs.migration_changed }}|g" deploy.sh
+        sed -i "s|GCP_SA_KEY_PLACEHOLDER|${{ secrets.GCP_SA_KEY }}|g" deploy.sh
+
+    - name: Copy and execute deployment script
+      run: |
+        gcloud compute scp deploy.sh ${{ secrets.GCP_VM_NAME }}:/tmp/deploy.sh --zone=${{ secrets.GCP_ZONE }}
+        gcloud compute ssh ${{ secrets.GCP_VM_NAME }} --zone=${{ secrets.GCP_ZONE }} --command="bash /tmp/deploy.sh && rm /tmp/deploy.sh"
