@@ -101,6 +101,21 @@ resource "google_compute_firewall" "gaon_ssh" {
   target_tags   = ["gaon-backend"]
 }
 
+# 방화벽 규칙 - PostgreSQL
+resource "google_compute_firewall" "gaon_postgres" {
+  name    = "gaon-allow-postgres"
+  network = "default"
+
+  allow {
+    protocol = "tcp"
+    ports    = ["5432"]
+  }
+
+  source_ranges = ["14.4.50.3/32"]  # 특정 IP만 허용
+  target_tags   = ["gaon-backend"]
+  description   = "Allow PostgreSQL access from specific IP"
+}
+
 # Backend VM
 resource "google_compute_instance" "gaon_backend" {
   name         = "gaon-backend-server"
