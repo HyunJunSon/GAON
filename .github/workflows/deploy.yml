@@ -108,12 +108,6 @@ jobs:
     - name: Set up Cloud SDK
       uses: google-github-actions/setup-gcloud@v2
 
-    - name: Setup SSH for GCP
-      run: |
-        mkdir -p ~/.ssh
-        ssh-keygen -t rsa -f ~/.ssh/google_compute_engine -N "" -q
-        gcloud compute config-ssh --quiet
-
     - name: Create deployment script
       env:
         REGISTRY: ${{ secrets.GCP_REGISTRY }}
@@ -252,5 +246,11 @@ jobs:
 
     - name: Copy and execute deployment script
       run: |
-        gcloud compute scp deploy.sh ${{ secrets.GCP_VM_NAME }}:/tmp/deploy.sh --zone=${{ secrets.GCP_ZONE }}
-        gcloud compute ssh ${{ secrets.GCP_VM_NAME }} --zone=${{ secrets.GCP_ZONE }} --command="bash /tmp/deploy.sh && rm /tmp/deploy.sh"
+        gcloud compute scp deploy.sh ${{ secrets.GCP_VM_NAME }}:/tmp/deploy.sh \
+          --zone=${{ secrets.GCP_ZONE }} \
+          --tunnel-through-iap \
+          --strict-host-key-checking=no
+        gcloud compute ssh ${{ secrets.GCP_VM_NAME }} \
+          --zone=${{ secrets.GCP_ZONE }} \
+          --tunnel-through-iap \
+          --command="bash /tmp/deploy.sh && rm /tmp/deploy.sh"
