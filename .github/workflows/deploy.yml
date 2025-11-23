@@ -252,13 +252,21 @@ jobs:
         mv deploy_final.sh deploy.sh
         chmod +x deploy.sh
 
+    - name: Debug secrets
+      run: |
+        echo "VM_NAME length: ${#VM_NAME}"
+        echo "ZONE length: ${#ZONE}"
+      env:
+        VM_NAME: ${{ secrets.GCP_VM_NAME }}
+        ZONE: ${{ secrets.GCP_ZONE }}
+
     - name: Copy and execute deployment script
       run: |
-        gcloud compute scp deploy.sh ${{ secrets.GCP_VM_NAME }}:/tmp/deploy.sh \
-          --zone=${{ secrets.GCP_ZONE }} \
+        gcloud compute scp deploy.sh "${{ secrets.GCP_VM_NAME }}":/tmp/deploy.sh \
+          --zone="${{ secrets.GCP_ZONE }}" \
           --tunnel-through-iap \
           --strict-host-key-checking=no
-        gcloud compute ssh ${{ secrets.GCP_VM_NAME }} \
-          --zone=${{ secrets.GCP_ZONE }} \
+        gcloud compute ssh "${{ secrets.GCP_VM_NAME }}" \
+          --zone="${{ secrets.GCP_ZONE }}" \
           --tunnel-through-iap \
           --command="bash /tmp/deploy.sh && rm /tmp/deploy.sh"
