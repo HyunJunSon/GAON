@@ -10,7 +10,7 @@
 
 ## 아키텍처
 
-![GAON Architecture](https://drive.google.com/file/d/1z6AgPhBGHLIPm3oSrTDgwsPQqxgX69AT/view?usp=sharing)
+![GAON Architecture](docs/images/architecture.png)
 
 ## 기술 스택
 - **Frontend**: Next.js 16, React 19, TanStack Query, Zustand
