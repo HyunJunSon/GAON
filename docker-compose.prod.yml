@@ -1,46 +1,80 @@
 version: "3.8"
 
 services:
-  gaon_backend:
-    image: ${BACKEND_IMAGE:-asia-northeast3-docker.pkg.dev/gaon-477004/gaon-docker-hub/backend:latest}
-    container_name: gaon-backend
-    env_file:
-      - .env
+  postgres:
+    image: pgvector/pgvector:pg17
+    container_name: gaon-postgres
     environment:
-      - DATABASE_URL=postgresql://${DB_USER}:${DB_PASSWORD}@localhost:5432/${DB_NAME}
-      - DB_HOST=localhost
+      POSTGRES_USER: ${DB_USER}
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
+      POSTGRES_DB: ${DB_NAME}
+      POSTGRES_SHARED_PRELOAD_LIBRARIES: pg_stat_statements
+      POSTGRES_MAX_CONNECTIONS: 100
+      POSTGRES_SHARED_BUFFERS: 256MB
+      POSTGRES_EFFECTIVE_CACHE_SIZE: 1GB
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - gaon_network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER} -d ${DB_NAME}"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  backend:
+    image: asia-northeast3-docker.pkg.dev/gaon-477004/gaon-docker-hub/backend:latest
+    container_name: gaon-backend
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      - DATABASE_URL=postgresql://${DB_USER}:${DB_PASSWORD}@postgres:5432/${DB_NAME}
+      - DB_HOST=postgres
       - DB_PORT=5432
       - DB_USER=${DB_USER}
       - DB_PASSWORD=${DB_PASSWORD}
       - DB_NAME=${DB_NAME}
-      - SECRET_KEY=${SECRET_KEY}
-      - GEMINI_API_KEY=${GEMINI_API_KEY}
-      - FRONTEND_URL=${FRONTEND_URL}
-      - GOOGLE_APPLICATION_CREDENTIALS=/app/gcp-key.json
     volumes:
       - ./logs:/app/logs
-      - ./gcp_service_account_key.json:/app/gcp-key.json:ro
+    networks:
+      - gaon_network
     restart: unless-stopped
-    network_mode: host
 
-  gaon_frontend:
-    image: ${FRONTEND_IMAGE:-asia-northeast3-docker.pkg.dev/gaon-477004/gaon-docker-hub/frontend:latest}
+  frontend:
+    image: asia-northeast3-docker.pkg.dev/gaon-477004/gaon-docker-hub/frontend:latest
     container_name: gaon-frontend
-    environment:
-      - NEXT_PUBLIC_API_URL=""
     depends_on:
-      - gaon_backend
+      - backend
+    networks:
+      - gaon_network
     restart: unless-stopped
-    network_mode: host
 
   nginx:
     image: nginx:alpine
     container_name: gaon-nginx
+    ports:
+      - "80:80"
+      - "443:443"
     volumes:
       - ./nginx.conf:/etc/nginx/nginx.conf:ro
-      - /etc/letsencrypt:/etc/letsencrypt:ro
     depends_on:
-      - gaon_frontend
-      - gaon_backend
+      - backend
+      - frontend
+    networks:
+      - gaon_network
     restart: unless-stopped
-    network_mode: host
+
+networks:
+  gaon_network:
+    driver: bridge
+
+volumes:
+  postgres_data:
