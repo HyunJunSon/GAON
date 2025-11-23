@@ -9,7 +9,7 @@ on:
 
 env:
   REGISTRY: asia-northeast3-docker.pkg.dev
-  PROJECT_ID: gaon-477004
+  PROJECT_ID: ${{ secrets.GCP_PROJECT_ID }}
   REPOSITORY: gaon-docker-hub
   BACKEND_IMAGE: backend
   FRONTEND_IMAGE: frontend
