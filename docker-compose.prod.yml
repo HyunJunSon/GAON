@@ -47,6 +47,15 @@ services:
     networks:
       - gaon_network
     restart: unless-stopped
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    cap_add:
+      - NET_BIND_SERVICE
+    read_only: false
+    tmpfs:
+      - /tmp:noexec,nosuid,size=200m
 
   frontend:
     image: asia-northeast3-docker.pkg.dev/gaon-477004/gaon-docker-hub/frontend:latest
@@ -56,6 +65,15 @@ services:
     networks:
       - gaon_network
     restart: unless-stopped
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    cap_add:
+      - NET_BIND_SERVICE
+    read_only: false
+    tmpfs:
+      - /tmp:noexec,nosuid,size=100m
 
   nginx:
     image: nginx:alpine
